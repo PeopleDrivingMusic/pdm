@@ -1,38 +1,20 @@
-# sv
+# People Driving Music (PDM)
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Welcome to **People Driving Music (PDM)**, a revolutionary platform designed to unite people through music and WEB3 technology.
 
-## Creating a project
+## About the Project
 
-If you're seeing this, you've probably already done this step. Congrats!
+PDM aims to create a community-driven ecosystem where music enthusiasts can connect, collaborate, and share their passion for music in a decentralized and innovative way.
 
-```sh
-# create a new project in the current directory
-npx sv create
+## Technology Stack
 
-# create a new project in my-app
-npx sv create my-app
-```
+This project is built using **SvelteKit**, a modern framework for building fast and scalable web applications.
 
-## Developing
+## Design
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+The design for this project is based on the following Figma resource:  
+[Untitled UI – FREE Figma UI kit and design system v2.0](https://www.figma.com/design/gg321CNbET2LJ0HtxOa3Om/%E2%9D%96-Untitled-UI-%E2%80%93-FREE-Figma-UI-kit-and-design-system-v2.0--Community---Copy-?m=dev)
 
-```sh
-npm run dev
+## Get Involved
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Stay tuned for updates and opportunities to contribute to this exciting project!
