@@ -1,0 +1,77 @@
+// Brand Color Palette
+$brand-25: #FFFDF7;   // Почти белый — фон, лайт-мод
+$brand-50: #FFF4D4;   // Ховер-фон, бэкдропы
+$brand-100: #FFE58F;  // Бордеры, вторичный текст
+$brand-200: #FFD65B;  // Подсветки элементов
+$brand-300: #FFC533;  // Кнопки (hover)
+$brand-400: #FFB200;  // Основной брендовый цвет
+$brand-500: #E89F00;  // Основной текст, иконки
+$brand-600: #D48806;  // Тень кнопки, активные элементы
+$brand-700: #B77400;  // Тень/глубина, тёмный фон
+$brand-800: #8C5B00;  // Hover на тёмных
+$brand-900: #5A3B00;  // Самые тёмные элементы
+
+// Color variables
+$primary-color: $brand-400;
+$secondary-color: $brand-500;
+$accent-color: $brand-200;
+$success-color: #28a745;
+$warning-color: #ffc107;
+$error-color: #dc3545;
+
+// Background colors
+$bg-dark: #0a0a0a;
+$bg-light: #1a1a1a;
+$bg-card: #2a2a2a;
+
+// Text colors
+$text-primary: #ffffff;
+$text-secondary: #cccccc;
+$text-muted: #999999;
+
+// Border and other colors
+$border-color: #333333;
+$border-light: #555555;
+
+// Spacing
+$spacing-xs: 0.25rem;
+$spacing-sm: 0.5rem;
+$spacing-md: 1rem;
+$spacing-lg: 1.5rem;
+$spacing-xl: 2rem;
+$spacing-xxl: 3rem;
+
+// Font sizes
+$font-xs: 0.75rem;
+$font-sm: 0.875rem;
+$font-md: 1rem;
+$font-lg: 1.125rem;
+$font-xl: 1.25rem;
+$font-xxl: 1.5rem;
+$font-xxxl: 2rem;
+
+// Border radius
+$radius-sm: 0.25rem;
+$radius-md: 0.5rem;
+$radius-lg: 0.75rem;
+$radius-xl: 1rem;
+
+// Shadows
+$shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+$shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+$shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.2);
+
+// Breakpoints
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;
+
+// Z-index levels
+$z-dropdown: 1000;
+$z-sticky: 1020;
+$z-fixed: 1030;
+$z-modal-backdrop: 1040;
+$z-modal: 1050;
+$z-popover: 1060;
+$z-tooltip: 1070;

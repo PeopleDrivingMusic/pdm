@@ -1,0 +1,7 @@
+// Import variables and global styles using @use (must be first)
+@use './styles/variables' as vars;
+@use './styles/global.scss';
+
+// Import theme files
+@import './styles/themes/dark.css';
+@import './styles/themes/light.css';

@@ -1,0 +1,137 @@
+/* Dark Theme for PDM */
+[data-theme="dark"] {
+  /* Brand colors */
+  --brand-25: #FFFDF7;
+  --brand-50: #FFF4D4;
+  --brand-100: #FFE58F;
+  --brand-200: #FFD65B;
+  --brand-300: #FFC533;
+  --brand-400: #FFB200;
+  --brand-500: #E89F00;
+  --brand-600: #D48806;
+  --brand-700: #B77400;
+  --brand-800: #8C5B00;
+  --brand-900: #5A3B00;
+
+  /* Primary colors */
+  --primary-color: var(--brand-400);
+  --secondary-color: var(--brand-500);
+  --accent-color: var(--brand-300);
+  --success-color: #28a745;
+  --warning-color: #ffc107;
+  --error-color: #dc3545;
+  --info-color: #17a2b8;
+
+  /* Background colors */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #2a2a2a;
+  --bg-card: #1e1e1e;
+  --bg-modal: #252525;
+  --bg-hover: var(--brand-900);
+  --bg-active: var(--brand-800);
+
+  /* Text colors */
+  --text-primary: var(--brand-50);
+  --text-secondary: var(--brand-100);
+  --text-muted: var(--brand-200);
+  --text-disabled: #666666;
+  --text-inverse: var(--brand-900);
+
+  /* Border colors */
+  --border-primary: var(--brand-800);
+  --border-secondary: var(--brand-700);
+  --border-focus: var(--brand-400);
+  --border-error: #dc3545;
+  --border-success: #28a745;
+
+  /* Shadow colors */
+  --shadow-light: rgba(255, 178, 0, 0.1);
+  --shadow-medium: rgba(255, 178, 0, 0.2);
+  --shadow-heavy: rgba(255, 178, 0, 0.4);
+  --shadow-primary: rgba(255, 178, 0, 0.3);
+
+  /* Gradient backgrounds */
+  --gradient-primary: linear-gradient(45deg, var(--brand-400), var(--brand-500));
+  --gradient-accent: linear-gradient(45deg, var(--brand-300), var(--brand-200));
+  --gradient-dark: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
+
+  /* Interactive states */
+  --opacity-disabled: 0.5;
+  --opacity-hover: 0.8;
+  --opacity-pressed: 0.6;
+
+  /* Scrollbar colors */
+  --scrollbar-track: var(--bg-secondary);
+  --scrollbar-thumb: var(--border-secondary);
+  --scrollbar-thumb-hover: var(--border-focus);
+}
+
+/* Dark theme is default */
+:root {
+  /* Brand colors */
+  --brand-25: #FFFDF7;
+  --brand-50: #FFF4D4;
+  --brand-100: #FFE58F;
+  --brand-200: #FFD65B;
+  --brand-300: #FFC533;
+  --brand-400: #FFB200;
+  --brand-500: #E89F00;
+  --brand-600: #D48806;
+  --brand-700: #B77400;
+  --brand-800: #8C5B00;
+  --brand-900: #5A3B00;
+
+  /* Primary colors */
+  --primary-color: var(--brand-400);
+  --secondary-color: var(--brand-500);
+  --accent-color: var(--brand-300);
+  --success-color: #28a745;
+  --warning-color: #ffc107;
+  --error-color: #dc3545;
+  --info-color: #17a2b8;
+
+  /* Background colors */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #2a2a2a;
+  --bg-card: #1e1e1e;
+  --bg-modal: #252525;
+  --bg-hover: var(--brand-900);
+  --bg-active: var(--brand-800);
+
+  /* Text colors */
+  --text-primary: var(--brand-50);
+  --text-secondary: var(--brand-100);
+  --text-muted: var(--brand-200);
+  --text-disabled: #666666;
+  --text-inverse: var(--brand-900);
+
+  /* Border colors */
+  --border-primary: var(--brand-800);
+  --border-secondary: var(--brand-700);
+  --border-focus: var(--brand-400);
+  --border-error: #dc3545;
+  --border-success: #28a745;
+
+  /* Shadow colors */
+  --shadow-light: rgba(255, 178, 0, 0.1);
+  --shadow-medium: rgba(255, 178, 0, 0.2);
+  --shadow-heavy: rgba(255, 178, 0, 0.4);
+  --shadow-primary: rgba(255, 178, 0, 0.3);
+
+  /* Gradient backgrounds */
+  --gradient-primary: linear-gradient(45deg, var(--brand-400), var(--brand-500));
+  --gradient-accent: linear-gradient(45deg, var(--brand-300), var(--brand-200));
+  --gradient-dark: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
+
+  /* Interactive states */
+  --opacity-disabled: 0.5;
+  --opacity-hover: 0.8;
+  --opacity-pressed: 0.6;
+
+  /* Scrollbar colors */
+  --scrollbar-track: var(--bg-secondary);
+  --scrollbar-thumb: var(--border-secondary);
+  --scrollbar-thumb-hover: var(--border-focus);
+}
