@@ -11,6 +11,7 @@
 	});
 	
 	function applyTheme(theme: string) {
+		// Set data-theme attribute instead of classes
 		document.documentElement.setAttribute('data-theme', theme);
 		localStorage.setItem('pdm-theme', theme);
 	}
@@ -40,7 +41,7 @@
 </button>
 
 <style lang="scss">
-	@use '../../styles/variables' as vars;
+	@use '../../styles/variables' as mixins;
 	
 	.theme-toggle {
 		display: flex;
@@ -49,24 +50,31 @@
 		width: 44px;
 		height: 44px;
 		border: 1px solid var(--border-primary);
-		border-radius: vars.$radius-lg;
-		background: var(--bg-card);
+		border-radius: var(--radius-lg);
+		background: var(--bg-secondary);
 		color: var(--text-primary);
 		cursor: pointer;
-		transition: all 0.3s ease;
+		transition: all var(--duration-normal) var(--easing-ease-out);
+		box-shadow: var(--shadow-sm);
 		
 		&:hover {
-			background: var(--bg-hover);
+			background: var(--bg-tertiary);
 			border-color: var(--border-focus);
 			transform: scale(1.05);
+			box-shadow: var(--shadow-md);
 		}
 		
 		&:active {
 			transform: scale(0.95);
 		}
 		
+		&:focus-visible {
+			outline: none;
+			box-shadow: var(--shadow-sm), var(--focus-ring-primary);
+		}
+		
 		svg {
-			transition: transform 0.3s ease;
+			transition: transform var(--duration-normal) var(--easing-ease-out);
 		}
 		
 		&:hover svg {

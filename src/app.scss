@@ -1,7 +1,13 @@
-// Import variables and global styles using @use (must be first)
-@use './styles/variables' as vars;
+// ==========================================================================
+// PDM - MAIN APPLICATION STYLES
+// ==========================================================================
+
+// SCSS Mixins (must be first in SCSS)
+@use './styles/variables' as mixins;
 @use './styles/global.scss';
 
-// Import theme files
+// CSS Custom Properties (Design Tokens)
+@import './styles/tokens.css';
+
 @import './styles/themes/dark.css';
 @import './styles/themes/light.css';

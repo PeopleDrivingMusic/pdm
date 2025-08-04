@@ -1,0 +1,492 @@
+/* ==========================================================================
+   PDM DESIGN SYSTEM - CSS CUSTOM PROPERTIES
+   ========================================================================== */
+
+:root {
+    /* ==========================================================================
+     BASE COLORS (Figma Design System)
+     ========================================================================== */
+
+    /* Base colors */
+    --color-white: #ffffff;
+    --color-black: #000000;
+
+
+    /*  Gray scale	(Paper) */
+    --color-gray-25: #FAFAFA;
+    --color-gray-50: #F5F5F5;
+    --color-gray-100: #EDEDED;
+    --color-gray-200: #DFDFDF;
+    --color-gray-300: #BFBFBF;
+    --color-gray-400: #999999;
+    --color-gray-500: #737373;
+    --color-gray-600: #525252;
+    --color-gray-700: #3A3A3A;
+    --color-gray-800: #262626;
+    --color-gray-900: #1A1A1A;
+
+    /* Modern Fog */
+    /* --color-gray-25: #FBFDFA;
+    --color-gray-50: #F9F6F4;
+    --color-gray-100: #F2EFED;
+    --color-gray-200: #E4E2DE;
+    --color-gray-300: #C3C3C0;
+    --color-gray-400: #9B9C9B;
+    --color-gray-500: #777572;
+    --color-gray-600: #555654;
+    --color-gray-700: #3F3B39;
+    --color-gray-800: #2B2828;
+    --color-gray-900: #1C1D18; */
+
+
+
+
+    /* Brand colors */
+    --color-brand-25: #fffdf7;
+    --color-brand-50: #fff4d4;
+    --color-brand-100: #ffe58f;
+    --color-brand-200: #ffd65b;
+    --color-brand-300: #ffc533;
+    --color-brand-400: #ffb200;
+    --color-brand-500: #e89f00;
+    --color-brand-600: #d48806;
+    --color-brand-700: #b77400;
+    --color-brand-800: #8c5b00;
+    --color-brand-900: #5a3b00;
+
+    /* Success colors */
+    --color-success-25: #f7fdfb;
+    --color-success-50: #e8faf2;
+    --color-success-100: #c6f2df;
+    --color-success-200: #98e7c5;
+    --color-success-300: #6edfb0;
+    --color-success-400: #45d69a;
+    --color-success-500: #28c488;
+    --color-success-600: #1aa06d;
+    --color-success-700: #167e58;
+    --color-success-800: #135f44;
+    --color-success-900: #104e38;
+
+    /* Warning colors */
+    --color-warning-25: #fffaf5;
+    --color-warning-50: #fff4e8;
+    --color-warning-100: #ffe3c2;
+    --color-warning-200: #ffd18f;
+    --color-warning-300: #ffb950;
+    --color-warning-400: #ffa62b;
+    --color-warning-500: #f68b00;
+    --color-warning-600: #d97400;
+    --color-warning-700: #b55d00;
+    --color-warning-800: #944a05;
+    --color-warning-900: #7a3d09;
+
+    /* Error colors */
+    --color-error-25: #fff9f8;
+    --color-error-50: #ffeeed;
+    --color-error-100: #ffd8d4;
+    --color-error-200: #ffb7b0;
+    --color-error-300: #ff9389;
+    --color-error-400: #f96c5f;
+    --color-error-500: #e94d3d;
+    --color-error-600: #cc392b;
+    --color-error-700: #a82e22;
+    --color-error-800: #872319;
+    --color-error-900: #6e1c13;
+
+    /* Blue colors */
+    --color-blue-25: #f7f8ff;
+    --color-blue-50: #f0f2ff;
+    --color-blue-100: #dcdffe;
+    --color-blue-200: #c2c9fd;
+    --color-blue-300: #a5b0fb;
+    --color-blue-400: #8a9afb;
+    --color-blue-500: #7b94ff;
+    --color-blue-600: #6578f1;
+    --color-blue-700: #525fd2;
+    --color-blue-800: #464fb3;
+    --color-blue-900: #3a4393;
+    /* ==========================================================================
+     SEMANTIC TOKENS
+     ========================================================================== */
+
+    /* Primary colors */
+    --primary: var(--color-brand-500);
+    --primary-hover: var(--color-brand-600);
+    --primary-light: var(--color-brand-100);
+    --primary-dark: var(--color-brand-700);
+
+    /* Status colors */
+    --success: var(--color-success-500);
+    --warning: var(--color-warning-500);
+    --error: var(--color-error-500);
+    --info: var(--color-blue-500);
+
+    /* Background tokens */
+    --bg-primary: var(--color-gray-900);
+    --bg-secondary: var(--color-gray-800);
+    --bg-tertiary: var(--color-gray-700);
+    --bg-surface: var(--color-gray-800);
+    --bg-overlay: rgba(24, 29, 39, 0.8);
+
+    /* Text tokens */
+    --text-primary: var(--color-white);
+    --text-secondary: var(--color-gray-300);
+    --text-tertiary: var(--color-gray-500);
+    --text-disabled: var(--color-gray-600);
+    --text-inverse: var(--color-gray-900);
+    --text-on-primary: var(--color-white);
+
+    /* Border tokens */
+    --border-primary: var(--color-gray-600);
+    --border-secondary: var(--color-gray-700);
+    --border-focus: var(--primary);
+    --border-error: var(--error);
+    --border-success: var(--success);
+
+    /* ==========================================================================
+     SPACING TOKENS
+     ========================================================================== */
+
+    --space-1: 0.25rem;
+    /* 4px */
+    --space-2: 0.5rem;
+    /* 8px */
+    --space-3: 0.75rem;
+    /* 12px */
+    --space-4: 1rem;
+    /* 16px */
+    --space-5: 1.25rem;
+    /* 20px */
+    --space-6: 1.5rem;
+    /* 24px */
+    --space-8: 2rem;
+    /* 32px */
+    --space-10: 2.5rem;
+    /* 40px */
+    --space-12: 3rem;
+    /* 48px */
+    --space-16: 4rem;
+    /* 64px */
+    --space-20: 5rem;
+    /* 80px */
+    --space-24: 6rem;
+    /* 96px */
+
+    /* ==========================================================================
+     BORDER RADIUS TOKENS
+     ========================================================================== */
+
+    --radius-xs: 0.125rem;
+    /* 2px */
+    --radius-sm: 0.25rem;
+    /* 4px */
+    --radius-md: 0.375rem;
+    /* 6px */
+    --radius-lg: 0.5rem;
+    /* 8px */
+    --radius-xl: 0.75rem;
+    /* 12px */
+    --radius-2xl: 1rem;
+    /* 16px */
+    --radius-3xl: 1.5rem;
+    /* 24px */
+    --radius-full: 9999px;
+
+    /* ==========================================================================
+     TYPOGRAPHY TOKENS
+     ========================================================================== */
+
+    /* Font families */
+    --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-family-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+    /* Font sizes */
+    --font-size-xs: 0.75rem;
+    /* 12px */
+    --font-size-sm: 0.875rem;
+    /* 14px */
+    --font-size-md: 1rem;
+    /* 16px */
+    --font-size-lg: 1.125rem;
+    /* 18px */
+    --font-size-xl: 1.25rem;
+    /* 20px */
+    --font-size-2xl: 1.5rem;
+    /* 24px */
+    --font-size-3xl: 1.875rem;
+    /* 30px */
+    --font-size-4xl: 2.25rem;
+    /* 36px */
+    --font-size-5xl: 3rem;
+    /* 48px */
+    --font-size-6xl: 3.75rem;
+    /* 60px */
+    --font-size-7xl: 4.5rem;
+    /* 72px */
+
+    /* Line heights */
+    --line-height-xs: 1.125;
+    /* 18px */
+    --line-height-sm: 1.25;
+    /* 20px */
+    --line-height-md: 1.5;
+    /* 24px */
+    --line-height-lg: 1.75;
+    /* 28px */
+    --line-height-xl: 1.875;
+    /* 30px */
+    --line-height-2xl: 2;
+    /* 32px */
+    --line-height-3xl: 2.375;
+    /* 38px */
+    --line-height-4xl: 2.75;
+    /* 44px */
+    --line-height-5xl: 3.75;
+    /* 60px */
+    --line-height-6xl: 4.5;
+    /* 72px */
+    --line-height-7xl: 5.625;
+    /* 90px */
+
+    /* Font weights */
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    /* Letter spacing */
+    --letter-spacing-tight: -0.02em;
+    --letter-spacing-normal: 0;
+    --letter-spacing-wide: 0.05em;
+
+    /* ==========================================================================
+     SHADOW TOKENS
+     ========================================================================== */
+
+    --shadow-xs: 0px 1px 2px rgba(10, 13, 18, 0.1);
+    --shadow-sm: 0px 1px 3px rgba(10, 13, 18, 0.1), 0px 1px 2px rgba(10, 13, 18, 0.06);
+    --shadow-md: 0px 4px 8px -2px rgba(10, 13, 18, 0.1), 0px 2px 4px -2px rgba(10, 13, 18, 0.06);
+    --shadow-lg: 0px 12px 16px -4px rgba(10, 13, 18, 0.1), 0px 4px 6px -2px rgba(10, 13, 18, 0.05);
+    --shadow-xl: 0px 20px 24px -4px rgba(10, 13, 18, 0.1), 0px 8px 8px -4px rgba(10, 13, 18, 0.04);
+    --shadow-2xl: 0px 24px 48px -12px rgba(10, 13, 18, 0.25);
+
+    /* Focus rings */
+    --focus-ring-primary: 0px 0px 0px 4px rgba(255, 232, 143, 0.5);
+    --focus-ring-error: 0px 0px 0px 4px rgba(254, 228, 226, 0.5);
+
+    /* ==========================================================================
+     Z-INDEX TOKENS
+     ========================================================================== */
+
+    --z-base: 0;
+    --z-dropdown: 1000;
+    --z-sticky: 1020;
+    --z-fixed: 1030;
+    --z-modal-backdrop: 1040;
+    --z-modal: 1050;
+    --z-popover: 1060;
+    --z-tooltip: 1070;
+    --z-toast: 1080;
+
+    /* ==========================================================================
+     ANIMATION TOKENS
+     ========================================================================== */
+
+    --duration-fast: 150ms;
+    --duration-normal: 200ms;
+    --duration-slow: 300ms;
+    --duration-slower: 500ms;
+
+    --easing-linear: linear;
+    --easing-ease: ease;
+    --easing-ease-in: ease-in;
+    --easing-ease-out: ease-out;
+    --easing-ease-in-out: ease-in-out;
+
+    /* ==========================================================================
+     BREAKPOINTS (for use in JS)
+     ========================================================================== */
+
+    --breakpoint-sm: 640px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 1024px;
+    --breakpoint-xl: 1280px;
+    --breakpoint-2xl: 1536px;
+}
+
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
+
+/* Typography utilities */
+.text-xs {
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-xs);
+}
+
+.text-sm {
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-sm);
+}
+
+.text-md {
+    font-size: var(--font-size-md);
+    line-height: var(--line-height-md);
+}
+
+.text-lg {
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-lg);
+}
+
+.text-xl {
+    font-size: var(--font-size-xl);
+    line-height: var(--line-height-xl);
+}
+
+.text-2xl {
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-2xl);
+}
+
+.text-3xl {
+    font-size: var(--font-size-3xl);
+    line-height: var(--line-height-3xl);
+}
+
+.text-4xl {
+    font-size: var(--font-size-4xl);
+    line-height: var(--line-height-4xl);
+}
+
+.text-5xl {
+    font-size: var(--font-size-5xl);
+    line-height: var(--line-height-5xl);
+}
+
+.text-6xl {
+    font-size: var(--font-size-6xl);
+    line-height: var(--line-height-6xl);
+}
+
+.text-7xl {
+    font-size: var(--font-size-7xl);
+    line-height: var(--line-height-7xl);
+}
+
+.font-normal {
+    font-weight: var(--font-weight-normal);
+}
+
+.font-medium {
+    font-weight: var(--font-weight-medium);
+}
+
+.font-semibold {
+    font-weight: var(--font-weight-semibold);
+}
+
+.font-bold {
+    font-weight: var(--font-weight-bold);
+}
+
+/* Color utilities */
+.text-primary {
+    color: var(--text-primary);
+}
+
+.text-secondary {
+    color: var(--text-secondary);
+}
+
+.text-tertiary {
+    color: var(--text-tertiary);
+}
+
+.bg-primary {
+    background-color: var(--bg-primary);
+}
+
+.bg-secondary {
+    background-color: var(--bg-secondary);
+}
+
+.bg-tertiary {
+    background-color: var(--bg-tertiary);
+}
+
+/* Spacing utilities */
+.space-1 {
+    gap: var(--space-1);
+}
+
+.space-2 {
+    gap: var(--space-2);
+}
+
+.space-3 {
+    gap: var(--space-3);
+}
+
+.space-4 {
+    gap: var(--space-4);
+}
+
+.space-6 {
+    gap: var(--space-6);
+}
+
+.space-8 {
+    gap: var(--space-8);
+}
+
+/* Border radius utilities */
+.rounded-sm {
+    border-radius: var(--radius-sm);
+}
+
+.rounded-md {
+    border-radius: var(--radius-md);
+}
+
+.rounded-lg {
+    border-radius: var(--radius-lg);
+}
+
+.rounded-xl {
+    border-radius: var(--radius-xl);
+}
+
+.rounded-2xl {
+    border-radius: var(--radius-2xl);
+}
+
+.rounded-full {
+    border-radius: var(--radius-full);
+}
+
+/* Shadow utilities */
+.shadow-xs {
+    box-shadow: var(--shadow-xs);
+}
+
+.shadow-sm {
+    box-shadow: var(--shadow-sm);
+}
+
+.shadow-md {
+    box-shadow: var(--shadow-md);
+}
+
+.shadow-lg {
+    box-shadow: var(--shadow-lg);
+}
+
+.shadow-xl {
+    box-shadow: var(--shadow-xl);
+}
+
+.shadow-2xl {
+    box-shadow: var(--shadow-2xl);
+}

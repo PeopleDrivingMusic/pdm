@@ -117,7 +117,7 @@ body {
 }
 
 // Responsive design
-@media (max-width: vars.$breakpoint-md) {
+@media (max-width: 768px) {
   .container {
     padding: 0 0.5rem;
   }
@@ -131,3 +131,5 @@ body {
     padding: 1rem;
   }
 }
+
+/* Force reload */
