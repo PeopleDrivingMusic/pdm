@@ -10,7 +10,6 @@
 @mixin text-display-2xl() {
   font-size: var(--font-size-7xl);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-7xl);
   letter-spacing: var(--letter-spacing-tight);
   font-weight: var(--font-weight-bold);
 }
@@ -18,7 +17,6 @@
 @mixin text-display-xl() {
   font-size: var(--font-size-6xl);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-6xl);
   letter-spacing: var(--letter-spacing-tight);
   font-weight: var(--font-weight-bold);
 }
@@ -26,7 +24,6 @@
 @mixin text-display-lg() {
   font-size: var(--font-size-5xl);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-5xl);
   letter-spacing: var(--letter-spacing-tight);
   font-weight: var(--font-weight-semibold);
 }
@@ -34,7 +31,6 @@
 @mixin text-display-md() {
   font-size: var(--font-size-4xl);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-4xl);
   letter-spacing: var(--letter-spacing-tight);
   font-weight: var(--font-weight-semibold);
 }
@@ -42,14 +38,12 @@
 @mixin text-display-sm() {
   font-size: var(--font-size-3xl);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-3xl);
   font-weight: var(--font-weight-semibold);
 }
 
 @mixin text-display-xs() {
   font-size: var(--font-size-2xl);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-2xl);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -57,35 +51,30 @@
 @mixin text-xl() {
   font-size: var(--font-size-xl);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-xl);
   font-weight: var(--font-weight-normal);
 }
 
 @mixin text-lg() {
   font-size: var(--font-size-lg);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-lg);
   font-weight: var(--font-weight-normal);
 }
 
 @mixin text-md() {
   font-size: var(--font-size-md);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-md);
   font-weight: var(--font-weight-normal);
 }
 
 @mixin text-sm() {
   font-size: var(--font-size-sm);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-sm);
   font-weight: var(--font-weight-normal);
 }
 
 @mixin text-xs() {
   font-size: var(--font-size-xs);
   font-family: var(--font-family-sans);
-  line-height: var(--line-height-xs);
   font-weight: var(--font-weight-normal);
 }
 

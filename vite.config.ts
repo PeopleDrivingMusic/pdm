@@ -1,8 +1,21 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import path from 'path';
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	resolve: {
+		alias: {
+			$styles: path.resolve("./src/styles")
+		}
+	},
+	css: {
+		preprocessorOptions: {
+			scss: {
+				additionalData: `@use '$styles/variables' as *;`
+			}
+		}
+	},
 	test: {
 		expect: { requireAssertions: true },
 		projects: [
