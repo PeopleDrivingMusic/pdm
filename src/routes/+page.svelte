@@ -31,6 +31,7 @@
 			<div class="hero-actions">
 				<button class="btn primary">Get Started</button>
 				<a href="https://github.com/PeopleDrivingMusic/pdm" class="btn secondary">Learn More</a>
+				<a href="/admin" class="btn secondary">Database Admin</a>
 			</div>
 		</main>
 	</div>
