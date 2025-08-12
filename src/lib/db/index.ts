@@ -6,7 +6,6 @@ import * as schema from './schema';
 // Load environment variables
 config();
 
-console.log('Connecting to database...', process.env.DATABASE_URL);
 // Create connection with proper configuration
 const client = postgres(process.env.DATABASE_URL!, {
   max: 1
