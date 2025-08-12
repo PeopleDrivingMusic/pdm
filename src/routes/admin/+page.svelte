@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	 import { PUBLIC_PGADMIN_URL } from '$env/static/public';
+    
 	
 	let { data } = $props();
 	let refreshing = $state(false);
@@ -86,7 +88,7 @@
 		<div class="actions-card">
 			<h2>Database Actions</h2>
 			<div class="actions-grid">
-				<a href={pgAdminUrl} target="_blank" class="action-btn">
+				<a href={PUBLIC_PGADMIN_URL} target="_blank" class="action-btn">
 					Open pgAdmin
 				</a>
 				<button class="action-btn" onclick={() => window.open('/api/db/health', '_blank')}>
