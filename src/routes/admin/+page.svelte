@@ -86,7 +86,7 @@
 		<div class="actions-card">
 			<h2>Database Actions</h2>
 			<div class="actions-grid">
-				<a href="http://localhost:8080" target="_blank" class="action-btn">
+				<a href={pgAdminUrl} target="_blank" class="action-btn">
 					Open pgAdmin
 				</a>
 				<button class="action-btn" onclick={() => window.open('/api/db/health', '_blank')}>
