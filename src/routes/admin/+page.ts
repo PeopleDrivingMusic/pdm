@@ -1,4 +1,6 @@
-export const load = async ({ fetch }: { fetch: any }) => {
+import type { LoadEvent } from '@sveltejs/kit';
+
+export const load = async ({ fetch }: LoadEvent) => {
   try {
     const response = await fetch('/api/db/health');
     const dbHealth = await response.json();
