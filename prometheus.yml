@@ -1,0 +1,64 @@
+# Prometheus configuration for PDM project
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'pdm-local'
+    environment: 'development'
+
+rule_files:
+  - "alerts/*.yml"
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'docker-services'
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+    relabel_configs:
+      - source_labels: [__meta_docker_container_label_prometheus_io_scrape]
+        action: keep
+        regex: true
+      # Make sure we can scrape from the internal network
+      - source_labels: [__address__]
+        action: replace
+        regex: '([^:]+):\\d+'
+        replacement: '${1}'
+        target_label: __address__
+      - source_labels: [__meta_docker_container_label_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: '(.+)'
+        replacement: '${__address__}:${1}'
+      - source_labels: [__meta_docker_container_label_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__meta_docker_container_name]
+        action: replace
+        target_label: instance
+        regex: '/(.*)'
+        replacement: '${1}'
+      - action: labelmap
+        regex: __meta_docker_container_label_(.+)
+      # Add service name from Docker Compose
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        action: replace
+        target_label: service
+      # Add container ID
+      - source_labels: [__meta_docker_container_id]
+        action: replace
+        target_label: container_id
+        regex: ([0-9a-f]{12}).*
+        replacement: ${1}
+
+# Remote write configuration for sending metrics (optional)
+# remote_write:
+#   - url: "http://remote-storage:9090/api/v1/write"
+#     name: "remote-storage"
+#     queue_config:
+#       max_samples_per_send: 1000
+#       max_shards: 200
+#       capacity: 2500

@@ -19,6 +19,12 @@ Thumbs.db
 !.env.example
 !.env.test
 
+# Database
+# drizzle/migrations  # Keep migrations in git for team sync
+docker/postgres/data/
+*.sql.bak
+*.dump
+
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
