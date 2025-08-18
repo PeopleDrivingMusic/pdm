@@ -1,23 +1,57 @@
-import { db } from './index';
+import { db, withDbLogging } from './index';
 import { users, artists, albums, tracks, playlists } from './schema';
 import { eq, like, and, or, desc, count, sql } from 'drizzle-orm';
 import type { User, NewUser, Artist, NewArtist, Track, NewTrack } from './index';
+import { logger } from '$lib/utils/logger';
 
 // User operations
 export class UserService {
   static async createUser(userData: NewUser): Promise<User> {
-    const [user] = await db.insert(users).values(userData).returning();
-    return user;
+    return await withDbLogging('UserService.createUser', async () => {
+      const [user] = await db.insert(users).values(userData).returning();
+      
+      logger.info('User created successfully', {
+        component: 'database',
+        metadata: {
+          userId: user.id,
+          email: userData.email
+        }
+      });
+      
+      return user;
+    });
   }
 
   static async getUserById(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return await withDbLogging('UserService.getUserById', async () => {
+      const [user] = await db.select().from(users).where(eq(users.id, id));
+      
+      logger.debug('User retrieved by ID', {
+        component: 'database',
+        metadata: {
+          userId: id,
+          found: !!user
+        }
+      });
+      
+      return user;
+    });
   }
 
   static async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
+    return await withDbLogging('UserService.getUserByEmail', async () => {
+      const [user] = await db.select().from(users).where(eq(users.email, email));
+      
+      logger.debug('User retrieved by email', {
+        component: 'database',
+        metadata: {
+          email,
+          found: !!user
+        }
+      });
+      
+      return user;
+    });
   }
 
   static async getUserByUsername(username: string): Promise<User | undefined> {

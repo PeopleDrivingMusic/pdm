@@ -19,7 +19,19 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:push": "drizzle-kit push",
 		"db:studio": "drizzle-kit studio",
-		"db:drop": "drizzle-kit drop"
+		"db:drop": "drizzle-kit drop",
+		"db:up": "docker-compose up -d postgres pgadmin",
+		"logging:up": "docker-compose up -d postgres-exporter loki promtail grafana prometheus node-exporter",
+		"logging:down": "docker-compose down postgres-exporter loki promtail grafana prometheus node-exporter",
+		"logging:logs": "docker-compose logs -f postgres-exporter loki promtail grafana prometheus",
+		"logging:restart": "docker-compose restart postgres-exporter loki promtail grafana prometheus node-exporter",
+		"monitoring:up": "docker-compose up -d prometheus node-exporter grafana",
+		"monitoring:down": "docker-compose down prometheus node-exporter grafana",
+		"monitoring:logs": "docker-compose logs -f prometheus node-exporter",
+		"docker:up": "docker-compose up -d",
+		"docker:down": "docker-compose down",
+		"docker:logs": "docker-compose logs -f",
+		"docker:clean": "docker-compose down -v --remove-orphans"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.2.5",
@@ -50,6 +62,7 @@
 	"dependencies": {
 		"dotenv": "^17.2.1",
 		"drizzle-orm": "^0.44.4",
-		"postgres": "^3.4.7"
+		"postgres": "^3.4.7",
+		"prom-client": "^15.1.0"
 	}
 }

@@ -1,0 +1,162 @@
+groups:
+  - name: pdm-application
+    rules:
+      # Application is down
+      - alert: PDMApplicationDown
+        expr: up{job="pdm-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: pdm-app
+        annotations:
+          summary: "PDM Application is down"
+          description: "PDM application has been down for more than 1 minute"
+
+      # High response time
+      - alert: PDMHighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="pdm-app"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: pdm-app
+        annotations:
+          summary: "PDM Application high response time"
+          description: "95th percentile response time is {{ $value }}s"
+
+      # High error rate
+      - alert: PDMHighErrorRate
+        expr: rate(http_requests_total{job="pdm-app",status=~"5.."}[5m]) / rate(http_requests_total{job="pdm-app"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: pdm-app
+        annotations:
+          summary: "PDM Application high error rate"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      # High memory usage
+      - alert: PDMHighMemoryUsage
+        expr: process_resident_memory_bytes{job="pdm-app"} / 1024 / 1024 > 500
+        for: 5m
+        labels:
+          severity: warning
+          service: pdm-app
+        annotations:
+          summary: "PDM Application high memory usage"
+          description: "Memory usage is {{ $value }}MB"
+
+      # Database connection issues
+      - alert: PDMDatabaseConnectionIssues
+        expr: db_connections_active{job="pdm-app"} > 15
+        for: 2m
+        labels:
+          severity: warning
+          service: pdm-app
+        annotations:
+          summary: "PDM Application database connection issues"
+          description: "Active database connections: {{ $value }}"
+
+  - name: system-resources
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}%"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}%"
+
+      # Low disk space
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Available disk space is {{ $value }}%"
+
+  - name: docker-containers
+    rules:
+      # Container down
+      - alert: ContainerDown
+        expr: up{job=~".*-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: docker
+        annotations:
+          summary: "Container {{ $labels.instance }} is down"
+          description: "Container has been down for more than 1 minute"
+
+      # High container CPU usage
+      - alert: ContainerHighCPU
+        expr: rate(container_cpu_usage_seconds_total{name=~"pdm-.*"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: docker
+        annotations:
+          summary: "Container {{ $labels.name }} high CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      # High container memory usage
+      - alert: ContainerHighMemory
+        expr: container_memory_usage_bytes{name=~"pdm-.*"} / container_spec_memory_limit_bytes{name=~"pdm-.*"} * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: docker
+        annotations:
+          summary: "Container {{ $labels.name }} high memory usage"
+          description: "Memory usage is {{ $value }}%"
+
+  - name: loki-logging
+    rules:
+      # Loki is down
+      - alert: LokiDown
+        expr: up{job="loki"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: loki
+        annotations:
+          summary: "Loki is down"
+          description: "Loki has been down for more than 1 minute"
+
+      # Promtail is down
+      - alert: PromtailDown
+        expr: up{job="promtail"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: promtail
+        annotations:
+          summary: "Promtail is down"
+          description: "Promtail has been down for more than 1 minute"
+
+      # High log ingestion rate
+      - alert: HighLogIngestionRate
+        expr: rate(loki_ingester_samples_received_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: loki
+        annotations:
+          summary: "High log ingestion rate"
+          description: "Log ingestion rate is {{ $value }} logs/second"
