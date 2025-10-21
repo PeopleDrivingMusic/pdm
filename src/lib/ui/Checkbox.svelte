@@ -3,18 +3,21 @@
     checked?: boolean;
     label?: string;
     id?: string;
+    name?: string;
   }
 
   let {
     checked = $bindable(false),
     label = '',
-    id = ''
+    id = '',
+    name = ''
   }: Props = $props();
 </script>
 
 <div class="checkbox-group">
   <input
     {id}
+    {name}
     type="checkbox"
     class="checkbox"
     bind:checked

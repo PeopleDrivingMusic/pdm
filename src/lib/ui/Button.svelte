@@ -3,6 +3,7 @@
     variant?: 'primary' | 'secondary' | 'google';
     type?: 'button' | 'submit' | 'reset';
     disabled?: boolean;
+    href?: string;
     onClick?: () => void;
     children?: () => any;
   }
@@ -11,19 +12,27 @@
     variant = 'primary',
     type = 'button',
     disabled = false,
+    href = '',
     onClick,
     children
   }: Props = $props();
 </script>
 
-<button 
-  class="btn btn--{variant}" 
-  {type} 
-  {disabled}
-  onclick={onClick}
->
-  {@render children?.()}
-</button>
+{#if href}
+   <a href={href} class="btn btn--{variant}">
+     {@render children?.()}
+   </a>
+{:else}
+   <!-- else content here -->
+   <button 
+     class="btn btn--{variant}" 
+     {type} 
+     {disabled}
+     onclick={onClick}
+   >
+     {@render children?.()}
+   </button>
+{/if}
 
 <style lang="scss">
   .btn {

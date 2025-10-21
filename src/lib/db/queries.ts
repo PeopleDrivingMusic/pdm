@@ -6,15 +6,32 @@ import { logger } from '$lib/utils/logger';
 
 // User operations
 export class UserService {
-  static async createUser(userData: NewUser): Promise<User> {
+  static async createUser(data: NewUser): Promise<User> {
     return await withDbLogging('UserService.createUser', async () => {
-      const [user] = await db.insert(users).values(userData).returning();
+      // Generate username if not provided
+      let username = data.username;
+      if (!username) {
+        const emailPrefix = data.email.split('@')[0];
+        username = `${emailPrefix}_${Date.now()}`;
+      }
+
+      const newUser: NewUser = {
+        email: data.email,
+        username,
+        displayName: data.displayName || data.email.split('@')[0],
+        googleId: data.googleId,
+        avatarUrl: data.avatarUrl,
+        hashedPassword: data.hashedPassword,
+      };
+
+      const [user] = await db.insert(users).values(newUser).returning();
       
       logger.info('User created successfully', {
         component: 'database',
         metadata: {
           userId: user.id,
-          email: userData.email
+          email: user.email,
+          provider: data.googleId ? 'google' : 'email'
         }
       });
       
@@ -24,53 +41,164 @@ export class UserService {
 
   static async getUserById(id: string): Promise<User | undefined> {
     return await withDbLogging('UserService.getUserById', async () => {
-      const [user] = await db.select().from(users).where(eq(users.id, id));
-      
-      logger.debug('User retrieved by ID', {
-        component: 'database',
-        metadata: {
+      try {
+        const result = await db.select().from(users).where(eq(users.id, id));
+        const user = result[0] ?? null;
+        
+        logger.debug('User retrieved by ID', {
+          component: 'database',
+          metadata: {
+            id,
+            found: !!user
+          }
+        });
+        
+        return user;
+      } catch (error) {
+        logger.error("Failed to get user by ID", {
+          component: "database",
           userId: id,
-          found: !!user
-        }
-      });
-      
-      return user;
+          metadata: { error }
+        });
+        return null;
+      }
     });
   }
 
-  static async getUserByEmail(email: string): Promise<User | undefined> {
+  static async getUserByEmail(email: string): Promise<User | null> {
     return await withDbLogging('UserService.getUserByEmail', async () => {
-      const [user] = await db.select().from(users).where(eq(users.email, email));
-      
-      logger.debug('User retrieved by email', {
-        component: 'database',
-        metadata: {
-          email,
-          found: !!user
-        }
-      });
-      
-      return user;
+      try {
+        const result = await db.select().from(users).where(eq(users.email, email));
+        const user = result[0] ?? null;
+        
+        logger.debug('User retrieved by email', {
+          component: 'database',
+          metadata: {
+            email,
+            found: !!user
+          }
+        });
+        
+        return user;
+      } catch (error) {
+        logger.error("Failed to get user by email", {
+          component: "database",
+          metadata: { error, email }
+        });
+        return null;
+      }
     });
   }
 
-  static async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+  static async getUserFromGoogleId(googleId: string): Promise<User | null> {
+    return await withDbLogging('UserService.getUserFromGoogleId', async () => {
+      try {
+        const result = await db.select().from(users).where(eq(users.googleId, googleId));
+        const user = result[0] ?? null;
+        
+        logger.debug('User retrieved by Google ID', {
+          component: 'database',
+          metadata: {
+            googleId,
+            found: !!user
+          }
+        });
+        
+        return user;
+      } catch (error) {
+        logger.error("Failed to get user by Google ID", {
+          component: "database",
+          metadata: { error, googleId }
+        });
+        return null;
+      }
+    });
   }
 
-  static async updateUser(id: string, updates: Partial<NewUser>): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(users.id, id))
-      .returning();
-    return user;
+  static async getUserByUsername(username: string): Promise<User | null> {
+    return await withDbLogging('UserService.getUserByUsername', async () => {
+      try {
+        const result = await db.select().from(users).where(eq(users.username, username));
+        const user = result[0] ?? null;
+        
+        logger.debug('User retrieved by username', {
+          component: 'database',
+          metadata: {
+            username,
+            found: !!user
+          }
+        });
+        
+        return user;
+      } catch (error) {
+        logger.error("Failed to get user by username", {
+          component: "database",
+          metadata: { error, username }
+        });
+        return null;
+      }
+    });
+  }
+
+  static async updateUser(userId: string, data: Partial<NewUser>): Promise<User | null> {
+    return await withDbLogging('UserService.updateUser', async () => {
+      try {
+        const result = await db
+          .update(users)
+          .set({
+            ...data,
+            updatedAt: new Date()
+          })
+          .where(eq(users.id, userId))
+          .returning();
+
+        const user = result[0] ?? null;
+
+        if (user) {
+          logger.info("User updated successfully", {
+            component: "database",
+            userId: user.id,
+            metadata: {
+              updatedFields: Object.keys(data)
+            }
+          });
+        }
+
+        return user;
+      } catch (error) {
+        logger.error("Failed to update user", {
+          component: "database",
+          userId,
+          metadata: { error }
+        });
+        throw error;
+      }
+    });
   }
 
   static async deleteUser(id: string): Promise<boolean> {
-    const result = await db.delete(users).where(eq(users.id, id));
-    return result.length > 0;
+    return await withDbLogging('UserService.deleteUser', async () => {
+      try {
+        const result = await db.delete(users).where(eq(users.id, id));
+        const deleted = result.length > 0;
+        
+        logger.info("User deletion attempt", {
+          component: "database",
+          metadata: {
+            userId: id,
+            deleted
+          }
+        });
+        
+        return deleted;
+      } catch (error) {
+        logger.error("Failed to delete user", {
+          component: "database",
+          metadata: { error, userId: id }
+        });
+        return false;
+      }
+    });
   }
 }
 

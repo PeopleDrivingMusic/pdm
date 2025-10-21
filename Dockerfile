@@ -1,19 +1,19 @@
-# Dockerfile для SvelteKit приложения PDM
+# Dockerfile for the SvelteKit PDM application
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Копируем package.json и package-lock.json
+# Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Устанавливаем зависимости
-RUN npm ci --only=production && npm cache clean --force
+# Install all dependencies (needed for build)
+RUN npm ci && npm cache clean --force
 
 # Copy source code
 COPY . .
 
-# Build application
-RUN npm run build
+# Build application, then remove dev dependencies to reduce the final image size
+RUN npm run build && npm prune --production && npm cache clean --force
 
 # Production image
 FROM node:18-alpine AS runner

@@ -1,6 +1,10 @@
 <script lang="ts">
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import DesignSystemDemo from '$lib/components/DesignSystemDemo.svelte';
+	import Button from '$lib/ui/Button.svelte';
+	import type { PageData } from './$types';
+	
+	export let data: PageData;
 	
 	let showDesignSystem = false;
 </script>
@@ -8,6 +12,37 @@
 <div class="theme-toggle-wrapper">
 	<ThemeToggle />
 </div>
+
+<!-- User info section -->
+{#if data.user}
+	<div class="user-info-wrapper">
+		<div class="user-info">
+			<div class="user-details">
+				<img 
+					src={data.user.avatarUrl || '/default-avatar.png'} 
+					alt="User Avatar"
+					class="user-avatar"
+				/>
+				<div class="user-text">
+					<h3>{data.user.displayName || data.user.username}</h3>
+					<p>{data.user.email}</p>
+				</div>
+			</div>
+			<a href="/logout">
+				<Button variant="outline">Log in</Button>
+			</a>
+		</div>
+	</div>
+{:else}
+	<div class="auth-info-wrapper">
+		<div class="auth-info">
+			<p>Log in to access all features</p>
+			<a href="/login">
+				<Button>Log in</Button>
+			</a>
+		</div>
+	</div>
+{/if}
 
 <div class="design-toggle-wrapper">
 	<button 

@@ -1,7 +1,49 @@
 import { createLoggingMiddleware, logger } from '$lib/utils/logger';
 import { MetricsCollector } from '$lib/utils/metrics';
+import { validateSessionToken } from '$lib/server/session';
 import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
+
+// Middleware for session handling
+const sessionHandle: Handle = async ({ event, resolve }) => {
+	const token = event.cookies.get("session") ?? null;
+	
+	if (token === null) {
+		event.locals.user = null;
+		event.locals.session = null;
+		return resolve(event);
+	}
+
+	try {
+		const { session, user } = await validateSessionToken(token);
+		
+		if (session === null) {
+			event.locals.user = null;
+			event.locals.session = null;
+		} else {
+			event.locals.user = user;
+			event.locals.session = session;
+			
+			logger.debug("User session validated", {
+				component: "auth",
+				userId: user.id,
+				sessionId: session.id,
+				requestId: event.locals.requestId
+			});
+		}
+	} catch (error) {
+		logger.error("Session validation failed", {
+			component: "auth",
+			requestId: event.locals.requestId,
+			metadata: { error }
+		});
+		
+		event.locals.user = null;
+		event.locals.session = null;
+	}
+
+	return resolve(event);
+};
 
 // Middleware for http logs
 const loggingHandle: Handle = async ({ event, resolve }) => {
@@ -21,7 +63,8 @@ const loggingHandle: Handle = async ({ event, resolve }) => {
 			method: event.request.method,
 			path: event.url.pathname,
 			userAgent: event.request.headers.get('user-agent'),
-			ip: event.getClientAddress()
+			ip: event.getClientAddress(),
+			userId: event.locals.user?.id
 		}
 	});
 
@@ -47,7 +90,8 @@ const loggingHandle: Handle = async ({ event, resolve }) => {
 				method: event.request.method,
 				path: event.url.pathname,
 				statusCode: response.status,
-				duration
+				duration,
+				userId: event.locals.user?.id
 			}
 		});
 		
@@ -88,8 +132,8 @@ const mainHandle: Handle = async ({ event, resolve }) => {
 	return await resolve(event);
 };
 
-// Combine middleware
-export const handle: Handle = sequence(loggingHandle, mainHandle);
+// Combine middleware - session should run before logging so userId is logged correctly
+export const handle: Handle = sequence(sessionHandle, loggingHandle, mainHandle);
 
 // Server error handler
 export const handleError: HandleServerError = ({ error, event }) => {

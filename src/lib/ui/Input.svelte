@@ -7,6 +7,7 @@
     required?: boolean;
     disabled?: boolean;
     id?: string;
+    name?: string;
   }
 
   let {
@@ -16,7 +17,8 @@
     label = '',
     required = false,
     disabled = false,
-    id = label || `input-${Math.random().toString(36).substr(2, 9)}`
+    id = label || `input-${Math.random().toString(36).substr(2, 9)}`,
+    name = ''
   }: Props = $props();
 </script>
 
@@ -29,6 +31,7 @@
   
   <input
     {id}
+    {name}
     class="input"
     {type}
     {placeholder}

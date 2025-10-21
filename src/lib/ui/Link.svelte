@@ -3,7 +3,7 @@
     href?: string;
     color?: 'primary' | 'secondary';
     underline?: boolean;
-    onclick?: () => void;
+    onclick?: (e: MouseEvent) => void;
     children?: () => any;
   }
 
@@ -18,7 +18,8 @@
 
 {#if href}
   <a 
-    {href} 
+    {href}
+    onclick={onclick}
     class="link link--{color}" 
     class:link--underline={underline}
   >
