@@ -28,7 +28,7 @@
 
 		{ section: true },
 
-		{ label: 'NFT Tickets', icon: mdiTicketConfirmation, href: '/tickets' },
+		{ label: 'Tickets', icon: mdiTicketConfirmation, href: '/tickets' },
 		{ label: 'Crowdfunding', icon: mdiHandCoin, href: '/crowdfunding' },
 		{ space: true },
 
