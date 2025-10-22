@@ -60,6 +60,7 @@
 		"vitest-browser-svelte": "^0.1.0"
 	},
 	"dependencies": {
+		"@mdi/js": "^7.4.47",
 		"@node-rs/argon2": "^2.0.2",
 		"@oslojs/encoding": "^1.1.0",
 		"arctic": "^3.7.0",

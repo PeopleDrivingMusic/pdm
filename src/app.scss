@@ -2,9 +2,9 @@
 // PDM - MAIN APPLICATION STYLES
 // ==========================================================================
 
+@use './styles/global.scss';
 // SCSS Mixins (must be first in SCSS)
 @use './styles/variables' as mixins;
-@use './styles/global.scss';
 
 // CSS Custom Properties (Design Tokens)
 @import './styles/tokens.css';

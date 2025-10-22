@@ -106,8 +106,8 @@ export async function validateSessionToken(token: string): Promise<SessionValida
 			userId: user.id,
 			sessionId
 		});
-
-		return { session, user };
+		const {hashedPassword, ...safeUserData} = user
+		return { session, user: safeUserData };
 	} catch (error) {
 		logger.error("Failed to validate session", {
 			component: "auth",
@@ -167,5 +167,5 @@ export function deleteSessionTokenCookie(event: RequestEvent): void {
 }
 
 export type SessionValidationResult =
-	| { session: Session; user: User }
+	| { session: Session; user: Omit<User, 'hashedPassword'> }
 	| { session: null; user: null };

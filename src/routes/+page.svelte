@@ -6,111 +6,12 @@
 	
 	export let data: PageData;
 	
-	let showDesignSystem = false;
 </script>
 
-<div class="theme-toggle-wrapper">
-	<ThemeToggle />
-</div>
 
-<!-- User info section -->
-{#if data.user}
-	<div class="user-info-wrapper">
-		<div class="user-info">
-			<div class="user-details">
-				<img 
-					src={data.user.avatarUrl || '/default-avatar.png'} 
-					alt="User Avatar"
-					class="user-avatar"
-				/>
-				<div class="user-text">
-					<h3>{data.user.displayName || data.user.username}</h3>
-					<p>{data.user.email}</p>
-				</div>
-			</div>
-			<a href="/logout">
-				<Button variant="outline">Log in</Button>
-			</a>
-		</div>
-	</div>
-{:else}
-	<div class="auth-info-wrapper">
-		<div class="auth-info">
-			<p>Log in to access all features</p>
-			<a href="/login">
-				<Button>Log in</Button>
-			</a>
-		</div>
-	</div>
-{/if}
-
-<div class="design-toggle-wrapper">
-	<button 
-		class="design-toggle-btn"
-		on:click={() => showDesignSystem = !showDesignSystem}
-	>
-		{showDesignSystem ? 'Hide' : 'Show'} Design System
-	</button>
-</div>
-
-{#if showDesignSystem}
-	<DesignSystemDemo />
-{:else}
-	<div class="container">
-		<main class="hero">
-			<h1 class="hero-title">PDM</h1>
-			<h2 class="hero-subtitle">People Driving Music</h2>
-			<p class="hero-description">
-				Revolutionizing music discovery and sharing through blockchain technology on the Sui network.
-			</p>
-			<div class="hero-actions">
-				<button class="btn primary">Get Started</button>
-				<a href="https://github.com/PeopleDrivingMusic/pdm" class="btn secondary">Learn More</a>
-				<a href="/admin" class="btn secondary">Database Admin</a>
-			</div>
-		</main>
-	</div>
-{/if}
 
 <style lang="scss">
 	@use '../styles/variables' as mixins;
-	
-	.design-toggle-wrapper {
-		position: fixed;
-		top: var(--space-6);
-		left: var(--space-6);
-		z-index: var(--z-fixed);
-	}
-
-	.design-toggle-btn {
-		@include mixins.text-sm();
-		@include mixins.font-semibold();
-		padding: var(--space-2) var(--space-4);
-		background: var(--primary);
-		color: var(--text-on-primary);
-		border: none;
-		border-radius: var(--radius-md);
-		cursor: pointer;
-		transition: all var(--duration-normal) var(--easing-ease-out);
-		box-shadow: var(--shadow-sm);
-
-		&:hover {
-			background: var(--primary-hover);
-			box-shadow: var(--shadow-md);
-			transform: translateY(-1px);
-		}
-
-		&:active {
-			transform: translateY(0);
-		}
-	}
-	
-	.theme-toggle-wrapper {
-		position: fixed;
-		top: var(--space-6);
-		right: var(--space-6);
-		z-index: var(--z-fixed);
-	}
 	
 	.container {
 		@include mixins.container();
