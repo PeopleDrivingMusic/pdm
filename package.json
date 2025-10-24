@@ -19,6 +19,7 @@
 		"db:migrate": "drizzle-kit migrate",
 		"db:push": "drizzle-kit push",
 		"db:studio": "drizzle-kit studio",
+		"db:pull": "drizzle-kit pull",
 		"db:drop": "drizzle-kit drop",
 		"db:up": "docker-compose up -d postgres pgadmin",
 		"logging:up": "docker-compose up -d postgres-exporter loki promtail grafana prometheus node-exporter",

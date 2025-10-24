@@ -13,6 +13,7 @@
 		mdiTicketConfirmation
 	} from '@mdi/js/mdi.js';
 	import type { PageData } from '../../routes/$types';
+	import Input from '$lib/ui/Input.svelte';
 
 	let { expand = $bindable() } = $props();
 
@@ -20,7 +21,6 @@
 	const user = $derived(page.data.user) as PageData['user'];
 
 	const sidebarItems = [
-		{ label: 'Search', icon: mdiMagnify, href: '/search' },
 		{ label: 'Home', icon: mdiHome, href: '/' },
 		{ label: 'Music', icon: mdiMusicNoteEighth, href: '/listen' },
 		{ label: 'Artists', icon: mdiAccountMusic, href: '/artists' },
@@ -41,6 +41,15 @@
 	<button class="logo" onclick={() => (expand = !expand)}>
 		<h2>PDM</h2>
 	</button>
+	<div class="sidebar-item search">
+		{#if expand}
+			<Input placeholder="Search" />
+		{:else}
+			<button onclick={() => expand = true}>
+				<SvgIcon path={	mdiMagnify} size={24} />
+			</button>
+		{/if}
+	</div>
 	<div class="nav-wrapper">
 		{#each sidebarItems as item}
 			{#if item.section}
@@ -91,6 +100,7 @@
 
 		.logo {
 			padding: var(--space-6);
+			padding-bottom: var(--space-3);
 			width: 100%;
 			text-align: left;
 			cursor: pointer;
@@ -124,33 +134,36 @@
 					background: var(--border-primary);
 				}
 			}
+		}
+		.sidebar-item {
+			padding-inline: var(--space-6);
+			padding-block: var(--space-2);
+			color: var(--text-tertiary);
+			text-decoration: none;
+			display: flex;
+			gap: var(--space-1);
+			.icon {
+				flex-shrink: 0;
+			}
+			span {
+				white-space: nowrap;
+				overflow: hidden;
+				word-break: normal;
+				text-overflow: clip;
+			}
 
-			.sidebar-item {
-				padding-inline: var(--space-6);
-				padding-block: var(--space-2);
-				color: var(--text-tertiary);
-				text-decoration: none;
-				display: flex;
-				gap: var(--space-1);
-                .icon {
-                    flex-shrink: 0;
-                }
-				span {
-					white-space: nowrap;
-					overflow: hidden;
-					word-break: normal;
-					text-overflow: clip;
-				}
+			&.active {
+				color: var(--color-brand-600);
+				text-shadow: 0 0 3px rgba(255, 179, 0, 0.5);
+			}
 
-				&.active {
-					color: var(--color-brand-600);
-					text-shadow: 0 0 3px rgba(255, 179, 0, 0.5);
-				}
+			&:hover {
+				background: var(--bg-hover);
+				color: var(--text-primary);
+			}
 
-				&:hover {
-					background: var(--bg-hover);
-					color: var(--text-primary);
-				}
+			&.search {
+				padding-top: 0;
 			}
 		}
 		.avatar-wrapper {

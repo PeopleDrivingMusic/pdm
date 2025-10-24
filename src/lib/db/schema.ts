@@ -32,6 +32,7 @@ export const artists = pgTable('artists', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id),
   stageName: varchar('stage_name', { length: 100 }).notNull(),
+  avatar: text('avatar'),
   genre: varchar('genre', { length: 50 }),
   description: text('description'),
   socialLinks: jsonb('social_links'), // JSON object for social media links
@@ -64,9 +65,10 @@ export const tracks = pgTable('tracks', {
   duration: integer('duration'), // Duration in seconds
   audioUrl: text('audio_url'),
   lyrics: text('lyrics'),
+  clipUrl: text('clip_url'),
+  imageUrl: text('image_url'), // Track cover image URL,
   trackNumber: integer('track_number'),
-  genre: varchar('genre', { length: 50 }),
-  price: integer('price'), // Price in cents
+  genre: jsonb('genres').$type<string[]>(),
   isPublished: boolean('is_published').default(false),
   playCount: integer('play_count').default(0),
   metadata: jsonb('metadata'), // Blockchain info, IPFS hash, etc.

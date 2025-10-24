@@ -40,6 +40,8 @@
 			border-top-left-radius: 24px;
 			background: var(--bg-primary);
 			box-shadow: var(--shadow-sm);
+			padding-block: var(--space-6);
+			padding-inline: var(--space-10);
 		}
 	}
 </style>

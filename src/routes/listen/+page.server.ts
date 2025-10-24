@@ -1,0 +1,9 @@
+import { TrackService } from "$lib/db/queries";
+import { logger } from "$lib/utils/logger";
+import type { PageServerLoad } from "./$types";
+
+export const load: PageServerLoad = async (event) => {
+
+    const tracks = await TrackService.getPopularTracks({limit: 10});
+    return { tracks };
+};

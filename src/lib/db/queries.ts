@@ -25,7 +25,7 @@ export class UserService {
       };
 
       const [user] = await db.insert(users).values(newUser).returning();
-      
+
       logger.info('User created successfully', {
         component: 'database',
         metadata: {
@@ -34,7 +34,7 @@ export class UserService {
           provider: data.googleId ? 'google' : 'email'
         }
       });
-      
+
       return user;
     });
   }
@@ -44,7 +44,7 @@ export class UserService {
       try {
         const result = await db.select().from(users).where(eq(users.id, id));
         const user = result[0] ?? null;
-        
+
         logger.debug('User retrieved by ID', {
           component: 'database',
           metadata: {
@@ -52,7 +52,7 @@ export class UserService {
             found: !!user
           }
         });
-        
+
         return user;
       } catch (error) {
         logger.error("Failed to get user by ID", {
@@ -70,7 +70,7 @@ export class UserService {
       try {
         const result = await db.select().from(users).where(eq(users.email, email));
         const user = result[0] ?? null;
-        
+
         logger.debug('User retrieved by email', {
           component: 'database',
           metadata: {
@@ -78,7 +78,7 @@ export class UserService {
             found: !!user
           }
         });
-        
+
         return user;
       } catch (error) {
         logger.error("Failed to get user by email", {
@@ -95,7 +95,7 @@ export class UserService {
       try {
         const result = await db.select().from(users).where(eq(users.googleId, googleId));
         const user = result[0] ?? null;
-        
+
         logger.debug('User retrieved by Google ID', {
           component: 'database',
           metadata: {
@@ -103,7 +103,7 @@ export class UserService {
             found: !!user
           }
         });
-        
+
         return user;
       } catch (error) {
         logger.error("Failed to get user by Google ID", {
@@ -120,7 +120,7 @@ export class UserService {
       try {
         const result = await db.select().from(users).where(eq(users.username, username));
         const user = result[0] ?? null;
-        
+
         logger.debug('User retrieved by username', {
           component: 'database',
           metadata: {
@@ -128,7 +128,7 @@ export class UserService {
             found: !!user
           }
         });
-        
+
         return user;
       } catch (error) {
         logger.error("Failed to get user by username", {
@@ -181,7 +181,7 @@ export class UserService {
       try {
         const result = await db.delete(users).where(eq(users.id, id));
         const deleted = result.length > 0;
-        
+
         logger.info("User deletion attempt", {
           component: "database",
           metadata: {
@@ -189,7 +189,7 @@ export class UserService {
             deleted
           }
         });
-        
+
         return deleted;
       } catch (error) {
         logger.error("Failed to delete user", {
@@ -287,19 +287,23 @@ export class TrackService {
       .limit(limit);
   }
 
-  static async getPopularTracks(limit = 10) {
-    return await db
+  static async getPopularTracks({ limit = 10, offset = 0, artist = true, album = true }) {
+    let query = db
       .select()
-      .from(tracks)
+      .from(tracks).leftJoin(artists, eq(tracks.artistId, artists.id)).leftJoin(albums, eq(tracks.albumId, albums.id));
+
+
+    return await query
       .where(eq(tracks.isPublished, true))
       .orderBy(desc(tracks.playCount))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
   }
 
   static async incrementPlayCount(trackId: string) {
     await db
       .update(tracks)
-      .set({ 
+      .set({
         playCount: sql`${tracks.playCount} + 1`,
         updatedAt: new Date()
       })

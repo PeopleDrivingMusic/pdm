@@ -8,6 +8,27 @@
       "when": 1754486458620,
       "tag": "0000_flowery_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1761201404639,
+      "tag": "0001_lethal_archangel",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1761205601885,
+      "tag": "0002_flat_mach_iv",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1761277552684,
+      "tag": "0003_lazy_invisible_woman",
+      "breakpoints": true
     }
   ]
 }

@@ -34,6 +34,12 @@ button {
   background: none;
   border: none;
   padding: 0;
+  color: currentColor;
+  cursor: pointer;
+}
+
+a {
+  text-decoration: none;
 }
 // Common components
 .container {
