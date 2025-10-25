@@ -39,6 +39,9 @@
 			height: 100%;
 			border-top-left-radius: 24px;
 			background: var(--bg-primary);
+			// background-image: url("/bg1.jpg");
+			background-position: center;
+			background-size: contain;
 			box-shadow: var(--shadow-sm);
 			padding-block: var(--space-6);
 			padding-inline: var(--space-10);
