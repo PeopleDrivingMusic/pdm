@@ -1,7 +1,7 @@
 import { db, withDbLogging } from './index';
 import { users, artists, albums, tracks, playlists } from './schema';
 import { eq, like, and, or, desc, count, sql } from 'drizzle-orm';
-import type { User, NewUser, Artist, NewArtist, Track, NewTrack } from './index';
+import type { User, NewUser, Artist, NewArtist, Track, NewTrack, NewAlbum } from './index';
 import { logger } from '$lib/utils/logger';
 
 // User operations
@@ -209,6 +209,11 @@ export class ArtistService {
     return artist;
   }
 
+  static async getArtistBySlug(slug: string): Promise<Artist | undefined> {
+    const [artist] = await db.select().from(artists).where(eq(artists.slug, slug));
+    return artist;
+  }
+
   static async getArtistById(id: string): Promise<Artist | undefined> {
     const [artist] = await db.select().from(artists).where(eq(artists.id, id));
     return artist;
@@ -225,7 +230,7 @@ export class ArtistService {
       .from(artists)
       .where(
         or(
-          like(artists.stageName, `%${query}%`),
+          like(artists.name, `%${query}%`),
           like(artists.genre, `%${query}%`)
         )
       )
@@ -309,6 +314,29 @@ export class TrackService {
       })
       .where(eq(tracks.id, trackId));
   }
+}
+
+// Album operations
+export class AlbumService {
+  static async createAlbum(albumData: NewAlbum) {
+    const [album] = await db.insert(albums).values(albumData).returning();
+    return album;
+  }
+
+  static async getAlbumById(id: string) {
+    const [album] = await db.select().from(albums).where(eq(albums.id, id));
+    return album;
+  }
+
+  static async getAlbumsByArtist(artistId: string, limit = 50) {
+    return await db
+      .select()
+      .from(albums)
+      .where(eq(albums.artistId, artistId))
+      .orderBy(desc(albums.releaseDate))
+      .limit(limit);
+  }
+
 }
 
 // Analytics utilities

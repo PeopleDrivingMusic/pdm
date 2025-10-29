@@ -79,6 +79,8 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-6);
+		padding-block: var(--space-6);
+		padding-inline: var(--space-10);
 		.section {
 			position: relative;
 			border-radius: 24px;

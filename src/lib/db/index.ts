@@ -108,6 +108,7 @@ export type NewAlbum = typeof schema.albums.$inferInsert;
 export type Track = typeof schema.tracks.$inferSelect;
 export type NewTrack = typeof schema.tracks.$inferInsert;
 
+
 export type Playlist = typeof schema.playlists.$inferSelect;
 export type NewPlaylist = typeof schema.playlists.$inferInsert;
 

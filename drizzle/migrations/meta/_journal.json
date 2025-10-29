@@ -29,6 +29,20 @@
       "when": 1761277552684,
       "tag": "0003_lazy_invisible_woman",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1761360510262,
+      "tag": "0004_shallow_vanisher",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1761361029300,
+      "tag": "0005_perpetual_tombstone",
+      "breakpoints": true
     }
   ]
 }

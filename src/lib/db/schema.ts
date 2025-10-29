@@ -31,7 +31,9 @@ export const sessions = pgTable('sessions', {
 export const artists = pgTable('artists', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id),
-  stageName: varchar('stage_name', { length: 100 }).notNull(),
+  name: varchar('name', { length: 100 }).notNull(),
+  slug: varchar('slug', { length: 100 }).notNull().unique(),
+  coverImg: text('cover_img'),
   avatar: text('avatar'),
   genre: varchar('genre', { length: 50 }),
   description: text('description'),

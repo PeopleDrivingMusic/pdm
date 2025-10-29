@@ -15,7 +15,6 @@
 		artist?: InferSelectModel<typeof artists> | null;
 	} = $props();
 
-    let hover = $state(false);
 	// your script goes here
 </script>
 
@@ -33,7 +32,7 @@
 	</div>
 	<div class="track-info">
 		<h3 class="track-title">{track.title}</h3>
-		<a class="track-artist" href="home" onmouseenter={(e) => e.stopPropagation()}>{artist?.stageName}</a>
+		<a class="track-artist" href="/artist/{artist?.slug}" onmouseenter={(e) => e.stopPropagation()}>{artist?.name}</a>
 	</div>
 </button>
 

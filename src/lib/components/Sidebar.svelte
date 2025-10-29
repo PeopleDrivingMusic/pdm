@@ -23,7 +23,7 @@
 	const sidebarItems = [
 		{ label: 'Home', icon: mdiHome, href: '/' },
 		{ label: 'Music', icon: mdiMusicNoteEighth, href: '/listen' },
-		{ label: 'Artists', icon: mdiAccountMusic, href: '/artists' },
+		{ label: 'Artists', icon: mdiAccountMusic, href: '/artist' },
 		{ label: 'My Playlists', icon: mdiPlaylistMusic, href: '/playlists' },
 
 		{ section: true },
@@ -61,7 +61,7 @@
 			{:else}
 				<a
 					class="sidebar-item"
-					class:active={item.href === pathname}
+					class:active={item.href !== "/" && pathname.startsWith(item.href || "") || item.href === pathname}
 					href={item.href}
 					title={item.label}
 				>
@@ -154,7 +154,6 @@
 
 			&.active {
 				color: var(--color-brand-600);
-				text-shadow: 0 0 3px rgba(255, 179, 0, 0.5);
 			}
 
 			&:hover {

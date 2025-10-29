@@ -1,5 +1,4 @@
 import { TrackService } from "$lib/db/queries";
-import { logger } from "$lib/utils/logger";
 import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {
