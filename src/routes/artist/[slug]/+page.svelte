@@ -4,19 +4,30 @@
 	import type { PageData } from './$types';
 	import Button from '$lib/ui/Button.svelte';
 	import Avatar from '$lib/ui/Avatar.svelte';
-	import MusicTrack from '$lib/ui/MusicTrack.svelte';
+	import MusicTrack from '$lib/ui/components/MusicTrack.svelte';
 	import {
-		mdiComment,
+		mdiChat,
 		mdiFormatListBulleted,
 		mdiListBox,
 		mdiMap,
 		mdiMapMarkerRadiusOutline,
-		mdiThumbUp
+		mdiHeart
 	} from '@mdi/js';
-	import MusicAlbum from '$lib/ui/MusicAlbum.svelte';
+	import MusicAlbum from '$lib/ui/components/MusicAlbum.svelte';
+	import Progress from '$lib/ui/Progress.svelte';
+	import Tabs from '$lib/ui/Tabs.svelte';
+	import { derived } from 'svelte/store';
 	$inspect(page.data);
 	const { artist, tracks, albums } = $derived(page.data as PageData);
-	const tabs = ['Feed', 'Music', 'Photos', 'Posts', 'Lives', 'Shop'];
+	const albumMap = $derived(new Map(albums.map((album) => ([album.id, album]))))
+	const tabs = [
+		{label: 'Feed', id: "feed"},
+		{label: 'Music', id: "music"},
+		{label: 'Photos', id: "photos"},
+		{label: 'Posts', id: "posts"},
+		{label: 'Lives', id: "lives"},
+		{label: 'Shop', id: "shop"}
+	];
 	let tab = $state('Feed');
 	const concerts = [
 		{
@@ -99,16 +110,15 @@
 		</div>
 		<div class="section">
 			<div class="tabs-wrapper">
-				{#each tabs as tab_button}
-					<Button variant={tab_button === tab ? 'primary' : 'secondary'}>{tab_button}</Button>
-				{/each}
+				<Tabs tabs={tabs} activeTab={tabs[0]} type="pill" />
+				
 			</div>
 			{#if tab === 'Feed'}
 				<div class="feed-content">
 					<h3>Top Music</h3>
 					<div class="track-wrapper">
-						{#each Array(10) as track}
-							<MusicTrack track={tracks[0]} {artist} />
+						{#each tracks as track}
+							<MusicTrack track={track}  {artist} album={albumMap.get(track.albumId || "")}/>
 						{/each}
 					</div>
 				</div>
@@ -130,10 +140,10 @@
 							</div>
 							<div class="post-actions">
 								<div class="action-button">
-									<SvgIcon path={mdiThumbUp} size={24} />
+									<SvgIcon path={mdiHeart} size={24} />
 								</div>
 								<div class="action-button">
-									<SvgIcon path={mdiComment} size={24} />
+									<SvgIcon path={mdiChat} size={24} />
 								</div>
 							</div>
 						</article>
@@ -141,9 +151,9 @@
 						<!-- Post 2 -->
 						<article class="post">
 							<div class="post-header">
-								<Avatar size="md" name="Studio Crew" />
+								<Avatar size="md" src={artist.avatar} name={artist.name} />
 								<div class="meta-row">
-									<div class="author">Studio Crew <span class="time">• Yesterday</span></div>
+									<div class="author">{artist.name}<span class="time">• Yesterday</span></div>
 									<div class="post-text">Live session highlights — cutting a sick verse. 🎤</div>
 								</div>
 							</div>
@@ -152,10 +162,10 @@
 							</div>
 							<div class="post-actions">
 								<div class="action-button">
-									<SvgIcon path={mdiThumbUp} size={24} />
+									<SvgIcon path={mdiHeart} size={24} />
 								</div>
 								<div class="action-button">
-									<SvgIcon path={mdiComment} size={24} />
+									<SvgIcon path={mdiChat} size={24} />
 								</div>
 							</div>
 						</article>
@@ -163,7 +173,7 @@
 						<!-- Poll -->
 						<article class="post poll">
 							<div class="post-header">
-								<Avatar size="md" name="Artist Poll" />
+								<Avatar size="md" src={artist.avatar} name={artist.name} />
 								<div class="meta-row">
 									<div class="author">Which track should be next?</div>
 									<div class="time">• Poll · 1d</div>
@@ -174,29 +184,21 @@
 								<label class="option">
 									<input type="radio" name="poll" value="A" />
 									<span class="option-label">Track A — Upbeat</span>
-									<div class="progress" style="--pct: 62%">
-										<div class="bar" style="width: var(--pct)"></div>
-										<span class="pct">62%</span>
-									</div>
+									<Progress progress={62} />
 								</label>
 
 								<label class="option">
 									<input type="radio" name="poll" value="B" />
 									<span class="option-label">Track B — Chill</span>
-									<div class="progress" style="--pct: 28%">
-										<div class="bar" style="width: var(--pct)"></div>
-										<span class="pct">28%</span>
-									</div>
+									<Progress progress={28} />
 								</label>
 
 								<label class="option">
 									<input type="radio" name="poll" value="C" />
 									<span class="option-label">Track C — Experimental</span>
-									<div class="progress" style="--pct: 10%">
-										<div class="bar" style="width: var(--pct)"></div>
-										<span class="pct">10%</span>
-									</div>
+									<Progress progress={10} />
 								</label>
+
 							</form>
 						</article>
 					</div>
@@ -261,7 +263,7 @@
 							</div>
 						</div>
 						<div class="button">
-							<Button>Get Tickets</Button>
+							<Button size="md">Get Tickets</Button>
 						</div>
 						<!-- <button class="get-tickets">Get Tickets</button> -->
 					</div>
@@ -357,7 +359,7 @@
 
 		.section {
 			position: relative;
-			border-radius: 24px;
+			border-radius: 12px;
 			display: flex;
 			display: flex;
 			flex-direction: column;
@@ -406,7 +408,7 @@
 					background-color: var(--bg-surface);
 					opacity: 0.8;
 					z-index: 0;
-					border-radius: 24px;
+					border-radius: 12px;
 				}
 
 				h2 {
@@ -588,29 +590,6 @@
 						font-weight: 600;
 					}
 
-					.progress {
-						position: relative;
-						height: 10px;
-						background: rgba(0, 0, 0, 0.06);
-						border-radius: 999px;
-						overflow: hidden;
-
-						.bar {
-							height: 100%;
-							background: linear-gradient(90deg, var(--color-brand-600), var(--color-brand-800));
-							border-radius: inherit;
-							transition: width 240ms ease;
-						}
-
-						.pct {
-							position: absolute;
-							right: 8px;
-							top: 50%;
-							transform: translateY(-50%);
-							font-size: 12px;
-							color: var(--text-secondary);
-						}
-					}
 
 					&:has(input:checked) {
 						box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06);
@@ -701,7 +680,7 @@
 
 			.button {
 				flex-shrink: 0;
-				width: 155px;
+				// width: 155px;
 			}
         }
     }
