@@ -1,14 +1,13 @@
 <script>
 	import {
-		mdiChat,
-		mdiCloudDownload,
 		mdiHeart,
-		mdiRepeat,
-		mdiPlaylistPlus,
 		mdiArrowCollapse,
-		mdiArrowExpandAll,
-		mdiCross,
-		mdiClose
+		mdiClose,
+		mdiBookmarkOutline,
+		mdiChatOutline,
+		mdiRocketLaunchOutline,
+		mdiCloudDownloadOutline,
+		mdiHeartOutline
 	} from '@mdi/js';
 	import SvgIcon from '../../SvgIcon.svelte';
 	import Button from '../../Button.svelte';
@@ -28,7 +27,8 @@
 	];
 
 	const playerModeTabs = [
-		{ id: 'cover', label: 'Cover' },
+		{ id: 'info', label: 'Info' },
+		{ id: 'lyric', label: 'Lyric' },
 		{ id: 'clip', label: 'Clip' },
 		{ id: 'live', label: 'Live' },
 		{ id: 'game', label: 'Game' }
@@ -95,6 +95,9 @@
 	</div>
 	<div class="center-column">
 		{#if isExpanded}
+			<button class="collapse-button icon-button" onclick={() => (isExpanded = false)}>
+				<SvgIcon path={mdiArrowCollapse} size={20} />
+			</button>
 			<div class="preview-wrapper" in:fade>
 				<div class="buttons-wrapper">
 					<Tabs
@@ -111,41 +114,44 @@
 			<Player />
 		{/if}
 	</div>
-	<div class="right-column">
-		<div class="actions">
-			{#if !isExpanded}
-				<button class="action-button">
-					<SvgIcon path={mdiPlaylistPlus} size={20} />
-				</button>
-				<button class="action-button">
-					<SvgIcon path={mdiHeart} size={20} />
-				</button>
-				<button class="action-button">
-					<SvgIcon path={mdiChat} size={20} />
-				</button><button class="action-button">
-					<SvgIcon path={mdiRepeat} size={20} />
-				</button>
-				<button class="action-button">
-					<SvgIcon path={mdiCloudDownload} size={20} />
-				</button>
-			{:else}
-				<Tabs
-					type="underline"
-					showTrack={true}
-					tabs={socialTabs}
-					activeTab={socialTabs[0]}
-					onTabChange={(tab) => console.log('Tab changed to:', tab)}
-				/>
-			{/if}
-			<button class="action-button expand-button" onclick={() => (isExpanded = !isExpanded)}>
-				{#if isExpanded}
-					<SvgIcon path={mdiArrowCollapse} size={20} />
+	{#if !isExpanded}
+		<!-- content here -->
+
+		<div class="right-column">
+			<div class="actions">
+				{#if !isExpanded}
+					<button class="action-button icon-button">
+						<SvgIcon path={mdiHeartOutline} size={20} />
+					</button>
+					<button class="action-button icon-button">
+						<SvgIcon path={mdiChatOutline} size={20} />
+					</button><button class="action-button icon-button">
+						<SvgIcon path={mdiRocketLaunchOutline} size={20} />
+					</button>
+					<button class="action-button icon-button">
+						<SvgIcon path={mdiBookmarkOutline} size={20} />
+					</button>
+					<button class="action-button icon-button">
+						<SvgIcon path={mdiCloudDownloadOutline} size={20} />
+					</button>
 				{:else}
-					<SvgIcon path={mdiArrowExpandAll} size={20} />
+					<Tabs
+						type="underline"
+						showTrack={true}
+						tabs={socialTabs}
+						activeTab={socialTabs[0]}
+						onTabChange={(tab) => console.log('Tab changed to:', tab)}
+					/>
 				{/if}
-			</button>
+				<button
+					class="action-button expand-button icon-button"
+					onclick={() => (isExpanded = !isExpanded)}
+				>
+					<SvgIcon path={mdiArrowCollapse} size={20} />
+				</button>
+			</div>
 		</div>
-	</div>
+	{/if}
 </div>
 
 <style lang="scss">
@@ -236,12 +242,6 @@
 			justify-content: flex-end;
 			gap: var(--space-2);
 			.action-button {
-				cursor: pointer;
-				color: var(--text-tertiary);
-				&:hover {
-					color: var(--primary);
-				}
-
 				&.expand-button {
 					margin-left: var(--space-10);
 				}
@@ -251,10 +251,19 @@
 			}
 		}
 
+		.icon-button {
+			cursor: pointer;
+			color: var(--text-tertiary);
+			&:hover {
+				color: var(--primary);
+			}
+		}
+
 		&.expanded {
 			height: 100vh;
 			background: var(--bg-primary);
 			padding: 0;
+			gap: 0;
 
 			.left-column {
 				box-shadow: inset -1px 0 0 0 rgba(0, 0, 0, 0.1);
@@ -333,13 +342,14 @@
 			}
 
 			.center-column {
-				max-width: 60%;
-				padding-top: var(--space-6);
-				padding-bottom: var(--space-3);
+				flex-grow: 1;
+				padding: var(--space-6);
+				// padding-bottom: var(--space-3);
 				.preview-wrapper {
 					display: flex;
 					align-items: center;
-					justify-content: center;
+					height: 100%;
+					justify-content: flex-start;
 				}
 			}
 
