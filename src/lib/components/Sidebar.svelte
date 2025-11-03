@@ -77,14 +77,14 @@
 			{/if}
 		{/each}
 	</div>
-	<button class="avatar-wrapper">
+	<a class="avatar-wrapper" href="/profile/{user?.username}">
 		<div class="avatar">
 			<Avatar name={user?.displayName || ''} src={user?.avatarUrl || ''} size="s" />
 		</div>
 		{#if expand}
 			<div class="name">{user?.displayName}</div>
 		{/if}
-	</button>
+	</a>
 </div>
 
 <style lang="scss">
