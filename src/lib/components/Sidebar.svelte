@@ -23,7 +23,7 @@
 	const sidebarItems = [
 		{ label: 'Home', icon: mdiHome, href: '/' },
 		{ label: 'Music', icon: mdiMusicNoteEighth, href: '/listen' },
-		{ label: 'Artists', icon: mdiAccountMusic, href: '/artist' },
+		{ label: 'Artists', icon: mdiAccountMusic, href: '/artists' },
 		{ label: 'My Playlists', icon: mdiPlaylistMusic, href: '/playlists' },
 
 		{ section: true },

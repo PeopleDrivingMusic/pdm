@@ -21,7 +21,7 @@
 </script>
 
 {#if href}
-	<a {href} class="btn btn--{variant}">
+	<a {href} class="btn btn--{variant} {size}">
 		{@render children?.()}
 	</a>
 {:else}
@@ -78,7 +78,7 @@
 		}
 
 		&--secondary {
-			background-color: transparent;
+			background-color: var(--bg-secondary);
 			color: var(--text-primary);
 			border: 1px solid var(--border-primary);
 
