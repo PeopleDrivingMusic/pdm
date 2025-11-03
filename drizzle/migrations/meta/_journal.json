@@ -43,6 +43,13 @@
       "when": 1761361029300,
       "tag": "0005_perpetual_tombstone",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1762142920962,
+      "tag": "0006_lame_grey_gargoyle",
+      "breakpoints": true
     }
   ]
 }
