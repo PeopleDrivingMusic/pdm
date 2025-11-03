@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import type { PageProps } from './$types';
-	import MusicTrack from '$lib/ui/MusicTrack.svelte';
+	import MusicTrack from '$lib/ui/components/MusicTrack.svelte';
 	let { data }: PageProps = $props();
-	$inspect(data.tracks);
+	$inspect(data);
 </script>
 
 <div class="music-wrapper">
@@ -13,11 +13,11 @@
 
 		<div class="for-you-wrapp">
 			{#if data.tracks.length}
-				{#each Array(10) as _}
+				{#each data.tracks as track}
 					<MusicTrack
-						track={data.tracks[0].tracks}
-						album={data.tracks[0].albums}
-						artist={data.tracks[0].artists}
+						track={track.tracks}
+						album={track.albums}
+						artist={track.artists}
 					/>
 				{/each}
 			{/if}
@@ -29,11 +29,11 @@
 
 		<div class="for-you-wrapp">
 			{#if data.tracks.length}
-				{#each Array(10) as _}
+				{#each data.tracks as track}
 					<MusicTrack
-						track={data.tracks[0].tracks}
-						album={data.tracks[0].albums}
-						artist={data.tracks[0].artists}
+						track={track.tracks}
+						album={track.albums}
+						artist={track.artists}
 					/>
 				{/each}
 			{/if}
@@ -45,11 +45,11 @@
 
 		<div class="for-you-wrapp">
 			{#if data.tracks.length}
-				{#each Array(10) as _}
+				{#each data.tracks as track}
 					<MusicTrack
-						track={data.tracks[0].tracks}
-						album={data.tracks[0].albums}
-						artist={data.tracks[0].artists}
+						track={track.tracks}
+						album={track.albums}
+						artist={track.artists}
 					/>
 				{/each}
 			{/if}
@@ -61,13 +61,12 @@
 
 		<div class="for-you-wrapp">
 			{#if data.tracks.length}
-				{#each Array(10) as _}
+				{#each data.tracks as track}
 					<MusicTrack
-						track={data.tracks[0].tracks}
-						album={data.tracks[0].albums}
-						artist={data.tracks[0].artists}
+						track={track.tracks}
+						album={track.albums}
+						artist={track.artists}
 					/>
-					<!-- content here -->
 				{/each}
 			{/if}
 		</div>
