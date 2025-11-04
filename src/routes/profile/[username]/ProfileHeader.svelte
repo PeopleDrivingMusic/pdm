@@ -12,7 +12,7 @@
     const { user }: Props = $props();
 
     const trust_score = new Tween(0);
-    trust_score.target = user.trust_score;
+    trust_score.target = Number(user.trust_score);
 
      function formatDate(dateString: string | Date): string {
         return new Date(dateString).toLocaleDateString('en-US', {

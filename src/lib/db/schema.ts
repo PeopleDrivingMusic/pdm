@@ -1,4 +1,4 @@
-import { pgTable, serial, text, varchar, timestamp, boolean, integer, jsonb, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, varchar, timestamp, boolean, integer, jsonb, uuid, numeric, decimal } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Users table
@@ -17,7 +17,7 @@ export const users = pgTable('users', {
   hashedPassword: text('hashed_password'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  trust_score: integer('trust_score').default(0).notNull(),
+  trust_score: decimal('trust_score', { precision: 3, scale: 2 }).default('0.00').notNull(),
 });
 
 // Sessions table for Lucia auth
