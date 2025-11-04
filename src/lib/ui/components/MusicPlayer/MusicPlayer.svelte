@@ -17,6 +17,8 @@
 	import Avatar from '$lib/ui/Avatar.svelte';
 	import Tabs from '$lib/ui/Tabs.svelte';
 	import CoverPreview from './CoverPreview.svelte';
+	import Aurora from '$lib/ui/backgrounds/Aurora.svelte';
+	import ColorThief from 'colorthief';
 
 	const { track, artist, album } = $derived(playerStore.que[playerStore.currentTrackIndex]);
 	const socialTabs = [
@@ -41,6 +43,25 @@
 		{ id: 'covers', label: 'Cover versions' }
 	];
 	let isExpanded = $state(true);
+	let auroraColors = $state([]);
+	$effect(() => {
+		extractColors(track.imageUrl || album?.coverImageUrl || artist?.avatar);
+	});
+
+	async function extractColors(imageUrl) {
+		const img = new Image();
+		img.crossOrigin = 'anonymous';
+		img.src = imageUrl;
+
+		img.onload = () => {
+			const colorThief = new ColorThief();
+			const palette = colorThief.getPalette(img, 4);
+			auroraColors = palette.map(color => {
+				const hex = '#' + color.map(c => c.toString(16).padStart(2, '0')).join('');
+				return hex;
+			});
+		};
+	}
 </script>
 
 <div class="player-wrapper" class:expanded={isExpanded} in:fly={{ y: 100 }}>
@@ -95,6 +116,9 @@
 	</div>
 	<div class="center-column">
 		{#if isExpanded}
+			<div class="aurora-bg" in:fade>
+				<Aurora colorStops={auroraColors}/>
+			</div>
 			<button class="collapse-button icon-button" onclick={() => (isExpanded = false)}>
 				<SvgIcon path={mdiArrowCollapse} size={20} />
 			</button>
@@ -190,6 +214,16 @@
 			justify-content: end;
 			gap: var(--space-4);
 			transition: background 300ms ease-out;
+			position: relative;
+
+			.aurora-bg {
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100vw;
+				height: 40vh;
+				z-index: -1;
+			}
 
 			.preview-wrapper {
 				flex-grow: 1;
