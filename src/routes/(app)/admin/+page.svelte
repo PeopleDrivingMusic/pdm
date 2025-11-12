@@ -125,7 +125,7 @@
 </div>
 
 <style lang="scss">
-	@use '../../styles/variables' as mixins;
+	@use '../../../styles/variables' as mixins;
 	
 	.admin-container {
 		@include mixins.container();

@@ -3,8 +3,8 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import MusicPlayer from '$lib/ui/components/MusicPlayer/MusicPlayer.svelte';
-	import '../app.scss';
-	import type { Snapshot } from './$types';
+	import '../../app.scss';
+	import type { Snapshot } from '../$types';
 
 	let { children } = $props();
 	export const snapshot: Snapshot<boolean> = {

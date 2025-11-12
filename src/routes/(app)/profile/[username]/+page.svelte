@@ -10,6 +10,7 @@
 	}
 
 	let { data }: Props = $props();
+	const { user } = $derived(data);
 
 	const viewsMap: { [key: string]: any } = {
 		overview: Overview,

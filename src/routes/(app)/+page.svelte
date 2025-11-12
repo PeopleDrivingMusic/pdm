@@ -1,7 +1,4 @@
 <script lang="ts">
-	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
-	import DesignSystemDemo from '$lib/components/DesignSystemDemo.svelte';
-	import Button from '$lib/ui/Button.svelte';
 	import type { PageData } from './$types';
 	
 	export let data: PageData;
@@ -11,7 +8,7 @@
 
 
 <style lang="scss">
-	@use '../styles/variables' as mixins;
+	@use '../../styles/variables' as mixins;
 	
 	.container {
 		@include mixins.container();

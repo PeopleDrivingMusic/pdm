@@ -1,5 +1,5 @@
 <script lang="ts">
-	import SvgIcon from './../../../lib/ui/SvgIcon.svelte';
+	import SvgIcon from '$lib/ui/SvgIcon.svelte';
 	import { page } from '$app/state';
 	import type { PageData } from './$types';
 	import Button from '$lib/ui/Button.svelte';

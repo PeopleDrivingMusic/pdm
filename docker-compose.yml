@@ -193,27 +193,27 @@ services:
       - "prometheus.io/scrape=true"
       - "prometheus.io/port=3000"
 
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: pdm-app
-    ports:
-      - "4173:4173"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://admin:root@postgres:5432/pdm_db
-      - LOKI_URL=http://loki:3100
-      - PROMETHEUS_METRICS_ENABLED=true
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - app
-      - monitoring
-    labels:
-      - "service=pdm-app"
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=4173"
-      - "prometheus.io/path=/metrics"
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: pdm-app
+  #   ports:
+  #     - "4173:4173"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - DATABASE_URL=postgresql://admin:root@postgres:5432/pdm_db
+  #     - LOKI_URL=http://loki:3100
+  #     - PROMETHEUS_METRICS_ENABLED=true
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - app
+  #     - monitoring
+  #   labels:
+  #     - "service=pdm-app"
+  #     - "prometheus.io/scrape=true"
+  #     - "prometheus.io/port=4173"
+  #     - "prometheus.io/path=/metrics"
