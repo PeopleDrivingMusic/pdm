@@ -2,15 +2,19 @@
 	import type { Album, Artist, Track } from '$lib/db';
 	import { Button } from '$lib/ui';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
-	import { mdiBookmarkOutline, mdiHeartOutline, mdiChatOutline, mdiCloudDownloadOutline, mdiRocketLaunchOutline } from '@mdi/js';
+	import {
+		mdiBookmarkOutline,
+		mdiHeartOutline,
+		mdiChatOutline,
+		mdiCloudDownloadOutline,
+		mdiRocketLaunchOutline,
+		mdiHeart
+	} from '@mdi/js';
 	import Player from './Player.svelte';
 	import Tabs from '$lib/ui/Tabs.svelte';
-
-	interface CoverPreviewProps {
-		track: Track;
-		artist?: Artist;
-		album?: Album;
-	}
+	import { TrackClient } from '$lib/client/tracks';
+	import { playerStore } from '$lib/stores/player.svelte';
+	import SaveTrackModal from '$lib/ui/components/Modal/SaveTrackModal.svelte';
 
 	const views = [
 		{ id: 'info', label: 'Info' },
@@ -19,8 +23,14 @@
 		{ id: 'posts', label: 'Posts' }
 	];
 
-	const { track, artist, album }: CoverPreviewProps = $props();
+	const { track, artist, album, isLiked } = $derived(
+		playerStore.que[playerStore.currentTrackIndex]
+	);
+	let showSaveModal = $state(false);
+	let saveTrackId = $state("")
 </script>
+
+<SaveTrackModal trackId={saveTrackId} bind:show={showSaveModal}></SaveTrackModal>
 
 <div class="preview">
 	<div
@@ -46,16 +56,31 @@
 				<div class="track-title">{track.title}</div>
 			</div>
 			<div class="actions">
-				
-				<button class="action-button icon-button">
-					<SvgIcon path={mdiHeartOutline} size={24} />
+				<button
+					class="action-button icon-button"
+					class:active={isLiked}
+					onclick={async () => {
+						const res = await TrackClient.toggleLike(track.id);
+						if (res) {
+							playerStore.que[playerStore.currentTrackIndex].isLiked = !isLiked;
+						}
+					}}
+				>
+					{#if isLiked}
+						<SvgIcon path={mdiHeart} size={20} />
+					{:else}
+						<SvgIcon path={mdiHeartOutline} size={20} />
+					{/if}
 				</button>
 				<button class="action-button icon-button">
 					<SvgIcon path={mdiChatOutline} size={24} />
 				</button><button class="action-button icon-button">
 					<SvgIcon path={mdiRocketLaunchOutline} size={24} />
 				</button>
-				<button class="action-button icon-button">
+				<button class="action-button icon-button"  onclick={() => {
+						saveTrackId = track.id;
+						showSaveModal = true;
+					}} >
 					<SvgIcon path={mdiBookmarkOutline} size={24} />
 				</button>
 				<button class="action-button icon-button">
@@ -173,6 +198,13 @@
 		color: var(--text-tertiary);
 		&:hover {
 			color: var(--primary);
+		}
+
+		&.active {
+			color: var(--primary);
+			&:hover {
+				color: var(--primary-hover);
+			}
 		}
 	}
 </style>

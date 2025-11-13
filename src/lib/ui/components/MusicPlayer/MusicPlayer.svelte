@@ -17,8 +17,12 @@
 	import Avatar from '$lib/ui/Avatar.svelte';
 	import Tabs from '$lib/ui/Tabs.svelte';
 	import CoverPreview from './CoverPreview.svelte';
+	import { TrackClient } from '$lib/client/tracks';
+	import SaveTrackModal from "$lib/ui/components/Modal/SaveTrackModal.svelte"
 
-	const { track, artist, album } = $derived(playerStore.que[playerStore.currentTrackIndex]);
+	const { track, artist, album, isLiked } = $derived(
+		playerStore.que[playerStore.currentTrackIndex]
+	);
 	const socialTabs = [
 		{ id: 'lyrics', label: 'Lyrics' },
 		{ id: 'comments', label: 'Comments' },
@@ -40,7 +44,9 @@
 		{ id: 'similar', label: 'Similar' },
 		{ id: 'covers', label: 'Cover versions' }
 	];
-	let isExpanded = $state(true);
+	let isExpanded = $state(false);
+	let showSaveModal = $state(false);
+	let saveTrackId = $state("")
 </script>
 
 <div class="player-wrapper" class:expanded={isExpanded} in:fly={{ y: 100 }}>
@@ -115,20 +121,34 @@
 		{/if}
 	</div>
 	{#if !isExpanded}
-		<!-- content here -->
-
 		<div class="right-column">
 			<div class="actions">
 				{#if !isExpanded}
-					<button class="action-button icon-button">
-						<SvgIcon path={mdiHeartOutline} size={20} />
+					<button
+						class="action-button icon-button"
+						class:active={isLiked}
+						onclick={async () => {
+							const res = await TrackClient.toggleLike(track.id);
+							if (res) {
+								playerStore.que[playerStore.currentTrackIndex].isLiked = !isLiked;
+							}
+						}}
+					>
+						{#if isLiked}
+							<SvgIcon path={mdiHeart} size={20} />
+						{:else}
+							<SvgIcon path={mdiHeartOutline} size={20} />
+						{/if}
 					</button>
 					<button class="action-button icon-button">
 						<SvgIcon path={mdiChatOutline} size={20} />
 					</button><button class="action-button icon-button">
 						<SvgIcon path={mdiRocketLaunchOutline} size={20} />
 					</button>
-					<button class="action-button icon-button">
+					<button class="action-button icon-button" onclick={() => {
+						saveTrackId = track.id;
+						showSaveModal = true;
+					}}>
 						<SvgIcon path={mdiBookmarkOutline} size={20} />
 					</button>
 					<button class="action-button icon-button">
@@ -153,6 +173,8 @@
 		</div>
 	{/if}
 </div>
+
+<SaveTrackModal trackId={saveTrackId} bind:show={showSaveModal}></SaveTrackModal>
 
 <style lang="scss">
 	.player-wrapper {
@@ -256,6 +278,12 @@
 			color: var(--text-tertiary);
 			&:hover {
 				color: var(--primary);
+			}
+			&.active {
+				color: var(--primary);
+				&:hover {
+					color: var(--primary-hover);
+				}
 			}
 		}
 

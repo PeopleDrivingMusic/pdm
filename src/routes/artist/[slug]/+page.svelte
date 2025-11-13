@@ -118,7 +118,7 @@
 					<h3>Top Music</h3>
 					<div class="track-wrapper">
 						{#each tracks as track}
-							<MusicTrack track={track}  {artist} album={albumMap.get(track.albumId || "")}/>
+							<MusicTrack track={track.track} isLiked={track.isLiked}  {artist} album={albumMap.get(track.albumId || "")}/>
 						{/each}
 					</div>
 				</div>

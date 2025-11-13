@@ -8,11 +8,13 @@
 	const {
 		track,
 		album,
-		artist
+		artist,
+		isLiked
 	}: {
 		track: Track;
-		album?: Album;
-		artist?: Artist;
+		album?: Album | null;
+		artist?: Artist | null;
+		isLiked?: boolean;
 	} = $props();
 
 	function trackClick() {
@@ -51,7 +53,7 @@
 		}
 		const currentIndex = playerStore.currentTrackIndex;
 		playerStore.currentTime = 0;
-		playerStore.que.splice(currentIndex + 1, 0, { track, artist, album });
+		playerStore.que.splice(currentIndex + 1, 0, { track, artist, album, isLiked });
 		playerStore.currentTrackIndex += 1;
 		playerStore.isPlaying = true;
 	}

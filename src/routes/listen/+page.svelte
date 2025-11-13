@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
 	import type { PageProps } from './$types';
 	import MusicTrack from '$lib/ui/components/MusicTrack.svelte';
+	import type { Artist } from '$lib/db';
 	let { data }: PageProps = $props();
 	$inspect(data);
 </script>
@@ -15,9 +15,10 @@
 			{#if data.tracks.length}
 				{#each data.tracks as track}
 					<MusicTrack
+						{...track}
 						track={track.tracks}
 						album={track.albums}
-						artist={track.artists}
+						artist={track.artists as Artist}
 					/>
 				{/each}
 			{/if}
@@ -30,11 +31,7 @@
 		<div class="for-you-wrapp">
 			{#if data.tracks.length}
 				{#each data.tracks as track}
-					<MusicTrack
-						track={track.tracks}
-						album={track.albums}
-						artist={track.artists}
-					/>
+					<MusicTrack {...track} track={track.tracks} album={track.albums} artist={track.artists} />
 				{/each}
 			{/if}
 		</div>
@@ -46,11 +43,7 @@
 		<div class="for-you-wrapp">
 			{#if data.tracks.length}
 				{#each data.tracks as track}
-					<MusicTrack
-						track={track.tracks}
-						album={track.albums}
-						artist={track.artists}
-					/>
+					<MusicTrack {...track} track={track.tracks} album={track.albums} artist={track.artists} />
 				{/each}
 			{/if}
 		</div>
@@ -62,11 +55,7 @@
 		<div class="for-you-wrapp">
 			{#if data.tracks.length}
 				{#each data.tracks as track}
-					<MusicTrack
-						track={track.tracks}
-						album={track.albums}
-						artist={track.artists}
-					/>
+					<MusicTrack {...track} track={track.tracks} album={track.albums} artist={track.artists} />
 				{/each}
 			{/if}
 		</div>

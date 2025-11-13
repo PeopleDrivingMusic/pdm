@@ -1,14 +1,14 @@
 import type { Album, Artist, Track } from "$lib/db";
-
+interface PlayerTrack { track: Track, artist?: Artist | null, album?: Album | null, isLiked?: boolean }
 interface PlayerStore {
-    que: Array<{track: Track, artist?: Artist, album?: Album}>;
+    que: Array<PlayerTrack>;
     currentTrackIndex: number;
     isPlaying: boolean;
     repeatMode: 'none' | 'one' | 'all';
     shuffle: boolean,
     volume: number, // 0.0 to 0.1
     currentTime: number,
-    currentTrack: {track: Track, artist?: Artist, album?: Album} | null;
+    currentTrack: PlayerTrack | null;
 }
 
 export const playerStore = $state<PlayerStore>({
