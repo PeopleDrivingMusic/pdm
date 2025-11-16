@@ -186,7 +186,7 @@
 							{#if data.tracks.length}
 								{#each data.tracks.slice(0, 6) as track}
 									<div class="track-item">
-										<MusicTrack track={track.tracks} album={track.albums} artist={track.artists} />
+										<MusicTrack isLiked={track.isLiked} track={track.tracks} album={track.albums} artist={track.artists} />
 									</div>
 								{/each}
 							{:else}

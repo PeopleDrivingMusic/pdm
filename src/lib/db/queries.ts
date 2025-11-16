@@ -1,5 +1,5 @@
 import { db, withDbLogging } from './index';
-import { users, artists, albums, tracks, playlists } from './schema';
+import { users, artists, albums, tracks, playlists, userFavorites, trackStats, playlistTracks } from './schema';
 import { eq, like, and, or, desc, count, sql } from 'drizzle-orm';
 import type { User, NewUser, Artist, NewArtist, Track, NewTrack, NewAlbum } from './index';
 import { logger } from '$lib/utils/logger';
@@ -60,7 +60,7 @@ export class UserService {
           userId: id,
           metadata: { error }
         });
-        return null;
+        return;
       }
     });
   }
@@ -259,13 +259,33 @@ export class TrackService {
     return track;
   }
 
-  static async getTracksByArtist(artistId: string, limit = 50) {
-    return await db
-      .select()
-      .from(tracks)
-      .where(and(eq(tracks.artistId, artistId), eq(tracks.isPublished, true)))
-      .orderBy(desc(tracks.createdAt))
-      .limit(limit);
+  static async getTracksByArtist({ artistId = "", userId = "", limit = 50 }) {
+
+    return await withDbLogging("TrackService.getTracksByArtist", async () => {
+      try {
+        let query =
+          db
+            .select({
+              track: tracks,
+              isLiked: sql<boolean>`CASE WHEN ${userFavorites.id} IS NOT NULL THEN true ELSE false END`
+            })
+            .from(tracks)
+            .leftJoin(userFavorites, and(
+              eq(tracks.id, userFavorites.trackId),
+              eq(userFavorites.userId, userId)
+            ));
+        const result = await query.where(and(eq(tracks.artistId, artistId), eq(tracks.isPublished, true)))
+          .orderBy(desc(tracks.createdAt))
+          .limit(limit);
+        return result;
+      } catch (error) {
+        logger.error('Failed to get tracks by artist', {
+          component: 'database',
+          metadata: { error, limit, artistId }
+        });
+        throw error;
+      }
+    })
   }
 
   static async getTracksByAlbum(albumId: string) {
@@ -292,27 +312,368 @@ export class TrackService {
       .limit(limit);
   }
 
-  static async getPopularTracks({ limit = 10, offset = 0, artist = true, album = true }) {
-    let query = db
-      .select()
-      .from(tracks).leftJoin(artists, eq(tracks.artistId, artists.id)).leftJoin(albums, eq(tracks.albumId, albums.id));
+  static async getPopularTracks({ limit = 10, offset = 0, userId = "", artist = true, album = true }) {
+  return await withDbLogging('TrackService.getPopularTracks', async () => {
+    try {
+      let query = db
+        .select({
+          tracks,
+          artists: artists,
+          albums: albums,
+          isLiked: sql<boolean>`CASE WHEN ${userFavorites.id} IS NOT NULL THEN true ELSE false END`,
+        })
+        .from(tracks)
+        .leftJoin(trackStats, eq(tracks.id, trackStats.trackId))
+        .leftJoin(artists, eq(tracks.artistId, artists.id))
+        .leftJoin(albums, eq(tracks.albumId, albums.id))
+        .leftJoin(
+          userFavorites,
+          and(
+            eq(tracks.id, userFavorites.trackId),
+            eq(userFavorites.userId, userId)
+          )
+        );
 
-
-    return await query
-      .where(eq(tracks.isPublished, true))
-      .orderBy(desc(tracks.playCount))
-      .limit(limit)
-      .offset(offset);
-  }
+      const result = await query
+        .where(eq(tracks.isPublished, true))
+        .orderBy(desc(trackStats.playCount))
+        .limit(limit)
+        .offset(offset);
+      return result;
+    } catch (error) {
+      logger.error('Failed to get popular tracks', {
+        component: 'database',
+        metadata: { error, limit, offset }
+      });
+      throw error;
+    }
+  });
+}
 
   static async incrementPlayCount(trackId: string) {
-    await db
-      .update(tracks)
-      .set({
-        playCount: sql`${tracks.playCount} + 1`,
-        updatedAt: new Date()
-      })
-      .where(eq(tracks.id, trackId));
+    return await withDbLogging("TrackService.incrementPlayCount", async () => {
+      try {
+        await db
+          .insert(trackStats)
+          .values({
+            trackId,
+            playCount: 1,
+            lastUpdated: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: trackStats.trackId,
+            set: {
+              playCount: sql`${trackStats.playCount} + 1`,
+              lastUpdated: new Date(),
+            },
+          });
+      } catch (error) {
+        logger.error("Failed to increment play count", {
+          component: 'database',
+          metadata: { error, trackId }
+        })
+      }
+    })
+  }
+
+  static async toggleLike(userId: string, trackId: string): Promise<boolean> {
+    return await withDbLogging('TrackService.toggleLike', async () => {
+      try {
+        const isLiked = await this.isTrackLikedByUser(userId, trackId)
+
+        return isLiked ? await this.unlikeTrack(userId, trackId, false) : await this.likeTrack(userId, trackId, false);
+      } catch (error) {
+        logger.error('Failed to toggle like track', {
+          component: 'database',
+          metadata: { error, userId, trackId }
+        });
+        return false;
+      }
+    })
+  }
+
+  static async likeTrack(userId: string, trackId: string, needCheck = true): Promise<boolean> {
+    return await withDbLogging('TrackService.likeTrack', async () => {
+      try {
+        let isLiked = needCheck ? await this.isTrackLikedByUser(userId, trackId) : false;
+
+        if (isLiked) {
+          return false;
+        }
+
+        await db.insert(userFavorites).values({
+          userId,
+          trackId,
+        });
+
+        // Upsert track stat
+        await db
+          .insert(trackStats)
+          .values({
+            trackId,
+            likeCount: 1,
+            lastUpdated: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: trackStats.trackId,
+            set: {
+              likeCount: sql`${trackStats.likeCount} + 1`,
+              lastUpdated: new Date(),
+            },
+          });
+
+        logger.info('Track liked', {
+          component: 'database',
+          metadata: { userId, trackId }
+        });
+
+        return true;
+      } catch (error) {
+        logger.error('Failed to like track', {
+          component: 'database',
+          metadata: { error, userId, trackId }
+        });
+        return false;
+      }
+    });
+  }
+
+  static async unlikeTrack(userId: string, trackId: string, needCheck = true): Promise<boolean> {
+    return await withDbLogging('TrackInteractionService.unlikeTrack', async () => {
+      try {
+        let isLiked = needCheck ? await this.isTrackLikedByUser(userId, trackId) : true;
+
+        if (isLiked) {
+          // Upsert track stat - 
+          await db
+            .insert(trackStats)
+            .values({
+              trackId,
+              likeCount: 0,
+              lastUpdated: new Date(),
+            })
+            .onConflictDoUpdate({
+              target: trackStats.trackId,
+              set: {
+                likeCount: sql`CASE WHEN ${trackStats.likeCount} > 0 THEN ${trackStats.likeCount} - 1 ELSE 0 END`,
+                lastUpdated: new Date(),
+            },
+            });
+
+          await db.delete(userFavorites).where(and(
+            eq(userFavorites.userId, userId),
+            eq(userFavorites.trackId, trackId)
+          ));
+        }
+
+        return isLiked;
+      } catch (error) {
+        logger.error('Failed to unlike track', {
+          component: 'database',
+          metadata: { error, userId, trackId }
+        });
+        return false;
+      }
+    });
+  }
+
+  static async isTrackLikedByUser(userId: string, trackId: string): Promise<boolean> {
+    const result = await db
+      .select()
+      .from(userFavorites)
+      .where(
+        and(
+          eq(userFavorites.userId, userId),
+          eq(userFavorites.trackId, trackId)
+        )
+      );
+    return result.length > 0;
+  }
+  static async saveTrackToPlaylist(
+    userId: string,
+    trackId: string,
+    playlistId: string
+  ): Promise<boolean> {
+    return await withDbLogging('TrackService.saveToPlaylist', async () => {
+      try {
+        // check if user own playlist
+        const playlist = await db
+          .select()
+          .from(playlists)
+          .where(
+            and(
+              eq(playlists.id, playlistId),
+              eq(playlists.userId, userId)
+            )
+          );
+
+        if (!playlist.length) {
+          throw new Error('Playlist not found or not owned by user');
+        }
+
+        const existing = await db
+          .select()
+          .from(playlistTracks)
+          .where(
+            and(
+              eq(playlistTracks.playlistId, playlistId),
+              eq(playlistTracks.trackId, trackId)
+            )
+          );
+
+        if (existing.length > 0) {
+          return false;
+        }
+
+        const maxPosition = await db
+          .select({ maxPos: sql<number>`MAX(${playlistTracks.position})` })
+          .from(playlistTracks)
+          .where(eq(playlistTracks.playlistId, playlistId));
+
+        const nextPosition = (maxPosition[0]?.maxPos ?? 0) + 1;
+
+        await db.insert(playlistTracks).values({
+          playlistId,
+          trackId,
+          position: nextPosition,
+        });
+
+        // Upsert track stat - 
+        await db
+          .insert(trackStats)
+          .values({
+            trackId,
+            saveCount: 1,
+            lastUpdated: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: trackStats.trackId,
+            set: {
+              saveCount: sql`${trackStats.saveCount} + 1`,
+              lastUpdated: new Date(),
+            },
+          });
+
+        logger.info('Track saved to playlist', {
+          component: 'database',
+          metadata: { userId, trackId, playlistId }
+        });
+
+        return true;
+      } catch (error) {
+        logger.error('Failed to save track to playlist', {
+          component: 'database',
+          metadata: { error, userId, trackId, playlistId }
+        });
+        return false;
+      }
+    });
+  }
+
+  static async removeTrackFromPlaylist(
+    playlistTrackId: string,
+    userId: string,
+    playlistId: string
+  ): Promise<boolean> {
+    return await withDbLogging("TrackService.removeTrackFromPlaylist", async () => {
+      try {
+        const isOwner = await db
+          .select()
+          .from(playlists)
+          .where(
+            and(
+              eq(playlists.id, playlistId),
+              eq(playlists.userId, userId)
+            )
+          );
+
+        if (!isOwner.length) {
+          throw new Error('Playlist not found or not owned by user');
+        }
+
+        const playlistTrack = await db
+          .select({ trackId: playlistTracks.trackId })
+          .from(playlistTracks)
+          .where(eq(playlistTracks.id, playlistTrackId));
+
+        const trackId = playlistTrack[0].trackId;
+
+        const result = await db
+          .delete(playlistTracks)
+          .where(eq(playlistTracks.id, playlistTrackId));
+
+        if (result.length) {
+          // Upsert track stat - 
+          await db
+            .insert(trackStats)
+            .values({
+              trackId,
+              saveCount: 0,
+              lastUpdated: new Date(),
+            })
+            .onConflictDoUpdate({
+              target: trackStats.trackId,
+              set: {
+                saveCount: sql`CASE WHEN ${trackStats.saveCount} > 0 THEN ${trackStats.saveCount} - 1 ELSE 0 END`,
+                lastUpdated: new Date(),
+            },
+            });
+
+          logger.info('Track removed from playlist', {
+            component: 'database',
+            metadata: { userId, trackId, playlistId, playlistTrackId }
+          });
+        }
+
+        return result.length > 0;
+      } catch (error) {
+        logger.error('Failed to remove track from playlist', {
+          component: 'database',
+          metadata: { error, playlistTrackId }
+        });
+        return false;
+      }
+    })
+  }
+
+  // ANALYTICS
+  static async getTrackStats(trackId: string) {
+    return await withDbLogging("TrackService.getTrackStats", async () => {
+      try {
+        const [stats] = await db
+          .select()
+          .from(trackStats)
+          .where(eq(trackStats.trackId, trackId));
+        return stats ?? null;
+      } catch (error) {
+        logger.error('Failed to get track stats', {
+          component: "database",
+          metadata: { error, trackId }
+        })
+        return null
+      }
+    })
+  }
+
+  static async getUserLikedTracks(userId: string, limit = 50, offset = 0) {
+    return await withDbLogging("TrackService.getUserLikedTracks", async () => {
+      try {
+        return await db
+          .select()
+          .from(userFavorites)
+          .innerJoin(tracks, eq(userFavorites.trackId, tracks.id))
+          .where(eq(userFavorites.userId, userId))
+          .orderBy(desc(userFavorites.createdAt))
+          .limit(limit)
+          .offset(offset);
+      } catch (error) {
+        logger.error('Failed to get user liked tracks', {
+          component: "database",
+          metadata: { error, userId, limit, offset }
+        })
+      }
+    })
+
   }
 }
 

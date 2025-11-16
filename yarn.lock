@@ -2625,11 +2625,6 @@ tdigest@^0.1.1:
   dependencies:
     bintrees "1.0.2"
 
-through@~2.3.4:
-  version "2.3.8"
-  resolved "https://registry.yarnpkg.com/through/-/through-2.3.8.tgz#0dd4c9ffaabc357960b1b724115d7e0e86a2e1f5"
-  integrity sha512-w89qg7PI8wAdvX60bMDP+bFoD5Dvhm9oLheFp5O4a2QF0cSBGsBX4qZmadPMvVqlLJBBci+WqGGOAPvcDeNSVg==
-
 tinybench@^2.9.0:
   version "2.9.0"
   resolved "https://registry.npmjs.org/tinybench/-/tinybench-2.9.0.tgz"
@@ -2736,13 +2731,6 @@ util-deprecate@^1.0.2:
   version "1.0.2"
   resolved "https://registry.npmjs.org/util-deprecate/-/util-deprecate-1.0.2.tgz"
   integrity sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==
-
-vibrant@^0.0.1:
-  version "0.0.1"
-  resolved "https://registry.yarnpkg.com/vibrant/-/vibrant-0.0.1.tgz#bf55ff041ffade983bc2b25a20ab4e9cfc312891"
-  integrity sha512-qs5u7xmnRdgEJcfPIk/T2FYwkuSZrv3GH4mjxOcEbZWWHtYYlIhF6NeRNcknUQ6q0fFueK9LY0M3xsWXd7M+eQ==
-  dependencies:
-    through "~2.3.4"
 
 vite-node@3.2.4:
   version "3.2.4"

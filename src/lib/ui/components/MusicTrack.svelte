@@ -8,12 +8,16 @@
 	const {
 		track,
 		album,
-		artist
+		artist,
+		isLiked
 	}: {
 		track: Track;
-		album?: Album;
-		artist?: Artist;
+		album?: Album | null;
+		artist?: Artist | null;
+		isLiked?: boolean;
 	} = $props();
+
+	$inspect(playerStore)
 
 	function trackClick() {
 		const isInQue = playerStore.que.findIndex(queItem => queItem.track.id === track.id);
@@ -37,13 +41,18 @@
 			}
 
 			// remove the item from its old position
-			const [item] = playerStore.que.splice(isInQue, 1);
+			const que = [...playerStore.que];
+			const removed = que.splice(isInQue, 1);
+			if (!removed.length) return; // Добавить проверку
+
+			const [item] = removed;
 
 			// adjust current index if the removed item was before the current track
 			const adjustedCurrentIndex = isInQue < currentIndex ? currentIndex - 1 : currentIndex;
 
 			// insert it right after the current track and start playing it
-			playerStore.que.splice(adjustedCurrentIndex + 1, 0, item);
+			que.splice(adjustedCurrentIndex + 1, 0, item);
+			playerStore.que = que;
 			playerStore.currentTime = 0;
 			playerStore.currentTrackIndex = adjustedCurrentIndex + 1;
 			playerStore.isPlaying = true;
@@ -51,7 +60,7 @@
 		}
 		const currentIndex = playerStore.currentTrackIndex;
 		playerStore.currentTime = 0;
-		playerStore.que.splice(currentIndex + 1, 0, { track, artist, album });
+		playerStore.que.splice(currentIndex + 1, 0, { track, artist, album, isLiked });
 		playerStore.currentTrackIndex += 1;
 		playerStore.isPlaying = true;
 	}

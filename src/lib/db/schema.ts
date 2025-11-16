@@ -73,10 +73,20 @@ export const tracks = pgTable('tracks', {
   trackNumber: integer('track_number'),
   genre: jsonb('genres').$type<string[]>(),
   isPublished: boolean('is_published').default(false),
-  playCount: integer('play_count').default(0),
   metadata: jsonb('metadata'), // Blockchain info, IPFS hash, etc.
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Track analytics/stats table
+export const trackStats = pgTable('track_stats', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  trackId: uuid('track_id').notNull().unique().references(() => tracks.id, { onDelete: 'cascade' }),
+  likeCount: integer('like_count').default(0).notNull(),
+  playCount: integer('play_count').default(0).notNull(),
+  saveCount: integer('save_count').default(0).notNull(), // Number of times users saved the track to favorites or playlists
+  commentCount: integer('comment_count').default(0).notNull(),
+  lastUpdated: timestamp('last_updated').defaultNow().notNull(),
 });
 
 // Playlists table
@@ -214,11 +224,20 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
   }),
 }));
 
+export const trackStatsRelations = relations(trackStats, ({ one }) => ({
+  track: one(tracks, {
+    fields: [trackStats.trackId],
+    references: [tracks.id],
+  }),
+}));
+
 // User type exports for TypeScript
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+export type Playlist = typeof playlists.$inferInsert
+export type PlaylistTrack = typeof playlistTracks.$inferInsert
 
 // Export all tables for migrations
 export const schema = {

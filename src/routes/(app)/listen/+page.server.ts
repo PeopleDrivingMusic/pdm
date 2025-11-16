@@ -3,6 +3,6 @@ import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async (event) => {
 
-    const tracks = await TrackService.getPopularTracks({limit: 10});
+    const tracks = await TrackService.getPopularTracks({limit: 10, userId: event.locals.user?.id});
     return { tracks };
 };
