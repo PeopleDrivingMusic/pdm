@@ -1,6 +1,6 @@
 <script lang="ts">
     import SvgIcon from '$lib/ui/SvgIcon.svelte';
-    import { mdiPlay, mdiCheckCircle, mdiMusicBox, mdiMicrophone, mdiTicket, mdiTrendingUp } from '@mdi/js';
+    import { mdiPlay, mdiCheckCircle, mdiMusicBox, mdiMicrophone, mdiTicket, mdiTrendingUp, mdiPercent } from '@mdi/js';
     import { Button } from '$lib/ui';
 
     interface Campaign {
@@ -17,6 +17,14 @@
         image: string;
         isVerified: boolean;
         rewards: any[];
+        artistStats?: {
+            trustScore: number;
+            songs: number;
+            followers: number;
+            subscribers: number;
+        };
+        revenueShare?: number; // 10-80% for songs/albums
+        projectedProfit?: number; // for concerts/festivals
     }
 
     interface Props {
@@ -42,13 +50,25 @@
     const progress = (campaign.raised / campaign.goal) * 100;
     const daysLeft = campaign.daysLeft;
 
-    function formatCurrency(value: number) {
+    function formatCurrency(value: number | string) {
+        if (typeof value === "string") return value
         return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
             minimumFractionDigits: 0
         }).format(value);
     }
+
+    function formatNumber(value: number) {
+        if (value >= 1000000) {
+            return (value / 1000000).toFixed(1) + 'M';
+        }
+        if (value >= 1000) {
+            return (value / 1000).toFixed(1) + 'K';
+        }
+        return value.toString();
+    }
+
+    const isRevenueSharing = campaign.type === 'song' || campaign.type === 'album';
+    const hasProjectedProfit = campaign.type === 'concert' || campaign.type === 'festival';
 </script>
 
 <a href={`/crowdfunding/${campaign.id}`} class="campaign-card">
@@ -76,9 +96,36 @@
             {/if}
         </div>
 
-        <div class="campaign-card__artist">
-            <img src={campaign.artistAvatar} alt={campaign.artist} class="campaign-card__avatar" />
-            <span>{campaign.artist}</span>
+        <!-- Artist Info Section -->
+        <div class="campaign-card__artist-section">
+            <div class="artist-info">
+                <img src={campaign.artistAvatar} alt={campaign.artist} class="artist-info__avatar" />
+                <div class="artist-info__content">
+                    <span class="artist-info__name">{campaign.artist}</span>
+                    <!-- <a href="/artist/${campaign.artist}" class="artist-info__name">{campaign.artist}</a> -->
+                    {#if campaign.artistStats}
+                        <div class="artist-stats">
+                            <span class="stat-item" title="Trust Score">
+                                ⭐ {campaign.artistStats.trustScore}%
+                            </span>
+                            <span class="stat-item" title="Songs">
+                                🎵 {formatNumber(campaign.artistStats.songs)}
+                            </span>
+                            <span class="stat-item" title="Followers">
+                                👥 {formatNumber(campaign.artistStats.followers)}
+                            </span>
+                        </div>
+                    {/if}
+                </div>
+            </div>
+
+            <!-- Projected Profit Info -->
+            {#if hasProjectedProfit && campaign.projectedProfit}
+                <div class="profit-badge">
+                    <SvgIcon path={mdiTrendingUp} size={14} />
+                    <span>~{formatCurrency(campaign.projectedProfit)} profit</span>
+                </div>
+            {/if}
         </div>
 
         <p class="campaign-card__description">{campaign.description}</p>
@@ -117,7 +164,7 @@
                 <div class="rewards-list">
                     {#each campaign.rewards.slice(0, 2) as reward}
                         <div class="reward-item">
-                            <span class="reward-amount">{formatCurrency(reward.amount)}+</span>
+                            <span class="reward-amount">{formatCurrency(reward.amount)}</span>
                             <span class="reward-title">{reward.title}</span>
                         </div>
                     {/each}
@@ -126,7 +173,7 @@
         {/if}
 
         <!-- CTA Button -->
-        <Button variant="primary" fullWidth>Back This Campaign</Button>
+        <Button variant="primary">Back This Campaign</Button>
     </div>
 </a>
 
@@ -274,24 +321,103 @@
         margin-top: 2px;
     }
 
-    .campaign-card__artist {
+    // Artist Section
+    .campaign-card__artist-section {
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    .artist-info {
+        display: flex;
+        align-items: flex-start;
         gap: var(--space-2);
+    }
+
+    .artist-info__avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex-shrink: 0;
+    }
+
+    .artist-info__content {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        min-width: 0;
+    }
+
+    .artist-info__name {
         @include text-sm();
-        font-weight: 500;
-        color: var(--color-gray-700);
+        font-weight: 600;
+        color: var(--color-brand-600);
+        text-decoration: none;
+        transition: color var(--duration-fast) var(--easing-ease-out);
 
         @media (prefers-color-scheme: dark) {
-            color: var(--color-gray-300);
+            color: var(--color-brand-400);
+        }
+
+        &:hover {
+            color: var(--color-brand-700);
+
+            @media (prefers-color-scheme: dark) {
+                color: var(--color-brand-300);
+            }
         }
     }
 
-    .campaign-card__avatar {
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        object-fit: cover;
+    .artist-stats {
+        display: flex;
+        gap: var(--space-2);
+        flex-wrap: wrap;
+    }
+
+    .stat-item {
+        @include text-xs();
+        color: var(--color-gray-600);
+        font-weight: 500;
+
+        @media (prefers-color-scheme: dark) {
+            color: var(--color-gray-400);
+        }
+    }
+
+    .revenue-badge,
+    .profit-badge {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
+        border-radius: var(--radius-md);
+        @include text-xs();
+        font-weight: 600;
+    }
+
+    .revenue-badge {
+        background-color: var(--color-green-50);
+        color: var(--color-green-700);
+        border: 1px solid var(--color-green-200);
+
+        @media (prefers-color-scheme: dark) {
+            background-color: var(--color-green-900);
+            color: var(--color-green-300);
+            border-color: var(--color-green-800);
+        }
+    }
+
+    .profit-badge {
+        background-color: var(--color-blue-50);
+        color: var(--color-blue-700);
+        border: 1px solid var(--color-blue-200);
+
+        @media (prefers-color-scheme: dark) {
+            background-color: var(--color-blue-900);
+            color: var(--color-blue-300);
+            border-color: var(--color-blue-800);
+        }
     }
 
     .campaign-card__description {
