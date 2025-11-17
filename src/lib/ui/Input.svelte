@@ -8,6 +8,7 @@
     disabled?: boolean;
     id?: string;
     name?: string;
+    onInput?: (e: InputEvent) => any
   }
 
   let {
@@ -22,7 +23,7 @@
   }: Props = $props();
 </script>
 
-<div class="input-group">
+<div class="input-group" oninput={(e) => onInput && onInput(e)}>
   {#if label}
     <label class="input-label" for={id}>
       {label}
