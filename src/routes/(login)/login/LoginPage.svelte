@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Button, Input, Link, Checkbox } from '$lib/ui';
+	import { Button, Input, Link, Checkbox, notificationStore } from '$lib/ui';
 	import { page } from '$app/state';
 	import { enhance, applyAction } from '$app/forms';
 
@@ -47,6 +47,11 @@
 					loading = true;
 					return async ({ result }) => {
 						loading = false;
+						if (result.type === 'redirect') {
+							notificationStore.success('Welcome! Redirecting...');
+						} else if (result.type === 'failure') {
+							notificationStore.error(result.data?.error || 'An error occurred');
+						}
 						await applyAction(result);
 					};
 				}}

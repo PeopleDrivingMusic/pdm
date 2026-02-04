@@ -5,3 +5,6 @@ export { default as Checkbox } from './Checkbox.svelte';
 export { default as Avatar } from './Avatar.svelte';
 export { default as StatCard } from './StatCard.svelte';
 export { default as Tabs } from './Tabs.svelte';
+export { default as InfoMessage } from './InfoMessage.svelte';
+export { default as NotificationContainer } from './NotificationContainer.svelte';
+export { notificationStore } from '$lib/stores/notification.svelte';
