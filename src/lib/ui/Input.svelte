@@ -9,6 +9,7 @@
     id?: string;
     name?: string;
     onInput?: (e: InputEvent) => any
+    error?: boolean;
   }
 
   let {
@@ -19,7 +20,8 @@
     required = false,
     disabled = false,
     id = label || `input-${Math.random().toString(36).substr(2, 9)}`,
-    name = ''
+    name = '',
+    error = false
   }: Props = $props();
 </script>
 
@@ -34,6 +36,7 @@
     {id}
     {name}
     class="input"
+    class:input--error={error}
     {type}
     {placeholder}
     bind:value
@@ -91,5 +94,9 @@
     &:invalid:not(:placeholder-shown) {
       border-color: var(--border-error);
     }
+  }
+
+  .input--error {
+    border-color: var(--border-error);
   }
 </style>

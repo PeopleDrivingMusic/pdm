@@ -1,10 +1,19 @@
 <script lang="ts">
 	import { Button, Input, Link, Checkbox } from '$lib/ui';
 	import { page } from '$app/state';
-	import { enhance } from '$app/forms';
+	import { enhance, applyAction } from '$app/forms';
 
-	// const error =  $page.url.searchParams.get('error');
-	const error = $derived(page.url.searchParams.get('error'));
+	const queryError = $derived(page.url.searchParams.get('error'));
+	const form = $derived(page.form);
+	const formError = $derived(form?.error as string | undefined);
+	const errorMessage = $derived.by(() => {
+		if (formError) return formError;
+		if (queryError === 'oauth_error') return 'An error occurred while logging in with Google. Please try again.';
+		if (queryError === 'invalid_credentials') return 'Invalid email or password.';
+		if (queryError) return 'An error occurred. Please try again.';
+		return '';
+	});
+	const hasError = $derived(!!errorMessage);
 	let email = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
@@ -31,24 +40,14 @@
 				<p>Log in to People Driving Music</p>
 			</div>
 
-			{#if error}
-				<div class="error-message">
-					{#if error === 'oauth_error'}
-						An error occurred while logging in with Google. Please try again.
-					{:else if error === 'invalid_credentials'}
-						Invalid email or password.
-					{:else}
-						An error occurred. Please try again.
-					{/if}
-				</div>
-			{/if}
 			<form
 				method="POST"
-				action="?/{mode}"
+				action={`?/${mode}`}
 				use:enhance={() => {
 					loading = true;
-					return ({ result }) => {
+					return async ({ result }) => {
 						loading = false;
+						await applyAction(result);
 					};
 				}}
 			>
@@ -58,6 +57,7 @@
 					name="email"
 					placeholder="your@email.com"
 					bind:value={email}
+					error={hasError}
 					required
 				/>
 
@@ -67,6 +67,7 @@
 					name="password"
 					placeholder="Enter your password"
 					bind:value={password}
+					error={hasError}
 					required
 				/>
 				{#if mode === 'register'}
@@ -76,6 +77,7 @@
 						name="confirmPassword"
 						placeholder="Confirm your password"
 						bind:value={confirmPassword}
+						error={hasError}
 						required
 					/>
 				{/if}
@@ -117,6 +119,10 @@
 						</svg>
 						Sign in with Google
 					</Button>
+
+					{#if hasError}
+						<div class="error-message">{errorMessage}</div>
+					{/if}
 				</div>
 			</form>
 
@@ -156,6 +162,13 @@
 			align-items: center;
 			justify-content: center;
 			padding: var(--space-4, 2rem);
+		}
+
+		.error-message {
+			margin-top: 0.5rem;
+			color: var(--text-error, #dc2626);
+			font-size: 0.875rem;
+			text-align: center;
 		}
 	}
 

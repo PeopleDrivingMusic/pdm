@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, isRedirect } from '@sveltejs/kit';
 import { generateSessionToken, createSession, setSessionTokenCookie } from '$lib/server/session';
 import { UserService } from '$lib/db/queries';
 import { verifyPassword, hashPassword } from '$lib/utils/password';
@@ -105,8 +105,7 @@ export const actions: Actions = {
 
             throw redirect(302, '/');
         } catch (error) {
-            if (error instanceof Response && error.status === 302) {
-                // Re-throw redirect responses
+            if (isRedirect(error)) {
                 throw error;
             }
 			
@@ -222,7 +221,7 @@ export const actions: Actions = {
 
             throw redirect(302, '/');
         } catch (error) {
-            if (error instanceof Response && error.status === 302) {
+            if (isRedirect(error)) {
                 throw error;
             }
             

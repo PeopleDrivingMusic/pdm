@@ -11,9 +11,7 @@ export const actions = {
 				requestId: event.locals.requestId
 			});
 			
-			return fail(401, {
-				error: "No active session"
-			});
+			throw redirect(302, "/login");
 		}
 
 		const sessionId = event.locals.session.id;
