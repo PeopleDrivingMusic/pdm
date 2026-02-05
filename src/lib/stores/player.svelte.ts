@@ -8,6 +8,7 @@ interface PlayerStore {
     shuffle: boolean,
     volume: number, // 0.0 to 0.1
     currentTime: number,
+    duration: number,
     currentTrack: PlayerTrack | null;
 }
 
@@ -19,6 +20,7 @@ export const playerStore = $state<PlayerStore>({
     shuffle: false,
     volume: 1.0, // 0.0 to 1.0
     currentTime: 0, // in seconds
+    duration: 0, // in seconds
     get currentTrack() {
         return this.currentTrackIndex >= 0 && this.currentTrackIndex < this.que.length
             ? this.que[this.currentTrackIndex]

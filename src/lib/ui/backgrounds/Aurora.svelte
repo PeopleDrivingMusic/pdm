@@ -140,18 +140,19 @@ void main() {
         gl.canvas.style.backgroundColor = 'transparent';
 
         let program: Program | undefined;
+        let resizeObserver: ResizeObserver | undefined;
 
-        function resize() {
-            if (!containerEl) return;
-            const width = containerEl.offsetWidth;
-            const height = containerEl.offsetHeight;
+        let currentWidth = 0;
+        let currentHeight = 0;
+        let targetWidth = 0;
+        let targetHeight = 0;
+
+        function applySize(width: number, height: number) {
             renderer.setSize(width, height);
             if (program) {
                 program.uniforms.uResolution.value = [width, height];
             }
         }
-
-        window.addEventListener('resize', resize);
 
         const geometry = new Triangle(gl);
         if (geometry.attributes.uv) {
@@ -183,6 +184,20 @@ void main() {
             animateId = requestAnimationFrame(update);
 
             if (program) {
+                if (currentWidth === 0 || currentHeight === 0) {
+                    currentWidth = targetWidth;
+                    currentHeight = targetHeight;
+                    applySize(currentWidth, currentHeight);
+                } else if (targetWidth > 0 && targetHeight > 0) {
+                    const dt = Math.min((t - lastTime) / 1000, 0.05);
+                    const lerp = 1 - Math.pow(0.001, dt);
+                    currentWidth += (targetWidth - currentWidth) * lerp;
+                    currentHeight += (targetHeight - currentHeight) * lerp;
+                    if (Math.abs(targetWidth - currentWidth) > 0.25 || Math.abs(targetHeight - currentHeight) > 0.25) {
+                        applySize(currentWidth, currentHeight);
+                    }
+                }
+
                 internalTime = t * 0.001;
                 program.uniforms.uTime.value = internalTime * speed * 0.1;
                 program.uniforms.uAmplitude.value = amplitude;
@@ -196,14 +211,28 @@ void main() {
                 program.uniforms.uColorStops.value = stops;
                 renderer.render({ scene: mesh });
             }
+            lastTime = t;
         };
 
+        resizeObserver = new ResizeObserver(entries => {
+            const entry = entries[0];
+            if (!entry) return;
+            const { width, height } = entry.contentRect;
+            targetWidth = width;
+            targetHeight = height;
+        });
+
+        resizeObserver.observe(containerEl);
         animateId = requestAnimationFrame(update);
-        resize();
+        targetWidth = containerEl.offsetWidth;
+        targetHeight = containerEl.offsetHeight;
+        currentWidth = targetWidth;
+        currentHeight = targetHeight;
+        applySize(currentWidth, currentHeight);
 
         return () => {
             cancelAnimationFrame(animateId);
-            window.removeEventListener('resize', resize);
+            resizeObserver?.disconnect();
             if (containerEl && gl.canvas.parentNode === containerEl) {
                 containerEl.removeChild(gl.canvas);
             }

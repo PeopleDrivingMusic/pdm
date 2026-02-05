@@ -6,63 +6,25 @@
 		mdiSkipPrevious,
 		mdiPause,
 		mdiPlay,
-		mdiSkipNext,
-		mdiVolumeHigh,
-		mdiVolumeMute
+		mdiSkipNext
 	} from '@mdi/js';
-	import { untrack } from 'svelte';
-	let audio: HTMLAudioElement;
-	let isMuted = $state(false);
-	let volume = $state(100);
-	let duration = $state(0);
+
 	let isUserSeeking = $state(false);
 
-	const { isPlaying, currentTime, currentTrack, que, currentTrackIndex } = $derived(playerStore);
+	const { isPlaying, currentTime, currentTrack, que, currentTrackIndex, duration } = $derived(playerStore);
 
 	function togglePlay() {
-		if (isPlaying) {
-			pause();
-		} else {
-			play();
-		}
-	}
-
-	$effect(() => {
-		if (currentTrack) untrack(() => play());
-	});
-
-	function play() {
-		audio.src = currentTrack?.track.audioUrl || '';
-		audio.currentTime = currentTime;
-		audio.play().catch((err) => console.error('Play error:', err));
-		playerStore.isPlaying = true;
-	}
-
-	function pause() {
-		playerStore.currentTime = audio.currentTime;
-		audio.pause();
-		playerStore.isPlaying = false;
-	}
-
-	function handleTimeUpdate() {
-		if (!isUserSeeking) {
-			playerStore.currentTime = audio.currentTime;
-		}
-	}
-
-	function handleLoadedMetadata() {
-		duration = audio.duration;
-	}
-
-	function handleEnded() {
-		skipNext();
+		playerStore.isPlaying = !isPlaying;
 	}
 
 	function handleProgressChange(progress: number) {
 		isUserSeeking = true;
+		if (!duration) {
+			isUserSeeking = false;
+			return;
+		}
 		const newTime = (progress / 100) * duration;
 		playerStore.currentTime = newTime;
-		audio.currentTime = newTime;
 		isUserSeeking = false;
 	}
 
@@ -80,17 +42,6 @@
 		}
 	}
 
-	function toggleMute() {
-		isMuted = !isMuted;
-		audio.muted = isMuted;
-	}
-
-	function handleVolumeChange(e: Event) {
-		const target = e.target as HTMLInputElement;
-		volume = parseInt(target.value);
-		audio.volume = volume / 100;
-	}
-
 	function formatTime(seconds: number) {
 		if (!seconds || isNaN(seconds)) return '0:00';
 		const mins = Math.floor(seconds / 60);
@@ -98,15 +49,6 @@
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	}
 </script>
-
-<audio
-	bind:this={audio}
-	ontimeupdate={handleTimeUpdate}
-	onloadedmetadata={handleLoadedMetadata}
-	onended={handleEnded}
-	crossorigin="anonymous"
->
-</audio>
 <div class="main-wrapper">
 	<div class="progress-bar">
 		<Progress

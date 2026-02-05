@@ -186,11 +186,36 @@
 							{#if data.tracks.length}
 								{#each data.tracks.slice(0, 6) as track}
 									<div class="track-item">
-										<MusicTrack isLiked={track.isLiked} track={track.tracks} album={track.albums} artist={track.artists} />
+										<MusicTrack
+											isLiked={track.isLiked}
+											track={track.tracks}
+											album={track.albums}
+											artist={track.artists}
+										/>
 									</div>
 								{/each}
 							{:else}
 								<div class="empty-state">
+									<MusicTrack
+										isLiked={false}
+										track={{
+											duration: null,
+											id: '1',
+											createdAt: new Date(),
+											updatedAt: new Date(),
+											genre: null,
+											artistId: '1',
+											title: 'Metallica',
+											isPublished: null,
+											metadata: null,
+											albumId: null,
+											audioUrl: '/music/01.mp3',
+											lyrics: null,
+											clipUrl: null,
+											imageUrl: null,
+											trackNumber: null
+										}}
+									/>
 									<p>No tracks available</p>
 								</div>
 							{/if}
@@ -257,7 +282,6 @@
 			height: 60vh;
 			z-index: 0;
 		}
-
 	}
 
 	// Main Wrapper
