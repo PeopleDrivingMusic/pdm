@@ -39,7 +39,7 @@
 
 <div class="sidebar-wrapper" class:expand>
 	<button class="logo" onclick={() => (expand = !expand)}>
-		<h2>PDM</h2>
+		<h2>{expand ? 'PDM' : 'P'}</h2>
 	</button>
 	<div class="sidebar-item search">
 		{#if expand}
@@ -163,6 +163,19 @@
 
 			&.search {
 				padding-top: 0;
+				min-height: 44px;
+				display: flex;
+				align-items: center;
+				justify-content: flex-start;
+
+				button {
+					padding: 0;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					width: 24px;
+					height: 24px;
+				}
 			}
 		}
 		.avatar-wrapper {

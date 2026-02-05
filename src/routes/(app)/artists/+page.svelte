@@ -7,7 +7,6 @@
         mdiFire,
         mdiMusicBoxMultiple,
         mdiCloudUploadOutline,
-        mdiFilterOutline,
 
 		mdiPlay
 
@@ -15,7 +14,6 @@
     import ArtistCard from './components/ArtistCard.svelte';
     import ArtistGrid from './components/ArtistGrid.svelte';
     import SearchBar from './components/SearchBar.svelte';
-    import FilterPanel from './components/FilterPanel.svelte';
 
     interface Artist {
         id: string;
@@ -172,29 +170,11 @@
     ];
 
     let searchQuery = $state('');
-    let selectedGenre = $state('all');
-    let showFilters = $state(false);
-
-    const genres = [
-        'all',
-        'Electronic',
-        'Hip Hop',
-        'Pop',
-        'Rock',
-        'Jazz',
-        'Ambient',
-        'Indie',
-        'Classical',
-        'Experimental'
-    ];
 
     function handleSearch(query: string) {
         searchQuery = query;
     }
 
-    function handleGenreChange(genre: string) {
-        selectedGenre = genre;
-    }
 </script>
 
 <div class="artists-page">
@@ -212,28 +192,8 @@
 
     <!-- Main Content -->
     <div class="artists-container">
-        <!-- Sidebar with Filters -->
-        <aside class="artists-sidebar" class:artists-sidebar--open={showFilters}>
-            <Button size="md" class="artists-sidebar__close" onclick={() => (showFilters = false)}>
-                <SvgIcon path={mdiFilterOutline} size={24} />
-            </Button>
-            <FilterPanel {genres} {selectedGenre} {handleGenreChange} />
-        </aside>
-
         <!-- Main Content Area -->
         <main class="artists-main">
-            <!-- Mobile Filter Toggle -->
-            <div class="artists-filter-toggle">
-                
-                <Button size="md"
-                    class="artists-filter-btn"
-                    onclick={() => (showFilters = !showFilters)}
-                >
-                    <SvgIcon path={mdiFilterOutline} size={18} />
-                    Filters
-                </Button>
-            </div>
-
             <!-- Recommended Section -->
             <section class="artists-section">
                 <div class="artists-section__header">
@@ -449,7 +409,6 @@
     // Main Container
     .artists-container {
         display: grid;
-        grid-template-columns: 280px 1fr;
         gap: var(--space-6);
         padding: 0 var(--space-6) var(--space-8) var(--space-6);
         max-width: 1600px;
