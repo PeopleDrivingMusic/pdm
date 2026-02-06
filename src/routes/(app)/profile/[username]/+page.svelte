@@ -10,7 +10,7 @@
 	}
 
 	let { data }: Props = $props();
-	const { user } = $derived(data);
+	const { profileUser, user: currentUser } = $derived(data);
 
 	const viewsMap: { [key: string]: any } = {
 		overview: Overview,
@@ -27,7 +27,7 @@
 	let activeTab = $state(tabs[0]);
 	const activeTabId = $derived(activeTab?.id);
 	let ViewComponent = $derived(viewsMap[activeTabId]);
-	$inspect(user);
+	$inspect(profileUser);
 	function handleTabChange(tab) {
 		activeTab = tab;
 	}
@@ -35,7 +35,7 @@
 
 <div class="profile-page">
 	<!-- Header Section -->
-	<ProfileHeader {user} />
+	<ProfileHeader user={profileUser} {currentUser} />
 
 	<!-- Tabs Section -->
 	<section class="profile-tabs-wrapper">

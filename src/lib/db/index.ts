@@ -101,6 +101,12 @@ export type NewUser = typeof schema.users.$inferInsert;
 
 export type Artist = typeof schema.artists.$inferSelect;
 export type NewArtist = typeof schema.artists.$inferInsert;
+export type ArtistOnboardingRequest = typeof schema.artistOnboardingRequests.$inferSelect;
+export type NewArtistOnboardingRequest = typeof schema.artistOnboardingRequests.$inferInsert;
+export type ArtistAccount = typeof schema.artistAccounts.$inferSelect;
+export type NewArtistAccount = typeof schema.artistAccounts.$inferInsert;
+export type ArtistSession = typeof schema.artistSessions.$inferSelect;
+export type NewArtistSession = typeof schema.artistSessions.$inferInsert;
 
 export type Album = typeof schema.albums.$inferSelect;
 export type NewAlbum = typeof schema.albums.$inferInsert;

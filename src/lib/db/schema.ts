@@ -44,6 +44,39 @@ export const artists = pgTable('artists', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Artist onboarding requests table
+export const artistOnboardingRequests = pgTable('artist_onboarding_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 100 }).notNull(),
+  listenersCount: integer('listeners_count').default(0).notNull(),
+  socialLinks: jsonb('social_links'),
+  status: varchar('status', { length: 20 }).default('pending').notNull(),
+  reviewedAt: timestamp('reviewed_at'),
+  reviewerNote: text('reviewer_note'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Artist accounts table (separate login for studio)
+export const artistAccounts = pgTable('artist_accounts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  artistId: uuid('artist_id').notNull().references(() => artists.id, { onDelete: 'cascade' }),
+  login: varchar('login', { length: 100 }).notNull().unique(),
+  hashedPassword: text('hashed_password').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Artist sessions table
+export const artistSessions = pgTable('artist_sessions', {
+  id: text('id').primaryKey(),
+  artistAccountId: uuid('artist_account_id').notNull().references(() => artistAccounts.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Albums table
 export const albums = pgTable('albums', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -134,6 +167,7 @@ export const purchases = pgTable('purchases', {
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   artist: one(artists),
+  artistOnboardingRequests: many(artistOnboardingRequests),
   playlists: many(playlists),
   favorites: many(userFavorites),
   purchases: many(purchases),
@@ -144,8 +178,31 @@ export const artistsRelations = relations(artists, ({ one, many }) => ({
     fields: [artists.userId],
     references: [users.id],
   }),
+  account: one(artistAccounts),
   albums: many(albums),
   tracks: many(tracks),
+}));
+
+export const artistOnboardingRequestsRelations = relations(artistOnboardingRequests, ({ one }) => ({
+  user: one(users, {
+    fields: [artistOnboardingRequests.userId],
+    references: [users.id],
+  }),
+}));
+
+export const artistAccountsRelations = relations(artistAccounts, ({ one, many }) => ({
+  artist: one(artists, {
+    fields: [artistAccounts.artistId],
+    references: [artists.id],
+  }),
+  sessions: many(artistSessions),
+}));
+
+export const artistSessionsRelations = relations(artistSessions, ({ one }) => ({
+  artistAccount: one(artistAccounts, {
+    fields: [artistSessions.artistAccountId],
+    references: [artistAccounts.id],
+  }),
 }));
 
 export const albumsRelations = relations(albums, ({ one, many }) => ({
@@ -236,6 +293,10 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+export type Artist = typeof artists.$inferSelect;
+export type ArtistOnboardingRequest = typeof artistOnboardingRequests.$inferSelect;
+export type ArtistAccount = typeof artistAccounts.$inferSelect;
+export type ArtistSession = typeof artistSessions.$inferSelect;
 export type Playlist = typeof playlists.$inferInsert
 export type PlaylistTrack = typeof playlistTracks.$inferInsert
 
@@ -244,6 +305,9 @@ export const schema = {
   users,
   sessions,
   artists,
+  artistOnboardingRequests,
+  artistAccounts,
+  artistSessions,
   albums,
   tracks,
   playlists,

@@ -1,7 +1,30 @@
 import { db, withDbLogging } from './index';
-import { users, artists, albums, tracks, playlists, userFavorites, trackStats, playlistTracks } from './schema';
+import {
+  users,
+  artists,
+  albums,
+  tracks,
+  playlists,
+  userFavorites,
+  trackStats,
+  playlistTracks,
+  artistOnboardingRequests,
+  artistAccounts
+} from './schema';
 import { eq, like, and, or, desc, count, sql } from 'drizzle-orm';
-import type { User, NewUser, Artist, NewArtist, Track, NewTrack, NewAlbum } from './index';
+import type {
+  User,
+  NewUser,
+  Artist,
+  NewArtist,
+  Track,
+  NewTrack,
+  NewAlbum,
+  ArtistOnboardingRequest,
+  NewArtistOnboardingRequest,
+  ArtistAccount,
+  NewArtistAccount
+} from './index';
 import { logger } from '$lib/utils/logger';
 
 // User operations
@@ -244,6 +267,88 @@ export class ArtistService {
       .where(eq(artists.isActive, true))
       .orderBy(desc(artists.createdAt))
       .limit(limit);
+  }
+}
+
+// Artist onboarding requests
+export class ArtistOnboardingService {
+  static async createRequest(data: NewArtistOnboardingRequest): Promise<ArtistOnboardingRequest> {
+    return await withDbLogging('ArtistOnboardingService.createRequest', async () => {
+      const [request] = await db.insert(artistOnboardingRequests).values(data).returning();
+      return request;
+    });
+  }
+
+  static async getLatestByUserId(userId: string): Promise<ArtistOnboardingRequest | null> {
+    return await withDbLogging('ArtistOnboardingService.getLatestByUserId', async () => {
+      const [request] = await db
+        .select()
+        .from(artistOnboardingRequests)
+        .where(eq(artistOnboardingRequests.userId, userId))
+        .orderBy(desc(artistOnboardingRequests.createdAt))
+        .limit(1);
+      return request ?? null;
+    });
+  }
+
+  static async updateStatus(
+    id: string,
+    status: 'pending' | 'approved' | 'rejected',
+    reviewerNote?: string | null
+  ): Promise<ArtistOnboardingRequest | null> {
+    return await withDbLogging('ArtistOnboardingService.updateStatus', async () => {
+      const [request] = await db
+        .update(artistOnboardingRequests)
+        .set({
+          status,
+          reviewerNote: reviewerNote ?? null,
+          reviewedAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(artistOnboardingRequests.id, id))
+        .returning();
+      return request ?? null;
+    });
+  }
+}
+
+// Artist accounts (studio login)
+export class ArtistAccountService {
+  static async createAccount(data: NewArtistAccount): Promise<ArtistAccount> {
+    return await withDbLogging('ArtistAccountService.createAccount', async () => {
+      const [account] = await db.insert(artistAccounts).values(data).returning();
+      return account;
+    });
+  }
+
+  static async getByLogin(login: string): Promise<ArtistAccount | null> {
+    return await withDbLogging('ArtistAccountService.getByLogin', async () => {
+      const [account] = await db
+        .select()
+        .from(artistAccounts)
+        .where(eq(artistAccounts.login, login));
+      return account ?? null;
+    });
+  }
+
+  static async getByArtistId(artistId: string): Promise<ArtistAccount | null> {
+    return await withDbLogging('ArtistAccountService.getByArtistId', async () => {
+      const [account] = await db
+        .select()
+        .from(artistAccounts)
+        .where(eq(artistAccounts.artistId, artistId));
+      return account ?? null;
+    });
+  }
+
+  static async getById(id: string): Promise<ArtistAccount | null> {
+    return await withDbLogging('ArtistAccountService.getById', async () => {
+      const [account] = await db
+        .select()
+        .from(artistAccounts)
+        .where(eq(artistAccounts.id, id));
+      return account ?? null;
+    });
   }
 }
 
