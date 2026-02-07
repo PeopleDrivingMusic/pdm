@@ -21,6 +21,7 @@
     disabled = false,
     id = label || `input-${Math.random().toString(36).substr(2, 9)}`,
     name = '',
+    onInput,
     error = false
   }: Props = $props();
 </script>
@@ -29,6 +30,9 @@
   {#if label}
     <label class="input-label" for={id}>
       {label}
+      {#if required}
+        <span class="required-indicator" aria-hidden="true">*</span>
+      {/if}
     </label>
   {/if}
   
@@ -57,6 +61,11 @@
     font-weight: var(--font-weight-medium);
     color: var(--text-primary);
     font-family: var(--font-family-sans);
+  }
+
+  .required-indicator {
+    color: var(--text-danger, var(--border-error));
+    margin-left: var(--space-1, 0.25rem);
   }
 
   .input {

@@ -7,6 +7,7 @@
 		href?: string;
 		onClick?: () => void;
 		children?: () => any;
+		full?: boolean;
 	}
 
 	let {
@@ -15,18 +16,19 @@
 		disabled = false,
 		href = '',
 		size = 'md',
+		full = false,
 		onClick,
 		children
 	}: Props = $props();
 </script>
 
 {#if href}
-	<a {href} class="btn btn--{variant} {size}">
+	<a {href} class="btn btn--{variant} {size}" class:full>
 		{@render children?.()}
 	</a>
 {:else}
 	<!-- else content here -->
-	<button class="btn btn--{variant} {size}" {type} {disabled} onclick={onClick}>
+	<button class="btn btn--{variant} {size}" class:full {type} {disabled} onclick={onClick}>
 		{@render children?.()}
 	</button>
 {/if}
@@ -50,6 +52,9 @@
 		position: relative;
 		overflow: hidden;
 
+		&.full {
+			width: 100%;
+		}
 		&:disabled {
 			opacity: 0.6;
 			cursor: not-allowed;
