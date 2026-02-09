@@ -17,12 +17,22 @@
 	let confirmPassword = $state('');
 	let loading = $state(false);
 
+	const passwordMinLength = 8;
+	const passwordsMatch = $derived(password === confirmPassword);
+	const passwordTouched = $derived(confirmPassword.length > 0);
+	const isPasswordValid = $derived(
+		password.length >= passwordMinLength &&
+		/[A-Z]/.test(password) &&
+		/[a-z]/.test(password) &&
+		/[0-9]/.test(password)
+	);
+
 	const isStepOneValid = $derived(!!name.trim() && !!listenersCount);
 	const isStepTwoValid = $derived(
 		!!instagram.trim() || !!spotify.trim() || !!youtube.trim()
 	);
 	const isStepThreeValid = $derived(
-		!!login.trim() && !!password && !!confirmPassword && password === confirmPassword
+		!!login.trim() && isPasswordValid && passwordsMatch && passwordTouched
 	);
 	const canProceed = $derived(
 		step === 1 ? isStepOneValid : step === 2 ? isStepTwoValid : isStepThreeValid
@@ -82,7 +92,7 @@
 					return async ({ result }) => {
 						loading = false;
 						if (result.type === 'redirect') {
-							notificationStore.success('Artist account created. Redirecting...');
+							notificationStore.success('Request submitted');
 						} else if (result.type === 'failure') {
 							notificationStore.error(result.data?.error || 'An error occurred');
 						}
@@ -160,23 +170,37 @@
 							error={hasError}
 						/>
 
-						<Input
-							label="Password"
-							type="password"
-							name="password"
-							placeholder="••••••••"
-							bind:value={password}
-							error={hasError}
-						/>
+						<div class="password-field">
+							<Input
+								label="Password"
+								type="password"
+								name="password"
+								placeholder="••••••••"
+								bind:value={password}
+								error={hasError || (password.length > 0 && !isPasswordValid)}
+							/>
+							{#if password.length > 0 && !isPasswordValid}
+								<div class="password-hint">
+									Password must be at least {passwordMinLength} characters and contain uppercase, lowercase, and number
+								</div>
+							{/if}
+						</div>
 
-						<Input
-							label="Confirm password"
-							type="password"
-							name="confirmPassword"
-							placeholder="••••••••"
-							bind:value={confirmPassword}
-							error={hasError}
-						/>
+						<div class="password-field">
+							<Input
+								label="Confirm password"
+								type="password"
+								name="confirmPassword"
+								placeholder="••••••••"
+								bind:value={confirmPassword}
+								error={hasError || (passwordTouched && !passwordsMatch)}
+							/>
+							{#if passwordTouched && !passwordsMatch}
+								<div class="password-error">
+									Passwords do not match
+								</div>
+							{/if}
+						</div>
 					</div>
 				{/if}
 
@@ -247,6 +271,24 @@
 			color: var(--text-error, #dc2626);
 			font-size: 0.875rem;
 			text-align: center;
+		}
+
+		.password-field {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+
+		.password-hint {
+			font-size: 0.75rem;
+			color: var(--text-tertiary);
+			margin-top: -0.75rem;
+		}
+
+		.password-error {
+			font-size: 0.75rem;
+			color: var(--text-error, #dc2626);
+			margin-top: -0.75rem;
 		}
 	}
 
