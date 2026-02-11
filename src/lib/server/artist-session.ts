@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import type { RequestEvent } from "@sveltejs/kit";
 import { dev } from "$app/environment";
 import { logger } from "$lib/utils/logger";
+import { ArtistAccountService, ArtistService } from "$lib/db/queries";
 
 export function generateArtistSessionToken(): string {
 	const bytes = new Uint8Array(20);
@@ -150,6 +151,30 @@ export function deleteArtistSessionTokenCookie(event: RequestEvent): void {
 		component: "auth",
 		requestId: event.locals.requestId
 	});
+}
+
+export async function getArtistByCookie(event: RequestEvent): Promise<Artist | null> {
+	const artistToken = event.cookies.get('artist_session') ?? null;
+	let artist: Artist | null = null;
+
+	if (artistToken) {
+		const result = await validateArtistSessionToken(artistToken);
+		artist = result.artist;
+	}
+
+	if (!artist && event.locals.user?.id) {
+		const ownedArtist = await ArtistService.getArtistByUserId(event.locals.user.id);
+		if (ownedArtist) {
+			const artistAccount = await ArtistAccountService.getByArtistId(ownedArtist.id);
+			if (artistAccount) {
+				const sessionToken = generateArtistSessionToken();
+				const session = await createArtistSession(sessionToken, artistAccount.id);
+				setArtistSessionTokenCookie(event, sessionToken, session.expiresAt);
+				artist = ownedArtist;
+			}
+		}
+	}
+	return artist;
 }
 
 export type ArtistSessionValidationResult =

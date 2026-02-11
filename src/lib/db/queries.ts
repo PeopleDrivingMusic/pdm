@@ -9,9 +9,11 @@ import {
   trackStats,
   playlistTracks,
   artistOnboardingRequests,
-  artistAccounts
+  artistAccounts,
+  genres,
+  albumTracks
 } from './schema';
-import { eq, like, and, or, desc, count, sql } from 'drizzle-orm';
+import { eq, like, and, or, desc, count, sql, inArray } from 'drizzle-orm';
 import type {
   User,
   NewUser,
@@ -20,10 +22,15 @@ import type {
   Track,
   NewTrack,
   NewAlbum,
+  Album,
   ArtistOnboardingRequest,
   NewArtistOnboardingRequest,
   ArtistAccount,
-  NewArtistAccount
+  NewArtistAccount,
+  Genre,
+  NewGenre,
+  AlbumTrack,
+  NewAlbumTrack
 } from './index';
 import { logger } from '$lib/utils/logger';
 
@@ -780,13 +787,149 @@ export class TrackService {
     })
 
   }
+
+  static async updateTrack(id: string, data: Partial<NewTrack>): Promise<Track | null> {
+    return await withDbLogging('TrackService.updateTrack', async () => {
+      try {
+        const [track] = await db
+          .update(tracks)
+          .set({
+            ...data,
+            updatedAt: new Date()
+          })
+          .where(eq(tracks.id, id))
+          .returning();
+
+        if (track) {
+          logger.info('Track updated', {
+            component: 'database',
+            metadata: { trackId: id, updatedFields: Object.keys(data) }
+          });
+        }
+
+        return track ?? null;
+      } catch (error) {
+        logger.error('Failed to update track', {
+          component: 'database',
+          metadata: { error, trackId: id }
+        });
+        throw error;
+      }
+    });
+  }
+
+  static async deleteTrack(id: string): Promise<boolean> {
+    return await withDbLogging('TrackService.deleteTrack', async () => {
+      try {
+        await db.delete(tracks).where(eq(tracks.id, id));
+        logger.info('Track deleted', {
+          component: 'database',
+          metadata: { trackId: id }
+        });
+        return true;
+      } catch (error) {
+        logger.error('Failed to delete track', {
+          component: 'database',
+          metadata: { error, trackId: id }
+        });
+        return false;
+      }
+    });
+  }
+
+  static async getTracksByArtistForStudio(artistId: string) {
+    return await withDbLogging('TrackService.getTracksByArtistForStudio', async () => {
+      try {
+        const result = await db
+          .select({
+            track: tracks,
+            stats: trackStats
+          })
+          .from(tracks)
+          .leftJoin(trackStats, eq(tracks.id, trackStats.trackId))
+          .where(eq(tracks.artistId, artistId))
+          .orderBy(desc(tracks.createdAt));
+
+        return result;
+      } catch (error) {
+        logger.error('Failed to get tracks by artist for studio', {
+          component: 'database',
+          metadata: { error, artistId }
+        });
+        throw error;
+      }
+    });
+  }
 }
 
 // Album operations
 export class AlbumService {
   static async createAlbum(albumData: NewAlbum) {
-    const [album] = await db.insert(albums).values(albumData).returning();
-    return album;
+    return await withDbLogging('AlbumService.createAlbum', async () => {
+      try {
+        const [album] = await db.insert(albums).values(albumData).returning();
+        logger.info('Album created', {
+          component: 'database',
+          metadata: { albumId: album.id, title: album.title }
+        });
+        return album;
+      } catch (error) {
+        logger.error('Failed to create album', {
+          component: 'database',
+          metadata: { error }
+        });
+        throw error;
+      }
+    });
+  }
+
+  static async updateAlbum(id: string, data: Partial<NewAlbum>): Promise<Album | null> {
+    return await withDbLogging('AlbumService.updateAlbum', async () => {
+      try {
+        const [album] = await db
+          .update(albums)
+          .set({
+            ...data,
+            updatedAt: new Date()
+          })
+          .where(eq(albums.id, id))
+          .returning();
+
+        if (album) {
+          logger.info('Album updated', {
+            component: 'database',
+            metadata: { albumId: id, updatedFields: Object.keys(data) }
+          });
+        }
+
+        return album ?? null;
+      } catch (error) {
+        logger.error('Failed to update album', {
+          component: 'database',
+          metadata: { error, albumId: id }
+        });
+        throw error;
+      }
+    });
+  }
+
+  static async deleteAlbum(id: string): Promise<boolean> {
+    return await withDbLogging('AlbumService.deleteAlbum', async () => {
+      try {
+        await db.delete(albums).where(eq(albums.id, id));
+        logger.info('Album deleted', {
+          component: 'database',
+          metadata: { albumId: id }
+        });
+        return true;
+      } catch (error) {
+        logger.error('Failed to delete album', {
+          component: 'database',
+          metadata: { error, albumId: id }
+        });
+        return false;
+      }
+    });
   }
 
   static async getAlbumById(id: string) {
@@ -799,10 +942,218 @@ export class AlbumService {
       .select()
       .from(albums)
       .where(eq(albums.artistId, artistId))
-      .orderBy(desc(albums.releaseDate))
+      .orderBy(desc(albums.createdAt))
       .limit(limit);
   }
 
+  static async getAlbumWithTracks(albumId: string) {
+    return await withDbLogging('AlbumService.getAlbumWithTracks', async () => {
+      try {
+        const album = await this.getAlbumById(albumId);
+        if (!album) return null;
+
+        const albumTracksList = await db
+          .select({
+            track: tracks,
+            trackNumber: albumTracks.trackNumber
+          })
+          .from(albumTracks)
+          .innerJoin(tracks, eq(albumTracks.trackId, tracks.id))
+          .where(eq(albumTracks.albumId, albumId))
+          .orderBy(albumTracks.trackNumber);
+
+        return {
+          ...album,
+          tracks: albumTracksList
+        };
+      } catch (error) {
+        logger.error('Failed to get album with tracks', {
+          component: 'database',
+          metadata: { error, albumId }
+        });
+        return null;
+      }
+    });
+  }
+}
+
+// Genre operations
+export class GenreService {
+  static async createGenre(name: string): Promise<Genre> {
+    return await withDbLogging('GenreService.createGenre', async () => {
+      try {
+        const normalizedName = name.toLowerCase().trim();
+        const [genre] = await db
+          .insert(genres)
+          .values({ name: normalizedName, displayName: normalizedName })
+          .onConflictDoNothing()
+          .returning();
+
+        if (!genre) {
+          // Genre already exists, fetch it
+          return await this.getGenreByName(normalizedName) as Genre;
+        }
+
+        logger.info('Genre created', {
+          component: 'database',
+          metadata: { genreName: normalizedName }
+        });
+
+        return genre;
+      } catch (error) {
+        logger.error('Failed to create genre', {
+          component: 'database',
+          metadata: { error, name }
+        });
+        throw error;
+      }
+    });
+  }
+
+  static async getGenreByName(name: string): Promise<Genre | null> {
+    const normalizedName = name.toLowerCase().trim();
+    const [genre] = await db
+      .select()
+      .from(genres)
+      .where(eq(genres.name, normalizedName));
+    return genre ?? null;
+  }
+
+  static async getAllGenres(): Promise<Genre[]> {
+    return await db
+      .select()
+      .from(genres)
+      .orderBy(genres.displayName);
+  }
+
+  static async getOrCreateGenres(genreNames: string[]): Promise<Genre[]> {
+    return await withDbLogging('GenreService.getOrCreateGenres', async () => {
+      try {
+        const results: Genre[] = [];
+        for (const name of genreNames) {
+          const genre = await this.createGenre(name);
+          results.push(genre);
+        }
+        return results;
+      } catch (error) {
+        logger.error('Failed to get or create genres', {
+          component: 'database',
+          metadata: { error, genreNames }
+        });
+        throw error;
+      }
+    });
+  }
+}
+
+// Album-Track junction operations
+export class AlbumTrackService {
+  static async linkTrackToAlbum(albumId: string, trackId: string, trackNumber: number): Promise<AlbumTrack> {
+    return await withDbLogging('AlbumTrackService.linkTrackToAlbum', async () => {
+      try {
+        const [albumTrack] = await db
+          .insert(albumTracks)
+          .values({
+            albumId,
+            trackId,
+            trackNumber
+          })
+          .returning();
+
+        logger.info('Track linked to album', {
+          component: 'database',
+          metadata: { albumId, trackId, trackNumber }
+        });
+
+        return albumTrack;
+      } catch (error) {
+        logger.error('Failed to link track to album', {
+          component: 'database',
+          metadata: { error, albumId, trackId }
+        });
+        throw error;
+      }
+    });
+  }
+
+  static async unlinkTrackFromAlbum(albumId: string, trackId: string): Promise<boolean> {
+    return await withDbLogging('AlbumTrackService.unlinkTrackFromAlbum', async () => {
+      try {
+        await db
+          .delete(albumTracks)
+          .where(
+            and(
+              eq(albumTracks.albumId, albumId),
+              eq(albumTracks.trackId, trackId)
+            )
+          );
+
+        logger.info('Track unlinked from album', {
+          component: 'database',
+          metadata: { albumId, trackId }
+        });
+
+        return true;
+      } catch (error) {
+        logger.error('Failed to unlink track from album', {
+          component: 'database',
+          metadata: { error, albumId, trackId }
+        });
+        return false;
+      }
+    });
+  }
+
+  static async updateTrackNumber(albumId: string, trackId: string, trackNumber: number): Promise<boolean> {
+    return await withDbLogging('AlbumTrackService.updateTrackNumber', async () => {
+      try {
+        await db
+          .update(albumTracks)
+          .set({ trackNumber })
+          .where(
+            and(
+              eq(albumTracks.albumId, albumId),
+              eq(albumTracks.trackId, trackId)
+            )
+          );
+
+        logger.info('Track number updated', {
+          component: 'database',
+          metadata: { albumId, trackId, trackNumber }
+        });
+
+        return true;
+      } catch (error) {
+        logger.error('Failed to update track number', {
+          component: 'database',
+          metadata: { error, albumId, trackId, trackNumber }
+        });
+        return false;
+      }
+    });
+  }
+
+  static async getAlbumTracks(albumId: string) {
+    return await withDbLogging('AlbumTrackService.getAlbumTracks', async () => {
+      try {
+        return await db
+          .select({
+            track: tracks,
+            trackNumber: albumTracks.trackNumber
+          })
+          .from(albumTracks)
+          .innerJoin(tracks, eq(albumTracks.trackId, tracks.id))
+          .where(eq(albumTracks.albumId, albumId))
+          .orderBy(albumTracks.trackNumber);
+      } catch (error) {
+        logger.error('Failed to get album tracks', {
+          component: 'database',
+          metadata: { error, albumId }
+        });
+        throw error;
+      }
+    });
+  }
 }
 
 // Analytics utilities

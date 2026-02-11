@@ -78,6 +78,13 @@
       "when": 1770700000000,
       "tag": "0010_active_artist_trust_score",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1770787386266,
+      "tag": "0011_living_doomsday",
+      "breakpoints": true
     }
   ]
 }

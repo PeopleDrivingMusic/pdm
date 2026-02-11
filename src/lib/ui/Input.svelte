@@ -10,6 +10,8 @@
     name?: string;
     onInput?: (e: InputEvent) => any
     error?: boolean;
+    min?: number;
+    max?: number;
   }
 
   let {
@@ -22,7 +24,8 @@
     id = label || `input-${Math.random().toString(36).substr(2, 9)}`,
     name = '',
     onInput,
-    error = false
+    error = false,
+    ...rest
   }: Props = $props();
 </script>
 
@@ -46,6 +49,7 @@
     bind:value
     {required}
     {disabled}
+    {...rest}
   />
 </div>
 

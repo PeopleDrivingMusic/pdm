@@ -78,6 +78,14 @@ export const artistSessions = pgTable('artist_sessions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Genres table (normalized)
+export const genres = pgTable('genres', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 50 }).notNull().unique(), // normalized lowercase value
+  displayName: varchar('display_name', { length: 50 }).notNull(), // display value
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Albums table
 export const albums = pgTable('albums', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -88,6 +96,7 @@ export const albums = pgTable('albums', {
   releaseDate: timestamp('release_date'),
   price: integer('price'), // Price in cents or smallest currency unit
   isPublished: boolean('is_published').default(false),
+  genres: jsonb('genres').$type<string[]>(), // genres array for search
   metadata: jsonb('metadata'), // Additional metadata (blockchain info, etc.)
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -141,6 +150,15 @@ export const playlistTracks = pgTable('playlist_tracks', {
   playlistId: uuid('playlist_id').notNull().references(() => playlists.id),
   trackId: uuid('track_id').notNull().references(() => tracks.id),
   position: integer('position').notNull(),
+  addedAt: timestamp('added_at').defaultNow().notNull(),
+});
+
+// Album tracks junction table (many-to-many)
+export const albumTracks = pgTable('album_tracks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  albumId: uuid('album_id').notNull().references(() => albums.id, { onDelete: 'cascade' }),
+  trackId: uuid('track_id').notNull().references(() => tracks.id, { onDelete: 'cascade' }),
+  trackNumber: integer('track_number').notNull(), // position in album
   addedAt: timestamp('added_at').defaultNow().notNull(),
 });
 
@@ -211,7 +229,7 @@ export const albumsRelations = relations(albums, ({ one, many }) => ({
     fields: [albums.artistId],
     references: [artists.id],
   }),
-  tracks: many(tracks),
+  albumTracks: many(albumTracks),
   purchases: many(purchases),
 }));
 
@@ -224,9 +242,11 @@ export const tracksRelations = relations(tracks, ({ one, many }) => ({
     fields: [tracks.albumId],
     references: [albums.id],
   }),
+  albumTracks: many(albumTracks),
   playlistTracks: many(playlistTracks),
   favorites: many(userFavorites),
   purchases: many(purchases),
+  stats: one(trackStats),
 }));
 
 export const playlistsRelations = relations(playlists, ({ one, many }) => ({
@@ -244,6 +264,17 @@ export const playlistTracksRelations = relations(playlistTracks, ({ one }) => ({
   }),
   track: one(tracks, {
     fields: [playlistTracks.trackId],
+    references: [tracks.id],
+  }),
+}));
+
+export const albumTracksRelations = relations(albumTracks, ({ one }) => ({
+  album: one(albums, {
+    fields: [albumTracks.albumId],
+    references: [albums.id],
+  }),
+  track: one(tracks, {
+    fields: [albumTracks.trackId],
     references: [tracks.id],
   }),
 }));
@@ -295,11 +326,23 @@ export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
 export type Artist = typeof artists.$inferSelect;
+export type NewArtist = typeof artists.$inferInsert;
 export type ArtistOnboardingRequest = typeof artistOnboardingRequests.$inferSelect;
+export type NewArtistOnboardingRequest = typeof artistOnboardingRequests.$inferInsert;
 export type ArtistAccount = typeof artistAccounts.$inferSelect;
+export type NewArtistAccount = typeof artistAccounts.$inferInsert;
 export type ArtistSession = typeof artistSessions.$inferSelect;
-export type Playlist = typeof playlists.$inferInsert
-export type PlaylistTrack = typeof playlistTracks.$inferInsert
+export type Album = typeof albums.$inferSelect;
+export type NewAlbum = typeof albums.$inferInsert;
+export type Track = typeof tracks.$inferSelect;
+export type NewTrack = typeof tracks.$inferInsert;
+export type TrackStats = typeof trackStats.$inferSelect;
+export type Genre = typeof genres.$inferSelect;
+export type NewGenre = typeof genres.$inferInsert;
+export type AlbumTrack = typeof albumTracks.$inferSelect;
+export type NewAlbumTrack = typeof albumTracks.$inferInsert;
+export type Playlist = typeof playlists.$inferInsert;
+export type PlaylistTrack = typeof playlistTracks.$inferInsert;
 
 // Export all tables for migrations
 export const schema = {
@@ -309,8 +352,11 @@ export const schema = {
   artistOnboardingRequests,
   artistAccounts,
   artistSessions,
+  genres,
   albums,
   tracks,
+  trackStats,
+  albumTracks,
   playlists,
   playlistTracks,
   userFavorites,
