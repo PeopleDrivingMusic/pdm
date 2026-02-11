@@ -71,6 +71,13 @@
       "when": 1770609045292,
       "tag": "0009_silly_trish_tilby",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1770700000000,
+      "tag": "0010_active_artist_trust_score",
+      "breakpoints": true
     }
   ]
 }

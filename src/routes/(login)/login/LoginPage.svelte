@@ -95,7 +95,7 @@
 				{/if}
 
 				<div class="form-buttons">
-					<Button type="submit" variant="primary" disabled={loading}>
+					<Button type="submit" variant="primary" full={true} disabled={loading}>
 						{#if mode === 'register'}
 							{loading ? 'Creating...' : 'Create account'}
 						{:else}
@@ -103,7 +103,7 @@
 						{/if}
 					</Button>
 
-					<Button type="button" variant="google" href="/login/google">
+					<Button type="button" variant="google" href="/login/google" full={true}>
 						<svg width="18" height="18" viewBox="0 0 18 18">
 							<path
 								fill="#4285F4"

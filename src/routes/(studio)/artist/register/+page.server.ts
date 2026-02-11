@@ -4,6 +4,7 @@ import { ArtistAccountService, ArtistOnboardingService, ArtistService } from '$l
 import { generateArtistSessionToken, createArtistSession, setArtistSessionTokenCookie } from '$lib/server/artist-session';
 import { hashPassword } from '$lib/utils/password';
 import { logger } from '$lib/utils/logger';
+import { getUniqueSlug, slugify } from '$lib/utils/utils';
 
 const listenersCountMap: Record<string, number> = {
     '0-1k': 1000,
@@ -13,23 +14,6 @@ const listenersCountMap: Record<string, number> = {
     '1m-plus': 1000000
 };
 
-const slugify = (value: string) =>
-    value
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '');
-
-const getUniqueSlug = async (base: string) => {
-    let slug = base || 'artist';
-    let suffix = 1;
-
-    while (await ArtistService.getArtistBySlug(slug)) {
-        slug = `${base}-${suffix}`;
-        suffix += 1;
-    }
-
-    return slug;
-};
 
 export const load = (async (event) => {
     if (!event.locals.user) {
@@ -91,7 +75,7 @@ export const actions: Actions = {
             const socialLinks = socialLinksEntries.length > 0 ? Object.fromEntries(socialLinksEntries) : undefined;
 
             const slugBase = slugify(name);
-            const slug = await getUniqueSlug(slugBase);
+            const slug = await getUniqueSlug(slugBase, ArtistService.getArtistBySlug);
 
             const artist = await ArtistService.createArtist({
                 userId: event.locals.user.id,

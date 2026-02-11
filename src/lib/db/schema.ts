@@ -39,6 +39,7 @@ export const artists = pgTable('artists', {
   genre: varchar('genre', { length: 50 }),
   description: text('description'),
   socialLinks: jsonb('social_links'), // JSON object for social media links
+  trust_score: decimal('trust_score', { precision: 3, scale: 2 }).default('3.00').notNull(),
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
