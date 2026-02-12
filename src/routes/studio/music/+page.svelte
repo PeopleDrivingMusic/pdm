@@ -13,8 +13,11 @@
 	import Button from '$lib/ui/Button.svelte';
 	import Modal from '$lib/ui/components/Modal/Modal.svelte';
 	import Input from '$lib/ui/Input.svelte';
+	import FileUpload from '$lib/ui/FileUpload.svelte';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
 	import { enhance } from '$app/forms';
+	import { notificationStore } from '$lib/stores/notification.svelte';
+	import Checkbox from '$lib/ui/Checkbox.svelte';
 
 	let { data } = $props();
 
@@ -41,9 +44,41 @@
 		genres: ''
 	});
 
+	// File states
+	let albumCoverFile = $state<File | null>(null);
+	let trackAudioFile = $state<File | null>(null);
+	let trackImageFile = $state<File | null>(null);
+	let trackDuration = $state<number | null>(null);
+	let durationRequestId = 0;
+
+	async function updateTrackDuration(file: File) {
+		const requestId = ++durationRequestId;
+		const objectUrl = URL.createObjectURL(file);
+		try {
+			const duration = await new Promise<number>((resolve, reject) => {
+				const audio = new Audio();
+				audio.preload = 'metadata';
+				audio.onloadedmetadata = () => resolve(audio.duration);
+				audio.onerror = () => reject(new Error('Failed to read audio metadata'));
+				audio.src = objectUrl;
+			});
+
+			if (requestId === durationRequestId) {
+				trackDuration = Number.isFinite(duration) ? Math.round(duration) : null;
+			}
+		} catch {
+			if (requestId === durationRequestId) {
+				trackDuration = null;
+			}
+		} finally {
+			URL.revokeObjectURL(objectUrl);
+		}
+	}
+
 	function openCreateAlbum() {
 		editingAlbum = null;
 		albumForm = { title: '', description: '', releaseDate: '', genres: '' };
+		albumCoverFile = null;
 		showAlbumModal = true;
 	}
 
@@ -55,12 +90,16 @@
 			releaseDate: album.releaseDate ? new Date(album.releaseDate).toISOString().split('T')[0] : '',
 			genres: album.genres ? album.genres.join(', ') : ''
 		};
+		albumCoverFile = null;
 		showAlbumModal = true;
 	}
 
 	function openCreateTrack() {
 		editingTrack = null;
 		trackForm = { title: '', genres: '' };
+		trackAudioFile = null;
+		trackImageFile = null;
+		trackDuration = null;
 		showTrackModal = true;
 	}
 
@@ -70,6 +109,9 @@
 			title: track.title || '',
 			genres: track.genre ? track.genre.join(', ') : ''
 		};
+		trackAudioFile = null;
+		trackImageFile = null;
+		trackDuration = null;
 		showTrackModal = true;
 	}
 
@@ -283,7 +325,20 @@
 	<form
 		method="POST"
 		action={editingAlbum ? '?/updateAlbum' : '?/createAlbum'}
-		use:enhance
+		enctype="multipart/form-data"
+		use:enhance={() => {
+			return async ({ result, update }) => {
+				if (result.type === 'success') {
+					showAlbumModal = false;
+					notificationStore.success(
+						editingAlbum ? 'Album updated successfully' : 'Album created successfully'
+					);
+				} else if (result.type === 'failure') {
+					notificationStore.error(result.data?.error || 'Failed to save album');
+				}
+				await update();
+			};
+		}}
 		class="modal-form"
 	>
 		{#if editingAlbum}
@@ -318,6 +373,15 @@
 			placeholder="e.g., Rock, Pop, Jazz (comma-separated)"
 		/>
 
+		<FileUpload
+			label="Cover Image"
+			name="coverImage"
+			accept="image/*"
+			bind:value={albumCoverFile}
+			maxSize={5}
+			helpText="Upload album cover (max 5MB, formats: JPG, PNG, WebP)"
+		/>
+
 		{#if editingAlbum}
 			<div class="form-group">
 				<label>
@@ -348,18 +412,31 @@
 	<form
 		method="POST"
 		action={editingTrack ? '?/updateTrack' : '?/createTrack'}
-		use:enhance
+		enctype="multipart/form-data"
+		use:enhance={() => {
+			return async ({ result, update }) => {
+				if (result.type === 'success') {
+					showTrackModal = false;
+					notificationStore.success(
+						editingTrack ? 'Track updated successfully' : 'Track created successfully'
+					);
+				} else if (result.type === 'failure') {
+					notificationStore.error(result.data?.error || 'Failed to save track');
+				}
+				await update();
+			};
+		}}
 		class="modal-form"
 	>
 		{#if editingTrack}
 			<input type="hidden" name="trackId" value={editingTrack.id} />
 		{/if}
+		<input type="hidden" name="duration" value={trackDuration ?? ''} />
 
 		<Input
 			label="Track Title"
 			name="title"
 			bind:value={trackForm.title}
-			required
 			placeholder="Enter track title"
 		/>
 
@@ -370,9 +447,29 @@
 			placeholder="e.g., Rock, Pop, Jazz (comma-separated)"
 		/>
 
+		<FileUpload
+			label="Audio File"
+			name="audioFile"
+			accept="audio/*"
+			bind:value={trackAudioFile}
+			maxSize={50}
+			preview={false}
+			helpText="Upload track audio (max 50MB, formats: MP3, WAV, FLAC)"
+		/>
+
+		<FileUpload
+			label="Track Cover Image"
+			name="trackImage"
+			accept="image/*"
+			bind:value={trackImageFile}
+			maxSize={5}
+			helpText="Upload track cover (max 5MB, formats: JPG, PNG, WebP)"
+		/>
+
 		{#if editingTrack}
 			<div class="form-group">
-				<label>
+				<Checkbox  name="isPublished" checked={editingTrack.isPublished} label="Published"></Checkbox>
+				<!-- <label>
 					<input
 						type="checkbox"
 						name="isPublished"
@@ -380,7 +477,7 @@
 						checked={editingTrack.isPublished}
 					/>
 					Published
-				</label>
+				</label> -->
 			</div>
 		{/if}
 
@@ -397,7 +494,22 @@
 
 <!-- Link Track to Album Modal -->
 <Modal bind:show={showLinkModal} title="Link Track to Album">
-	<form method="POST" action="?/linkTrackToAlbum" use:enhance class="modal-form">
+	<form
+		method="POST"
+		action="?/linkTrackToAlbum"
+		use:enhance={() => {
+			return async ({ result, update }) => {
+				if (result.type === 'success') {
+					showLinkModal = false;
+					notificationStore.success('Track linked to album successfully');
+				} else if (result.type === 'failure') {
+					notificationStore.error(result.data?.error || 'Failed to link track to album');
+				}
+				await update();
+			};
+		}}
+		class="modal-form"
+	>
 		<input type="hidden" name="trackId" value={linkingTrackId} />
 
 		<div class="form-group">
@@ -410,7 +522,7 @@
 			</select>
 		</div>
 
-		<Input label="Track Number" name="trackNumber" type="number" min={1} placeholder="1" />
+		<Input label="Track Number" name="trackNumber" type="number" min={1} placeholder="1" required />
 
 		<div class="modal-actions">
 			<Button type="button" variant="secondary" onClick={() => (showLinkModal = false)}>

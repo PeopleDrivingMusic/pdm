@@ -41,6 +41,7 @@
     width: var(--space-4);
     height: var(--space-4);
     accent-color: var(--primary);
+    background: var( --bg-primary);
     cursor: pointer;
     border-radius: var(--radius-sm);
     transition: all var(--duration-fast) var(--easing-ease-out);

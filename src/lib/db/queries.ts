@@ -983,16 +983,20 @@ export class GenreService {
     return await withDbLogging('GenreService.createGenre', async () => {
       try {
         const normalizedName = name.toLowerCase().trim();
+
+        // Check if genre already exists
+        const existing = await this.getGenreByName(normalizedName);
+        if (existing) {
+          return existing;
+        }
+
         const [genre] = await db
           .insert(genres)
-          .values({ name: normalizedName, displayName: normalizedName })
-          .onConflictDoNothing()
+          .values({
+            name: normalizedName,
+            displayName: normalizedName
+          })
           .returning();
-
-        if (!genre) {
-          // Genre already exists, fetch it
-          return await this.getGenreByName(normalizedName) as Genre;
-        }
 
         logger.info('Genre created', {
           component: 'database',
@@ -1051,6 +1055,55 @@ export class AlbumTrackService {
   static async linkTrackToAlbum(albumId: string, trackId: string, trackNumber: number): Promise<AlbumTrack> {
     return await withDbLogging('AlbumTrackService.linkTrackToAlbum', async () => {
       try {
+        // Check if this track is already linked to this album
+        const existingLink = await db
+          .select()
+          .from(albumTracks)
+          .where(
+            and(
+              eq(albumTracks.albumId, albumId),
+              eq(albumTracks.trackId, trackId)
+            )
+          );
+
+        if (existingLink.length > 0) {
+          throw new Error('Track is already linked to this album');
+        }
+
+        // Check if the trackNumber is already taken in this album
+        const existingTrackNumber = await db
+          .select()
+          .from(albumTracks)
+          .where(
+            and(
+              eq(albumTracks.albumId, albumId),
+              eq(albumTracks.trackNumber, trackNumber)
+            )
+          );
+
+        // If track number is taken, shift all tracks with >= trackNumber by 1
+        if (existingTrackNumber.length > 0) {
+          // Get all tracks with trackNumber >= requested number, ordered DESC
+          const tracksToShift = await db
+            .select()
+            .from(albumTracks)
+            .where(
+              and(
+                eq(albumTracks.albumId, albumId),
+                sql`${albumTracks.trackNumber} >= ${trackNumber}`
+              )
+            )
+            .orderBy(desc(albumTracks.trackNumber));
+
+          // Shift tracks recursively (update from highest to lowest to avoid conflicts)
+          for (const track of tracksToShift) {
+            await db
+              .update(albumTracks)
+              .set({ trackNumber: track.trackNumber + 1 })
+              .where(eq(albumTracks.id, track.id));
+          }
+        }
+
         const [albumTrack] = await db
           .insert(albumTracks)
           .values({

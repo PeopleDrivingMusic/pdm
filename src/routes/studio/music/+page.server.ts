@@ -7,6 +7,19 @@ import {
 	AlbumTrackService
 } from '$lib/db/queries';
 import { getArtistByCookie } from '$lib/server/artist-session';
+import { uploadImage, uploadAudio, deleteFile } from '$lib/server/upload';
+import { extractTrackMetadata } from '$lib/server/music-metadata';
+
+function getUploadRelativePath(urlOrPath: string | null | undefined) {
+	if (!urlOrPath) return null;
+	if (urlOrPath.startsWith('/uploads/')) {
+		return urlOrPath.slice('/uploads/'.length);
+	}
+	if (urlOrPath.startsWith('uploads/')) {
+		return urlOrPath.slice('uploads/'.length);
+	}
+	return urlOrPath;
+}
 
 export const load: PageServerLoad = async ({ parent }) => {
 	const { artist } = await parent();
@@ -60,6 +73,7 @@ export const actions: Actions = {
 			const description = data.get('description') as string;
 			const releaseDate = data.get('releaseDate') as string;
 			const genresString = data.get('genres') as string;
+			const coverImageFile = data.get('coverImage') as File | null;
 
 			if (!title) {
 				return fail(400, { error: 'Title is required' });
@@ -67,12 +81,24 @@ export const actions: Actions = {
 
 			const genres = genresString ? genresString.split(',').map((g) => g.trim()) : [];
 
+			// Upload cover image if provided
+			let coverImageUrl: string | null = null;
+			if (coverImageFile && coverImageFile.size > 0) {
+				const uploadResult = await uploadImage(coverImageFile, 'albums');
+				if (uploadResult.success) {
+					coverImageUrl = uploadResult.url!;
+				} else {
+					return fail(400, { error: uploadResult.error || 'Failed to upload cover image' });
+				}
+			}
+
 			const album = await AlbumService.createAlbum({
 				artistId: artist.id,
 				title,
 				description: description || null,
 				releaseDate: releaseDate ? new Date(releaseDate) : null,
 				genres: genres.length > 0 ? genres : null,
+				coverImageUrl,
 				isPublished: false
 			});
 
@@ -104,9 +130,15 @@ export const actions: Actions = {
 			const releaseDate = data.get('releaseDate') as string;
 			const isPublished = data.get('isPublished') === 'true';
 			const genresString = data.get('genres') as string;
+			const coverImageFile = data.get('coverImage') as File | null;
 
 			if (!albumId) {
 				return fail(400, { error: 'Album ID is required' });
+			}
+
+			const existingAlbum = await AlbumService.getAlbumById(albumId);
+			if (!existingAlbum) {
+				return fail(404, { error: 'Album not found' });
 			}
 
 			const genres = genresString ? genresString.split(',').map((g) => g.trim()) : [];
@@ -121,7 +153,22 @@ export const actions: Actions = {
 				await GenreService.getOrCreateGenres(genres);
 			}
 
+			// Upload new cover image if provided
+			let previousCoverPath: string | null = null;
+			if (coverImageFile && coverImageFile.size > 0) {
+				const uploadResult = await uploadImage(coverImageFile, 'albums');
+				if (uploadResult.success) {
+					updateData.coverImageUrl = uploadResult.url!;
+					previousCoverPath = getUploadRelativePath(existingAlbum.coverImageUrl);
+				} else {
+					return fail(400, { error: uploadResult.error || 'Failed to upload cover image' });
+				}
+			}
+
 			const album = await AlbumService.updateAlbum(albumId, updateData);
+			if (album && previousCoverPath && previousCoverPath !== getUploadRelativePath(album.coverImageUrl)) {
+				deleteFile(previousCoverPath);
+			}
 
 			if (!album) {
 				return fail(404, { error: 'Album not found' });
@@ -150,10 +197,20 @@ export const actions: Actions = {
 				return fail(400, { error: 'Album ID is required' });
 			}
 
+			const existingAlbum = await AlbumService.getAlbumById(albumId);
+			if (!existingAlbum) {
+				return fail(404, { error: 'Album not found' });
+			}
+
+			const previousCoverPath = getUploadRelativePath(existingAlbum.coverImageUrl);
 			const success = await AlbumService.deleteAlbum(albumId);
 
 			if (!success) {
 				return fail(500, { error: 'Failed to delete album' });
+			}
+
+			if (previousCoverPath) {
+				deleteFile(previousCoverPath);
 			}
 
 			return { success: true };
@@ -175,18 +232,57 @@ export const actions: Actions = {
 			const data = await request.formData();
 			const title = data.get('title') as string;
 			const genresString = data.get('genres') as string;
+			const audioFile = data.get('audioFile') as File | null;
+			const trackImageFile = data.get('trackImage') as File | null;
 
-			if (!title) {
+			const trackMetadata = audioFile && audioFile.size > 0
+				? await extractTrackMetadata(audioFile)
+				: null;
+			const resolvedTitle = title?.trim() || trackMetadata?.title || '';
+
+			if (!resolvedTitle) {
 				return fail(400, { error: 'Title is required' });
 			}
 
 			const genres = genresString ? genresString.split(',').map((g) => g.trim()) : [];
 
+			// Upload audio file if provided
+			let audioUrl: string | null = null;
+			let duration: number | null = trackMetadata?.duration ?? null;
+			if (audioFile && audioFile.size > 0) {
+				const uploadResult = await uploadAudio(audioFile, 'tracks');
+				if (uploadResult.success) {
+					audioUrl = uploadResult.url!;
+				} else {
+					return fail(400, { error: uploadResult.error || 'Failed to upload audio file' });
+				}
+			}
+
+			// Upload track image if provided
+			let imageUrl: string | null = null;
+			if (trackImageFile && trackImageFile.size > 0) {
+				const uploadResult = await uploadImage(trackImageFile, 'tracks');
+				if (uploadResult.success) {
+					imageUrl = uploadResult.url!;
+				} else {
+					return fail(400, { error: uploadResult.error || 'Failed to upload track image' });
+				}
+			} else if (trackMetadata?.coverImageFile) {
+				const uploadResult = await uploadImage(trackMetadata.coverImageFile, 'tracks');
+				if (uploadResult.success) {
+					imageUrl = uploadResult.url!;
+				} else {
+					return fail(400, { error: uploadResult.error || 'Failed to upload track image' });
+				}
+			}
+
 			const track = await TrackService.createTrack({
 				artistId: artist.id,
-				title,
-				duration: null, // Will be set when audio file is uploaded
+				title: resolvedTitle,
 				genre: genres.length > 0 ? genres : null,
+				audioUrl,
+				imageUrl,
+				duration,
 				isPublished: false,
 				albumId: null
 			});
@@ -217,22 +313,90 @@ export const actions: Actions = {
 			const title = data.get('title') as string;
 			const isPublished = data.get('isPublished') as string;
 			const genresString = data.get('genres') as string;
+			const audioFile = data.get('audioFile') as File | null;
+			const trackImageFile = data.get('trackImage') as File | null;
+			const durationValue = data.get('duration') as string | null;
 
 			if (!trackId) {
 				return fail(400, { error: 'Track ID is required' });
 			}
 
+			const existingTrack = await TrackService.getTrackById(trackId);
+			if (!existingTrack) {
+				return fail(404, { error: 'Track not found' });
+			}
+
+			const trackMetadata = audioFile && audioFile.size > 0
+				? await extractTrackMetadata(audioFile)
+				: null;
+
 			const genres = genresString ? genresString.split(',').map((g) => g.trim()) : [];
 
 			const updateData: any = {};
-			if (title) updateData.title = title;
+			if (title) {
+				updateData.title = title;
+			} else if (trackMetadata?.title) {
+				updateData.title = trackMetadata.title;
+			}
 			if (isPublished !== null) updateData.isPublished = isPublished === 'true';
+			if (durationValue && durationValue.trim() !== '') {
+				const parsedDuration = Number(durationValue);
+				if (Number.isFinite(parsedDuration)) {
+					updateData.duration = Math.round(parsedDuration);
+				}
+			} else if (trackMetadata?.duration) {
+				updateData.duration = trackMetadata.duration;
+			}
 			if (genres.length > 0) {
 				updateData.genre = genres;
 				await GenreService.getOrCreateGenres(genres);
 			}
 
+			let previousAudioPath: string | null = null;
+			if (audioFile && audioFile.size > 0) {
+				const uploadResult = await uploadAudio(audioFile, 'tracks');
+				if (uploadResult.success) {
+					updateData.audioUrl = uploadResult.url!;
+					previousAudioPath = getUploadRelativePath(existingTrack.audioUrl);
+					if (durationValue && durationValue.trim() !== '') {
+						const parsedDuration = Number(durationValue);
+						if (Number.isFinite(parsedDuration)) {
+							updateData.duration = Math.round(parsedDuration);
+						}
+					}
+				} else {
+					return fail(400, { error: uploadResult.error || 'Failed to upload audio file' });
+				}
+			}
+
+			let previousImagePath: string | null = null;
+			if (trackImageFile && trackImageFile.size > 0) {
+				const uploadResult = await uploadImage(trackImageFile, 'tracks');
+				if (uploadResult.success) {
+					updateData.imageUrl = uploadResult.url!;
+					previousImagePath = getUploadRelativePath(existingTrack.imageUrl);
+				} else {
+					return fail(400, { error: uploadResult.error || 'Failed to upload track image' });
+				}
+			} else if (trackMetadata?.coverImageFile) {
+				const uploadResult = await uploadImage(trackMetadata.coverImageFile, 'tracks');
+				if (uploadResult.success) {
+					updateData.imageUrl = uploadResult.url!;
+					previousImagePath = getUploadRelativePath(existingTrack.imageUrl);
+				} else {
+					return fail(400, { error: uploadResult.error || 'Failed to upload track image' });
+				}
+			}
+
 			const track = await TrackService.updateTrack(trackId, updateData);
+			if (track) {
+				if (previousAudioPath && previousAudioPath !== getUploadRelativePath(track.audioUrl)) {
+					deleteFile(previousAudioPath);
+				}
+				if (previousImagePath && previousImagePath !== getUploadRelativePath(track.imageUrl)) {
+					deleteFile(previousImagePath);
+				}
+			}
 
 			if (!track) {
 				return fail(404, { error: 'Track not found' });
@@ -261,10 +425,24 @@ export const actions: Actions = {
 				return fail(400, { error: 'Track ID is required' });
 			}
 
+			const existingTrack = await TrackService.getTrackById(trackId);
+			if (!existingTrack) {
+				return fail(404, { error: 'Track not found' });
+			}
+
+			const previousAudioPath = getUploadRelativePath(existingTrack.audioUrl);
+			const previousImagePath = getUploadRelativePath(existingTrack.imageUrl);
 			const success = await TrackService.deleteTrack(trackId);
 
 			if (!success) {
 				return fail(500, { error: 'Failed to delete track' });
+			}
+
+			if (previousAudioPath) {
+				deleteFile(previousAudioPath);
+			}
+			if (previousImagePath) {
+				deleteFile(previousImagePath);
 			}
 
 			return { success: true };

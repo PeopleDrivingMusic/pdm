@@ -1,6 +1,7 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import NotificationContainer from '$lib/ui/NotificationContainer.svelte';
 	import {
 		mdiViewDashboard,
 		mdiMusicNoteEighth,
@@ -51,6 +52,8 @@
 		{@render children?.()}
 	</div>
 </div>
+
+<NotificationContainer />
 
 <style lang="scss">
 	.app-wrapper {
