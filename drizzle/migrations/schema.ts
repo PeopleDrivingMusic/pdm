@@ -1,5 +1,4 @@
 import { pgTable, foreignKey, unique, uuid, varchar, text, jsonb, boolean, timestamp, numeric, integer } from "drizzle-orm/pg-core"
-import { sql } from "drizzle-orm"
 
 
 
@@ -282,4 +281,77 @@ export const albumTracks = pgTable("album_tracks", {
 			foreignColumns: [tracks.id],
 			name: "album_tracks_track_id_tracks_id_fk"
 		}).onDelete("cascade"),
+]);
+
+// Artist videos table
+export const artistVideos = pgTable("artist_videos", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	artistId: uuid("artist_id").notNull(),
+	fileUrl: text("file_url").notNull(),
+	tags: jsonb("tags"),
+	date: timestamp("date", { mode: 'string' }),
+	location: varchar({ length: 100 }),
+	description: text(),
+	stats: jsonb("stats"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+		columns: [table.artistId],
+		foreignColumns: [artists.id],
+		name: "artist_videos_artist_id_artists_id_fk"
+	}),
+]);
+
+// Artist photos table
+export const artistPhotos = pgTable("artist_photos", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	artistId: uuid("artist_id").notNull(),
+	fileUrl: text("file_url").notNull(),
+	tags: jsonb("tags"),
+	date: timestamp("date", { mode: 'string' }),
+	description: text(),
+	stats: jsonb("stats"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+		columns: [table.artistId],
+		foreignColumns: [artists.id],
+		name: "artist_photos_artist_id_artists_id_fk"
+	}),
+]);
+
+// Artist posts table
+export const artistPosts = pgTable("artist_posts", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	artistId: uuid("artist_id").notNull(),
+	content: text().notNull(),
+	images: jsonb("images"),
+	widgets: jsonb("widgets"),
+	tags: jsonb("tags"),
+	date: timestamp("date", { mode: 'string' }),
+	stats: jsonb("stats"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+		columns: [table.artistId],
+		foreignColumns: [artists.id],
+		name: "artist_posts_artist_id_artists_id_fk"
+	}),
+]);
+// Artist tags table
+export const artistTags = pgTable("artist_tags", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	artistId: uuid("artist_id").notNull(),
+	tag: varchar({ length: 50 }).notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+		columns: [table.artistId],
+		foreignColumns: [artists.id],
+		name: "artist_tags_artist_id_artists_id_fk"
+	}),
+	unique("artist_tags_artist_id_tag_unique").on(table.artistId, table.tag),
 ]);

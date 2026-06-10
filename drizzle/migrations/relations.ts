@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { users, artists, albums, tracks, trackStats, purchases, playlists, playlistTracks, sessions, userFavorites, artistAccounts, artistOnboardingRequests, artistSessions, albumTracks } from "./schema";
+import { users, artists, albums, tracks, trackStats, purchases, playlists, playlistTracks, sessions, userFavorites, artistAccounts, artistOnboardingRequests, artistSessions, albumTracks, artistTags, artistVideos, artistPhotos, artistPosts } from "./schema";
 
 export const artistsRelations = relations(artists, ({one, many}) => ({
 	user: one(users, {
@@ -9,6 +9,37 @@ export const artistsRelations = relations(artists, ({one, many}) => ({
 	tracks: many(tracks),
 	albums: many(albums),
 	artistAccounts: many(artistAccounts),
+  artistTags: many(artistTags),
+  artistVideos: many(artistVideos),
+  artistPhotos: many(artistPhotos),
+  artistPosts: many(artistPosts),
+}));
+export const artistTagsRelations = relations(artistTags, ({one}) => ({
+	artist: one(artists, {
+		fields: [artistTags.artistId],
+		references: [artists.id]
+	})
+}));
+
+export const artistVideosRelations = relations(artistVideos, ({one}) => ({
+	artist: one(artists, {
+		fields: [artistVideos.artistId],
+		references: [artists.id]
+	})
+}));
+
+export const artistPhotosRelations = relations(artistPhotos, ({one}) => ({
+	artist: one(artists, {
+		fields: [artistPhotos.artistId],
+		references: [artists.id]
+	})
+}));
+
+export const artistPostsRelations = relations(artistPosts, ({one}) => ({
+	artist: one(artists, {
+		fields: [artistPosts.artistId],
+		references: [artists.id]
+	})
 }));
 
 export const usersRelations = relations(users, ({many}) => ({

@@ -1,1 +1,0 @@
-ALTER TABLE "artists" ADD COLUMN "cover_img" text;

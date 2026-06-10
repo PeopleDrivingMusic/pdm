@@ -1,4 +1,4 @@
-import { pgTable, serial, text, varchar, timestamp, boolean, integer, jsonb, uuid, numeric, decimal } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, varchar, timestamp, boolean, integer, jsonb, uuid, numeric, decimal, foreignKey, unique } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Users table
@@ -183,6 +183,80 @@ export const purchases = pgTable('purchases', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+
+// Artist videos table
+export const artistVideos = pgTable("artist_videos", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	artistId: uuid("artist_id").notNull(),
+	fileUrl: text("file_url").notNull(),
+	tags: jsonb("tags"),
+	date: timestamp("date", { mode: 'string' }),
+	location: varchar({ length: 100 }),
+	description: text(),
+	stats: jsonb("stats"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+		columns: [table.artistId],
+		foreignColumns: [artists.id],
+		name: "artist_videos_artist_id_artists_id_fk"
+	}),
+]);
+
+// Artist photos table
+export const artistPhotos = pgTable("artist_photos", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	artistId: uuid("artist_id").notNull(),
+	fileUrl: text("file_url").notNull(),
+	tags: jsonb("tags"),
+	date: timestamp("date", { mode: 'string' }),
+	description: text(),
+	stats: jsonb("stats"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+		columns: [table.artistId],
+		foreignColumns: [artists.id],
+		name: "artist_photos_artist_id_artists_id_fk"
+	}),
+]);
+
+// Artist posts table
+export const artistPosts = pgTable("artist_posts", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	artistId: uuid("artist_id").notNull(),
+	content: text().notNull(),
+	images: jsonb("images"),
+	widgets: jsonb("widgets"),
+	tags: jsonb("tags"),
+	date: timestamp("date", { mode: 'string' }),
+	stats: jsonb("stats"),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+		columns: [table.artistId],
+		foreignColumns: [artists.id],
+		name: "artist_posts_artist_id_artists_id_fk"
+	}),
+]);
+// Artist tags table
+export const artistTags = pgTable("artist_tags", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	artistId: uuid("artist_id").notNull(),
+	tag: varchar({ length: 50 }).notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+		columns: [table.artistId],
+		foreignColumns: [artists.id],
+		name: "artist_tags_artist_id_artists_id_fk"
+	}),
+	unique("artist_tags_artist_id_tag_unique").on(table.artistId, table.tag),
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   artist: one(artists),
@@ -192,15 +266,6 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   purchases: many(purchases),
 }));
 
-export const artistsRelations = relations(artists, ({ one, many }) => ({
-  user: one(users, {
-    fields: [artists.userId],
-    references: [users.id],
-  }),
-  account: one(artistAccounts),
-  albums: many(albums),
-  tracks: many(tracks),
-}));
 
 export const artistOnboardingRequestsRelations = relations(artistOnboardingRequests, ({ one }) => ({
   user: one(users, {
@@ -318,6 +383,47 @@ export const trackStatsRelations = relations(trackStats, ({ one }) => ({
     fields: [trackStats.trackId],
     references: [tracks.id],
   }),
+}));
+
+export const artistsRelations = relations(artists, ({one, many}) => ({
+	user: one(users, {
+		fields: [artists.userId],
+		references: [users.id]
+	}),
+	tracks: many(tracks),
+	albums: many(albums),
+	artistAccounts: many(artistAccounts),
+  artistTags: many(artistTags),
+  artistVideos: many(artistVideos),
+  artistPhotos: many(artistPhotos),
+  artistPosts: many(artistPosts),
+}));
+export const artistTagsRelations = relations(artistTags, ({one}) => ({
+	artist: one(artists, {
+		fields: [artistTags.artistId],
+		references: [artists.id]
+	})
+}));
+
+export const artistVideosRelations = relations(artistVideos, ({one}) => ({
+	artist: one(artists, {
+		fields: [artistVideos.artistId],
+		references: [artists.id]
+	})
+}));
+
+export const artistPhotosRelations = relations(artistPhotos, ({one}) => ({
+	artist: one(artists, {
+		fields: [artistPhotos.artistId],
+		references: [artists.id]
+	})
+}));
+
+export const artistPostsRelations = relations(artistPosts, ({one}) => ({
+	artist: one(artists, {
+		fields: [artistPosts.artistId],
+		references: [artists.id]
+	})
 }));
 
 // User type exports for TypeScript

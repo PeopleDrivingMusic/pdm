@@ -5,85 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1754486458620,
-      "tag": "0000_flowery_stranger",
+      "when": 1771830374687,
+      "tag": "0000_mysterious_black_knight",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1761201404639,
-      "tag": "0001_lethal_archangel",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1761205601885,
-      "tag": "0002_flat_mach_iv",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1761277552684,
-      "tag": "0003_lazy_invisible_woman",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1761360510262,
-      "tag": "0004_shallow_vanisher",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1761361029300,
-      "tag": "0005_perpetual_tombstone",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1762142920962,
-      "tag": "0006_lame_grey_gargoyle",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1762929288342,
-      "tag": "0007_high_omega_sentinel",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1770212959121,
-      "tag": "0008_furry_monster_badoon",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1770609045292,
-      "tag": "0009_silly_trish_tilby",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1770700000000,
-      "tag": "0010_active_artist_trust_score",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1770787386266,
-      "tag": "0011_living_doomsday",
+      "when": 1771830618609,
+      "tag": "0001_peaceful_post",
       "breakpoints": true
     }
   ]
