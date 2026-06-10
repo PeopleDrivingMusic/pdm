@@ -1,20 +1,27 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1771830374687,
-      "tag": "0000_mysterious_black_knight",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1771830618609,
-      "tag": "0001_peaceful_post",
-      "breakpoints": true
-    }
-  ]
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1771830374687,
+			"tag": "0000_mysterious_black_knight",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1771830618609,
+			"tag": "0001_peaceful_post",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1781100000000,
+			"tag": "0002_artist_schema_namespace",
+			"breakpoints": true
+		}
+	]
 }

@@ -45,7 +45,8 @@ export async function extractTrackMetadata(file: File): Promise<TrackMetadata> {
 			const ext = getCoverExtension(picture.format);
 			const fileName = `cover.${ext}`;
 			const mimeType = picture.format || `image/${ext}`;
-			coverImageFile = new File([picture.data], fileName, { type: mimeType });
+			const imageBytes = new Uint8Array(picture.data);
+			coverImageFile = new File([imageBytes.buffer as ArrayBuffer], fileName, { type: mimeType });
 		}
 
 		return { duration, title, coverImageFile };
