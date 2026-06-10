@@ -144,7 +144,7 @@
 			time: '18:00',
 			location: 'Stockholm Park',
 			distance: '5.2 km away',
-			image: '/bg/festival.jpg',
+			image: '/bg/bg1.jpg',
 			interested: 8932
 		}
 	];
@@ -154,21 +154,21 @@
 			id: '1',
 			trackName: 'Runaway',
 			artistName: 'Aurora',
-			image: '/tracks/aurora-runaway.jpg',
+			image: '/tracks/enter_sandman.jpg',
 			reason: 'Based on your subscriptions'
 		},
 		{
 			id: '2',
 			trackName: 'Sunset',
 			artistName: 'The Midnight',
-			image: '/tracks/midnight-sunset.jpg',
+			image: '/tracks/ACDCPowerUp.jpg',
 			reason: 'Popular among your followed artists'
 		},
 		{
 			id: '3',
 			trackName: 'Dreams',
 			artistName: 'Grimes',
-			image: '/tracks/grimes-dreams.jpg',
+			image: '/tracks/GunsnRosesUseYourIllusionII.jpg',
 			reason: 'Similar to your favorites'
 		}
 	];

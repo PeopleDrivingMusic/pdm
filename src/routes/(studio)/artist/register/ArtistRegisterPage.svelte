@@ -229,7 +229,7 @@
 
 			<div class="form-footer">
 				<span>Already have an account?</span>
-				<Link color="primary" href="/login">Sign in</Link>
+				<Link color="primary" href="/artist/login">Sign in</Link>
 			</div>
 		</div>
 	</div>

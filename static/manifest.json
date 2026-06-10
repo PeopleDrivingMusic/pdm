@@ -1,0 +1,17 @@
+{
+	"name": "People Driving Music",
+	"short_name": "PDM",
+	"description": "People Driving Music web app",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#050505",
+	"theme_color": "#050505",
+	"icons": [
+		{
+			"src": "/favicon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml",
+			"purpose": "any"
+		}
+	]
+}
