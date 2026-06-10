@@ -1,164 +1,28 @@
-import {
-	pgTable,
-	text,
-	varchar,
-	timestamp,
-	boolean,
-	integer,
-	jsonb,
-	uuid
-} from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-export { users, sessions } from './schemas/core';
+export { users, sessions } from './schemas/users';
 export {
 	artists,
 	artistOnboardingRequests,
 	artistAccounts,
-	artistSessions,
-	artistVideos,
-	artistPhotos,
-	artistPosts,
-	artistTags
+	artistSessions
 } from './schemas/artist';
-import { users, sessions } from './schemas/core';
+export { artistVideos, artistPhotos, artistPosts, artistTags } from './schemas/content';
+export { genres, albums, tracks, albumTracks } from './schemas/catalog';
+export { trackStats } from './schemas/engagement';
+export { playlists, playlistTracks, userFavorites } from './schemas/user-library';
+export { purchases } from './schemas/finance';
+import { users, sessions } from './schemas/users';
 import {
 	artists,
 	artistOnboardingRequests,
 	artistAccounts,
-	artistSessions,
-	artistVideos,
-	artistPhotos,
-	artistPosts,
-	artistTags
+	artistSessions
 } from './schemas/artist';
-
-// Genres table (normalized)
-export const genres = pgTable('genres', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	name: varchar('name', { length: 50 }).notNull().unique(), // normalized lowercase value
-	displayName: varchar('display_name', { length: 50 }).notNull(), // display value
-	createdAt: timestamp('created_at').defaultNow().notNull()
-});
-
-// Albums table
-export const albums = pgTable('albums', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	artistId: uuid('artist_id')
-		.notNull()
-		.references(() => artists.id),
-	title: varchar('title', { length: 200 }).notNull(),
-	description: text('description'),
-	coverImageUrl: text('cover_image_url'),
-	releaseDate: timestamp('release_date'),
-	price: integer('price'), // Price in cents or smallest currency unit
-	isPublished: boolean('is_published').default(false),
-	genres: jsonb('genres').$type<string[]>(), // genres array for search
-	metadata: jsonb('metadata'), // Additional metadata (blockchain info, etc.)
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at').defaultNow().notNull()
-});
-
-// Tracks table
-export const tracks = pgTable('tracks', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	albumId: uuid('album_id').references(() => albums.id),
-	artistId: uuid('artist_id')
-		.notNull()
-		.references(() => artists.id),
-	title: varchar('title', { length: 200 }).notNull(),
-	duration: integer('duration'), // Duration in seconds
-	audioUrl: text('audio_url'),
-	lyrics: text('lyrics'),
-	clipUrl: text('clip_url'),
-	imageUrl: text('image_url'), // Track cover image URL,
-	trackNumber: integer('track_number'),
-	genre: jsonb('genres').$type<string[]>(),
-	isPublished: boolean('is_published').default(false),
-	metadata: jsonb('metadata'), // Blockchain info, IPFS hash, etc.
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at').defaultNow().notNull()
-});
-
-// Track analytics/stats table
-export const trackStats = pgTable('track_stats', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	trackId: uuid('track_id')
-		.notNull()
-		.unique()
-		.references(() => tracks.id, { onDelete: 'cascade' }),
-	likeCount: integer('like_count').default(0).notNull(),
-	playCount: integer('play_count').default(0).notNull(),
-	saveCount: integer('save_count').default(0).notNull(), // Number of times users saved the track to favorites or playlists
-	commentCount: integer('comment_count').default(0).notNull(),
-	lastUpdated: timestamp('last_updated').defaultNow().notNull()
-});
-
-// Playlists table
-export const playlists = pgTable('playlists', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	userId: uuid('user_id')
-		.notNull()
-		.references(() => users.id),
-	name: varchar('name', { length: 100 }).notNull(),
-	description: text('description'),
-	coverImageUrl: text('cover_image_url'),
-	isPublic: boolean('is_public').default(true),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at').defaultNow().notNull()
-});
-
-// Playlist tracks junction table
-export const playlistTracks = pgTable('playlist_tracks', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	playlistId: uuid('playlist_id')
-		.notNull()
-		.references(() => playlists.id),
-	trackId: uuid('track_id')
-		.notNull()
-		.references(() => tracks.id),
-	position: integer('position').notNull(),
-	addedAt: timestamp('added_at').defaultNow().notNull()
-});
-
-// Album tracks junction table (many-to-many)
-export const albumTracks = pgTable('album_tracks', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	albumId: uuid('album_id')
-		.notNull()
-		.references(() => albums.id, { onDelete: 'cascade' }),
-	trackId: uuid('track_id')
-		.notNull()
-		.references(() => tracks.id, { onDelete: 'cascade' }),
-	trackNumber: integer('track_number').notNull(), // position in album
-	addedAt: timestamp('added_at').defaultNow().notNull()
-});
-
-// User favorites
-export const userFavorites = pgTable('user_favorites', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	userId: uuid('user_id')
-		.notNull()
-		.references(() => users.id),
-	trackId: uuid('track_id')
-		.notNull()
-		.references(() => tracks.id),
-	createdAt: timestamp('created_at').defaultNow().notNull()
-});
-
-// Purchase history
-export const purchases = pgTable('purchases', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	userId: uuid('user_id')
-		.notNull()
-		.references(() => users.id),
-	trackId: uuid('track_id').references(() => tracks.id),
-	albumId: uuid('album_id').references(() => albums.id),
-	price: integer('price').notNull(),
-	currency: varchar('currency', { length: 10 }).default('USD'),
-	transactionHash: varchar('transaction_hash', { length: 100 }), // Blockchain transaction hash
-	status: varchar('status', { length: 20 }).default('pending'), // pending, completed, failed
-	createdAt: timestamp('created_at').defaultNow().notNull()
-});
+import { artistVideos, artistPhotos, artistPosts, artistTags } from './schemas/content';
+import { genres, albums, tracks, albumTracks } from './schemas/catalog';
+import { trackStats } from './schemas/engagement';
+import { playlists, playlistTracks, userFavorites } from './schemas/user-library';
+import { purchases } from './schemas/finance';
 
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -351,6 +215,10 @@ export type AlbumTrack = typeof albumTracks.$inferSelect;
 export type NewAlbumTrack = typeof albumTracks.$inferInsert;
 export type Playlist = typeof playlists.$inferInsert;
 export type PlaylistTrack = typeof playlistTracks.$inferInsert;
+export type ArtistVideo = typeof artistVideos.$inferSelect;
+export type ArtistPhoto = typeof artistPhotos.$inferSelect;
+export type ArtistPost = typeof artistPosts.$inferSelect;
+export type ArtistTag = typeof artistTags.$inferSelect;
 
 // Export all tables for migrations
 export const schema = {
@@ -360,6 +228,10 @@ export const schema = {
 	artistOnboardingRequests,
 	artistAccounts,
 	artistSessions,
+	artistVideos,
+	artistPhotos,
+	artistPosts,
+	artistTags,
 	genres,
 	albums,
 	tracks,

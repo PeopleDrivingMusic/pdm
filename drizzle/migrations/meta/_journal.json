@@ -22,6 +22,13 @@
 			"when": 1781100000000,
 			"tag": "0002_artist_schema_namespace",
 			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1781101000000,
+			"tag": "0003_logical_schema_namespaces",
+			"breakpoints": true
 		}
 	]
 }
