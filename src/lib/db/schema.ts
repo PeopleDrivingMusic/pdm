@@ -6,7 +6,21 @@ export {
 	artistAccounts,
 	artistSessions
 } from './schemas/artist';
-export { artistVideos, artistPhotos, artistPosts, artistTags } from './schemas/content';
+export {
+	posts,
+	contentMedia,
+	postMedia,
+	postMusicAttachments,
+	postPolls,
+	postPollOptions,
+	postPollVotes,
+	photoAlbums,
+	photos,
+	videos,
+	videoCollections,
+	videoCollectionItems,
+	artistFeedItems
+} from './schemas/content';
 export { genres, albums, tracks, albumTracks } from './schemas/catalog';
 export { trackStats } from './schemas/engagement';
 export { playlists, playlistTracks, userFavorites } from './schemas/user-library';
@@ -18,7 +32,21 @@ import {
 	artistAccounts,
 	artistSessions
 } from './schemas/artist';
-import { artistVideos, artistPhotos, artistPosts, artistTags } from './schemas/content';
+import {
+	posts,
+	contentMedia,
+	postMedia,
+	postMusicAttachments,
+	postPolls,
+	postPollOptions,
+	postPollVotes,
+	photoAlbums,
+	photos,
+	videos,
+	videoCollections,
+	videoCollectionItems,
+	artistFeedItems
+} from './schemas/content';
 import { genres, albums, tracks, albumTracks } from './schemas/catalog';
 import { trackStats } from './schemas/engagement';
 import { playlists, playlistTracks, userFavorites } from './schemas/user-library';
@@ -159,35 +187,138 @@ export const artistsRelations = relations(artists, ({ one, many }) => ({
 	tracks: many(tracks),
 	albums: many(albums),
 	artistAccounts: many(artistAccounts),
-	artistTags: many(artistTags),
-	artistVideos: many(artistVideos),
-	artistPhotos: many(artistPhotos),
-	artistPosts: many(artistPosts)
+	posts: many(posts),
+	contentMedia: many(contentMedia),
+	photoAlbums: many(photoAlbums),
+	videos: many(videos),
+	videoCollections: many(videoCollections),
+	artistFeedItems: many(artistFeedItems)
 }));
-export const artistTagsRelations = relations(artistTags, ({ one }) => ({
+export const postsRelations = relations(posts, ({ one, many }) => ({
 	artist: one(artists, {
-		fields: [artistTags.artistId],
+		fields: [posts.artistId],
+		references: [artists.id]
+	}),
+	media: many(postMedia),
+	musicAttachments: many(postMusicAttachments),
+	polls: many(postPolls)
+}));
+
+export const contentMediaRelations = relations(contentMedia, ({ one, many }) => ({
+	artist: one(artists, {
+		fields: [contentMedia.artistId],
+		references: [artists.id]
+	}),
+	postMedia: many(postMedia),
+	photos: many(photos)
+}));
+
+export const postMediaRelations = relations(postMedia, ({ one }) => ({
+	post: one(posts, {
+		fields: [postMedia.postId],
+		references: [posts.id]
+	}),
+	media: one(contentMedia, {
+		fields: [postMedia.mediaId],
+		references: [contentMedia.id]
+	})
+}));
+
+export const postMusicAttachmentsRelations = relations(postMusicAttachments, ({ one }) => ({
+	post: one(posts, {
+		fields: [postMusicAttachments.postId],
+		references: [posts.id]
+	}),
+	track: one(tracks, {
+		fields: [postMusicAttachments.trackId],
+		references: [tracks.id]
+	}),
+	album: one(albums, {
+		fields: [postMusicAttachments.albumId],
+		references: [albums.id]
+	})
+}));
+
+export const postPollsRelations = relations(postPolls, ({ one, many }) => ({
+	post: one(posts, {
+		fields: [postPolls.postId],
+		references: [posts.id]
+	}),
+	options: many(postPollOptions),
+	votes: many(postPollVotes)
+}));
+
+export const postPollOptionsRelations = relations(postPollOptions, ({ one, many }) => ({
+	poll: one(postPolls, {
+		fields: [postPollOptions.pollId],
+		references: [postPolls.id]
+	}),
+	votes: many(postPollVotes)
+}));
+
+export const postPollVotesRelations = relations(postPollVotes, ({ one }) => ({
+	poll: one(postPolls, {
+		fields: [postPollVotes.pollId],
+		references: [postPolls.id]
+	}),
+	option: one(postPollOptions, {
+		fields: [postPollVotes.optionId],
+		references: [postPollOptions.id]
+	}),
+	user: one(users, {
+		fields: [postPollVotes.userId],
+		references: [users.id]
+	})
+}));
+
+export const photoAlbumsRelations = relations(photoAlbums, ({ one, many }) => ({
+	artist: one(artists, {
+		fields: [photoAlbums.artistId],
+		references: [artists.id]
+	}),
+	photos: many(photos)
+}));
+
+export const photosRelations = relations(photos, ({ one }) => ({
+	album: one(photoAlbums, {
+		fields: [photos.albumId],
+		references: [photoAlbums.id]
+	}),
+	media: one(contentMedia, {
+		fields: [photos.mediaId],
+		references: [contentMedia.id]
+	})
+}));
+
+export const videosRelations = relations(videos, ({ one }) => ({
+	artist: one(artists, {
+		fields: [videos.artistId],
 		references: [artists.id]
 	})
 }));
 
-export const artistVideosRelations = relations(artistVideos, ({ one }) => ({
+export const videoCollectionsRelations = relations(videoCollections, ({ one, many }) => ({
 	artist: one(artists, {
-		fields: [artistVideos.artistId],
+		fields: [videoCollections.artistId],
 		references: [artists.id]
+	}),
+	items: many(videoCollectionItems)
+}));
+
+export const videoCollectionItemsRelations = relations(videoCollectionItems, ({ one }) => ({
+	collection: one(videoCollections, {
+		fields: [videoCollectionItems.collectionId],
+		references: [videoCollections.id]
+	}),
+	video: one(videos, {
+		fields: [videoCollectionItems.videoId],
+		references: [videos.id]
 	})
 }));
 
-export const artistPhotosRelations = relations(artistPhotos, ({ one }) => ({
+export const artistFeedItemsRelations = relations(artistFeedItems, ({ one }) => ({
 	artist: one(artists, {
-		fields: [artistPhotos.artistId],
-		references: [artists.id]
-	})
-}));
-
-export const artistPostsRelations = relations(artistPosts, ({ one }) => ({
-	artist: one(artists, {
-		fields: [artistPosts.artistId],
+		fields: [artistFeedItems.artistId],
 		references: [artists.id]
 	})
 }));
@@ -215,10 +346,32 @@ export type AlbumTrack = typeof albumTracks.$inferSelect;
 export type NewAlbumTrack = typeof albumTracks.$inferInsert;
 export type Playlist = typeof playlists.$inferInsert;
 export type PlaylistTrack = typeof playlistTracks.$inferInsert;
-export type ArtistVideo = typeof artistVideos.$inferSelect;
-export type ArtistPhoto = typeof artistPhotos.$inferSelect;
-export type ArtistPost = typeof artistPosts.$inferSelect;
-export type ArtistTag = typeof artistTags.$inferSelect;
+export type Post = typeof posts.$inferSelect;
+export type NewPost = typeof posts.$inferInsert;
+export type ContentMedia = typeof contentMedia.$inferSelect;
+export type NewContentMedia = typeof contentMedia.$inferInsert;
+export type PostMedia = typeof postMedia.$inferSelect;
+export type NewPostMedia = typeof postMedia.$inferInsert;
+export type PostMusicAttachment = typeof postMusicAttachments.$inferSelect;
+export type NewPostMusicAttachment = typeof postMusicAttachments.$inferInsert;
+export type PostPoll = typeof postPolls.$inferSelect;
+export type NewPostPoll = typeof postPolls.$inferInsert;
+export type PostPollOption = typeof postPollOptions.$inferSelect;
+export type NewPostPollOption = typeof postPollOptions.$inferInsert;
+export type PostPollVote = typeof postPollVotes.$inferSelect;
+export type NewPostPollVote = typeof postPollVotes.$inferInsert;
+export type PhotoAlbum = typeof photoAlbums.$inferSelect;
+export type NewPhotoAlbum = typeof photoAlbums.$inferInsert;
+export type Photo = typeof photos.$inferSelect;
+export type NewPhoto = typeof photos.$inferInsert;
+export type Video = typeof videos.$inferSelect;
+export type NewVideo = typeof videos.$inferInsert;
+export type VideoCollection = typeof videoCollections.$inferSelect;
+export type NewVideoCollection = typeof videoCollections.$inferInsert;
+export type VideoCollectionItem = typeof videoCollectionItems.$inferSelect;
+export type NewVideoCollectionItem = typeof videoCollectionItems.$inferInsert;
+export type ArtistFeedItem = typeof artistFeedItems.$inferSelect;
+export type NewArtistFeedItem = typeof artistFeedItems.$inferInsert;
 
 // Export all tables for migrations
 export const schema = {
@@ -228,10 +381,19 @@ export const schema = {
 	artistOnboardingRequests,
 	artistAccounts,
 	artistSessions,
-	artistVideos,
-	artistPhotos,
-	artistPosts,
-	artistTags,
+	posts,
+	contentMedia,
+	postMedia,
+	postMusicAttachments,
+	postPolls,
+	postPollOptions,
+	postPollVotes,
+	photoAlbums,
+	photos,
+	videos,
+	videoCollections,
+	videoCollectionItems,
+	artistFeedItems,
 	genres,
 	albums,
 	tracks,

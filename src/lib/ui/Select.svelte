@@ -33,13 +33,33 @@
 
 	let isOpen = $state(false);
 	let rootEl: HTMLDivElement | null = $state(null);
+	let menuDirection = $state<'down' | 'up'>('down');
 
 	const selectedOption = $derived(options.find((option) => option.value === value));
 	const displayLabel = $derived(selectedOption?.label || placeholder || 'Select');
 
+	function updateMenuDirection() {
+		if (!rootEl || typeof window === 'undefined') return;
+
+		const rect = rootEl.getBoundingClientRect();
+		const menuHeight = Math.min(
+			240,
+			Math.max(48, (options.length + (placeholder ? 1 : 0)) * 42 + 16)
+		);
+		const spaceBelow = window.innerHeight - rect.bottom;
+		const spaceAbove = rect.top;
+
+		menuDirection = spaceBelow < menuHeight && spaceAbove > spaceBelow ? 'up' : 'down';
+	}
+
 	function toggleOpen() {
 		if (disabled) return;
-		isOpen = !isOpen;
+		if (!isOpen) {
+			updateMenuDirection();
+			isOpen = true;
+			return;
+		}
+		isOpen = false;
 	}
 
 	function close() {
@@ -74,7 +94,7 @@
 	});
 </script>
 
-<div class="select-group" bind:this={rootEl} onkeydown={handleKeydown}>
+<div class="select-group" role="presentation" bind:this={rootEl} onkeydown={handleKeydown}>
 	{#if label}
 		<label class="select-label" for={id}>
 			{label}
@@ -111,7 +131,7 @@
 		class="select-trigger"
 		class:select-trigger--error={error}
 		class:select-trigger--open={isOpen}
-		disabled={disabled}
+		{disabled}
 		aria-haspopup="listbox"
 		aria-expanded={isOpen}
 		aria-controls={`${id}-listbox`}
@@ -129,8 +149,10 @@
 		<ul
 			id={`${id}-listbox`}
 			class="select-menu"
+			class:select-menu--up={menuDirection === 'up'}
 			role="listbox"
 			aria-activedescendant={selectedOption ? `${id}-option-${selectedOption.value}` : undefined}
+			tabindex="-1"
 		>
 			{#if placeholder}
 				<li class="select-option" role="option" aria-selected={!value}>
@@ -277,6 +299,7 @@
 	.select-menu {
 		position: absolute;
 		z-index: 20;
+		top: 100%;
 		margin-top: var(--space-2);
 		width: 100%;
 		max-height: var(--select-max-height);
@@ -288,6 +311,13 @@
 		background-color: var(--select-menu-bg);
 		box-shadow: var(--select-menu-shadow);
 		box-sizing: border-box;
+	}
+
+	.select-menu--up {
+		top: auto;
+		bottom: 100%;
+		margin-top: 0;
+		margin-bottom: var(--space-2);
 	}
 
 	.select-option {
@@ -319,5 +349,4 @@
 		color: var(--select-option-disabled);
 		cursor: not-allowed;
 	}
-	
 </style>

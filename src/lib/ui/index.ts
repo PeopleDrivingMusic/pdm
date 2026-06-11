@@ -6,6 +6,8 @@ export { default as Checkbox } from './Checkbox.svelte';
 export { default as FileUpload } from './FileUpload.svelte';
 export { default as Avatar } from './Avatar.svelte';
 export { default as StatCard } from './StatCard.svelte';
+export { default as SvgIcon } from './SvgIcon.svelte';
+export { default as IconButton } from './IconButton.svelte';
 export { default as Tabs } from './Tabs.svelte';
 export { default as InfoMessage } from './InfoMessage.svelte';
 export { default as NotificationContainer } from './NotificationContainer.svelte';

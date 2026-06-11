@@ -1,14 +1,17 @@
+<script lang="ts">
+	import ContentShell from './components/ContentShell.svelte';
+	import type { PageData } from './$types';
+
+	interface Props {
+		data: PageData;
+		form?: { error?: string; success?: boolean } | null;
+	}
+
+	let { data, form }: Props = $props();
+</script>
+
 <svelte:head>
 	<title>Studio Content - PDM</title>
 </svelte:head>
 
-<section class="studio-page">
-	<h1>Content</h1>
-	<p>Production and scheduling for posts, videos, and stories.</p>
-</section>
-
-<style lang="scss">
-	.studio-page {
-		padding: var(--space-8);
-	}
-</style>
+<ContentShell {data} {form} />

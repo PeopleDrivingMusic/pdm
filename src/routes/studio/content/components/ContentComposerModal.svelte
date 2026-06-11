@@ -1,0 +1,848 @@
+<script lang="ts">
+	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import { mdiArrowLeft, mdiClose, mdiImageOutline, mdiMusicNotePlus, mdiPoll } from '@mdi/js';
+	import { Button, FileUpload, IconButton, Input, Select, SvgIcon } from '$lib/ui';
+	import type { Editor } from '@tiptap/core';
+	import CollectionCreateOverlay from './CollectionCreateOverlay.svelte';
+	import MusicAttachmentPicker from './MusicAttachmentPicker.svelte';
+	import PollBuilder from './PollBuilder.svelte';
+	import PostEditor from './PostEditor.svelte';
+	import PostEditorToolbar from './PostEditorToolbar.svelte';
+	import PublishPanel from './PublishPanel.svelte';
+
+	interface Props {
+		open: boolean;
+		type: 'post' | 'gallery' | 'video';
+		artist: {
+			name: string;
+			avatar?: string | null;
+		} | null;
+		attachableMusic: {
+			tracks: Array<{
+				id: string;
+				title: string;
+				imageUrl: string | null;
+				isPublished: boolean | null;
+			}>;
+			albums: Array<{
+				id: string;
+				title: string;
+				coverImageUrl: string | null;
+				isPublished: boolean | null;
+			}>;
+		};
+		photoAlbums: Array<{ id: string; title: string; status: string }>;
+		videoCollections: Array<{ id: string; title: string; status: string }>;
+		onClose: () => void;
+	}
+
+	let { open, type, artist, attachableMusic, photoAlbums, videoCollections, onClose }: Props =
+		$props();
+
+	let postStatus = $state('draft');
+	let postVisibility = $state('public');
+	let galleryStatus = $state('draft');
+	let galleryVisibility = $state('public');
+	let videoStatus = $state('draft');
+	let videoVisibility = $state('public');
+	let galleryPublishStep = $state(false);
+	let videoPublishStep = $state(false);
+	let localPhotoAlbums = $state(photoAlbums);
+	let localVideoCollections = $state(videoCollections);
+	let galleryDestination = $state('');
+	let videoDestination = $state('__none__');
+	let galleryCreateOpen = $state(false);
+	let videoCollectionCreateOpen = $state(false);
+	let activeWidget = $state<'none' | 'cover' | 'music' | 'poll'>('none');
+	let publishStep = $state(false);
+	let coverEnabled = $state(false);
+	let musicEnabled = $state(false);
+	let pollEnabled = $state(false);
+	let editor = $state<Editor | null>(null);
+
+	const title = $derived(
+		type === 'post' ? 'Create post' : type === 'gallery' ? 'Create gallery' : 'Upload video'
+	);
+	const photoAlbumOptions = $derived([
+		{ label: '+ Create new gallery', value: '__create__' },
+		...localPhotoAlbums.map((album) => ({
+			label: `${album.title}${album.status === 'draft' ? ' · Draft' : ''}`,
+			value: album.id
+		}))
+	]);
+	const videoCollectionOptions = $derived([
+		{ label: 'No playlist', value: '__none__' },
+		{ label: '+ Create new playlist', value: '__create__' },
+		...localVideoCollections.map((collection) => ({
+			label: `${collection.title}${collection.status === 'draft' ? ' · Draft' : ''}`,
+			value: collection.id
+		}))
+	]);
+	const galleryCollectionMode = $derived('existing');
+	const videoCollectionMode = $derived(videoDestination === '__none__' ? 'none' : 'existing');
+
+	$effect(() => {
+		if (!open) {
+			activeWidget = 'none';
+			publishStep = false;
+			galleryPublishStep = false;
+			videoPublishStep = false;
+			galleryCreateOpen = false;
+			videoCollectionCreateOpen = false;
+		}
+	});
+
+	$effect(() => {
+		localPhotoAlbums = photoAlbums;
+		localVideoCollections = videoCollections;
+	});
+
+	$effect(() => {
+		if (!galleryDestination && localPhotoAlbums.length > 0) {
+			galleryDestination = localPhotoAlbums[0].id;
+		}
+	});
+
+	$effect(() => {
+		if (galleryDestination === '__create__') {
+			galleryCreateOpen = true;
+			galleryDestination = localPhotoAlbums[0]?.id ?? '';
+		}
+	});
+
+	$effect(() => {
+		if (videoDestination === '__create__') {
+			videoCollectionCreateOpen = true;
+			videoDestination = '__none__';
+		}
+	});
+
+	function openWidget(widget: 'cover' | 'music' | 'poll') {
+		if (widget === 'cover') coverEnabled = true;
+		if (widget === 'music') musicEnabled = true;
+		if (widget === 'poll') pollEnabled = true;
+		activeWidget = widget;
+		publishStep = false;
+	}
+
+	function removeWidget(widget: 'cover' | 'music' | 'poll') {
+		if (widget === 'cover') coverEnabled = false;
+		if (widget === 'music') musicEnabled = false;
+		if (widget === 'poll') pollEnabled = false;
+		activeWidget = 'none';
+	}
+
+	function openPublishStep() {
+		activeWidget = 'none';
+		publishStep = true;
+	}
+
+	async function createPhotoAlbum(payload: {
+		title: string;
+		description: string;
+		visibility: 'public' | 'followers' | 'subscribers' | 'investors';
+	}) {
+		const response = await fetch('/api/studio/content/photo-albums', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload)
+		});
+		const result = await response.json();
+
+		if (!response.ok) {
+			throw new Error(result.error || 'Could not create gallery');
+		}
+
+		localPhotoAlbums = [result.album, ...localPhotoAlbums];
+		galleryDestination = result.album.id;
+		galleryCreateOpen = false;
+		await invalidateAll();
+	}
+
+	async function createVideoCollection(payload: {
+		title: string;
+		description: string;
+		visibility: 'public' | 'followers' | 'subscribers' | 'investors';
+	}) {
+		const response = await fetch('/api/studio/content/video-collections', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload)
+		});
+		const result = await response.json();
+
+		if (!response.ok) {
+			throw new Error(result.error || 'Could not create playlist');
+		}
+
+		localVideoCollections = [result.collection, ...localVideoCollections];
+		videoDestination = result.collection.id;
+		videoCollectionCreateOpen = false;
+		await invalidateAll();
+	}
+</script>
+
+{#if open}
+	<div class="modal-backdrop">
+		<button class="backdrop-button" type="button" aria-label="Close composer" onclick={onClose}
+		></button>
+		<div class="composer-modal" role="dialog" aria-modal="true" aria-label={title}>
+			<header class="modal-header">
+				<div class="identity">
+					<div class="avatar">
+						{#if artist?.avatar}
+							<img src={artist.avatar} alt="" />
+						{:else}
+							<span>{artist?.name?.slice(0, 1) || 'P'}</span>
+						{/if}
+					</div>
+					<div>
+						<h2>{type === 'post' ? artist?.name || 'Artist' : title}</h2>
+						<p>
+							{type === 'post'
+								? 'Create something for your audience'
+								: type === 'gallery'
+									? 'Add a photo gallery to your artist page'
+									: 'Upload video content for your fans'}
+						</p>
+					</div>
+				</div>
+
+				<IconButton path={mdiClose} label="Close composer" onClick={onClose} />
+			</header>
+
+			{#if type === 'post'}
+				<form method="POST" action="?/createPost" enctype="multipart/form-data" use:enhance>
+					<input type="hidden" name="status" value={postStatus} />
+					<input type="hidden" name="visibility" value={postVisibility} />
+					<div class="modal-body modal-body--post">
+						<input
+							class="title-input"
+							name="title"
+							aria-label="Post title"
+							placeholder="What do you want to share with fans?"
+							required
+						/>
+						<PostEditor bind:editor />
+
+						{#if coverEnabled || musicEnabled || pollEnabled}
+							<div
+								class="inline-overlay"
+								class:inline-overlay--hidden={activeWidget === 'none'}
+								role="dialog"
+								aria-label="Widget settings"
+							>
+								<div class="inline-overlay__panel">
+									<div class="inline-overlay__header">
+										<div>
+											<h3>
+												{activeWidget === 'cover'
+													? 'Cover image'
+													: activeWidget === 'music'
+														? 'Attach music'
+														: 'Poll'}
+											</h3>
+										</div>
+										<div class="inline-overlay__actions">
+											<button
+												type="button"
+												class="remove-widget"
+												onclick={() =>
+													removeWidget(activeWidget === 'none' ? 'cover' : activeWidget)}
+											>
+												Remove
+											</button>
+											<IconButton
+												path={mdiClose}
+												label="Close widget settings"
+												onClick={() => (activeWidget = 'none')}
+											/>
+										</div>
+									</div>
+
+									{#if coverEnabled}
+										<div class:widget-panel--hidden={activeWidget !== 'cover'}>
+											<FileUpload
+												label=""
+												name="coverImage"
+												accept="image/jpeg,image/png,image/webp"
+												maxSize={5}
+												helpText=""
+											/>
+										</div>
+									{/if}
+
+									{#if musicEnabled}
+										<div class:widget-panel--hidden={activeWidget !== 'music'}>
+											<MusicAttachmentPicker
+												tracks={attachableMusic.tracks}
+												albums={attachableMusic.albums}
+											/>
+										</div>
+									{/if}
+
+									{#if pollEnabled}
+										<div class:widget-panel--hidden={activeWidget !== 'poll'}>
+											<PollBuilder />
+										</div>
+									{/if}
+								</div>
+							</div>
+						{/if}
+
+						{#if publishStep}
+							<div class="inline-overlay" role="dialog" aria-label="Publish settings">
+								<div class="inline-overlay__panel inline-overlay__panel--publish">
+									<div class="inline-overlay__header">
+										<button type="button" class="back-button" onclick={() => (publishStep = false)}>
+											<SvgIcon path={mdiArrowLeft} size={18} />
+											Back
+										</button>
+										<IconButton
+											path={mdiClose}
+											label="Close publish settings"
+											onClick={() => (publishStep = false)}
+										/>
+									</div>
+									<PublishPanel bind:status={postStatus} bind:visibility={postVisibility} />
+									<div class="publish-actions">
+										<Button
+											type="submit"
+											variant="secondary"
+											onClick={() => (postStatus = 'draft')}
+										>
+											Save draft
+										</Button>
+										<Button type="submit" onClick={() => (postStatus = 'published')}>
+											Publish
+										</Button>
+									</div>
+								</div>
+							</div>
+						{/if}
+					</div>
+
+					{#if !publishStep}
+						<footer class="modal-footer">
+							<div class="composer-tools">
+								<PostEditorToolbar {editor} />
+								<div class="tool-divider"></div>
+								<div class="widget-toolbar" aria-label="Post widgets">
+									<IconButton
+										path={mdiImageOutline}
+										label={coverEnabled ? 'Edit cover image' : 'Add cover image'}
+										active={coverEnabled}
+										onClick={() => openWidget('cover')}
+									/>
+									<IconButton
+										path={mdiMusicNotePlus}
+										label={musicEnabled ? 'Edit attached music' : 'Attach music'}
+										active={musicEnabled}
+										onClick={() => openWidget('music')}
+									/>
+									<IconButton
+										path={mdiPoll}
+										label={pollEnabled ? 'Edit poll' : 'Add poll'}
+										active={pollEnabled}
+										onClick={() => openWidget('poll')}
+									/>
+								</div>
+							</div>
+
+							<div class="submit-area">
+								<Button type="button" onClick={openPublishStep}>Continue</Button>
+							</div>
+						</footer>
+					{/if}
+				</form>
+			{:else if type === 'gallery'}
+				<form method="POST" action="?/createGallery" enctype="multipart/form-data" use:enhance>
+					<input type="hidden" name="status" value={galleryStatus} />
+					<input type="hidden" name="visibility" value={galleryVisibility} />
+					<input type="hidden" name="collectionMode" value={galleryCollectionMode} />
+					<input
+						type="hidden"
+						name="existingPhotoAlbumId"
+						value={galleryCollectionMode === 'existing' ? galleryDestination : ''}
+					/>
+					<div class="modal-body modal-body--compact">
+						<section class="collection-choice">
+							<Select
+								label="Gallery"
+								options={photoAlbumOptions}
+								placeholder="Choose or create gallery"
+								bind:value={galleryDestination}
+								required
+							/>
+						</section>
+
+						<FileUpload
+							label="Photo"
+							name="photo"
+							accept="image/jpeg,image/png,image/webp"
+							maxSize={5}
+							required
+						/>
+
+						{#if galleryPublishStep}
+							<div class="inline-overlay" role="dialog" aria-label="Publish gallery settings">
+								<div class="inline-overlay__panel inline-overlay__panel--publish">
+									<div class="inline-overlay__header">
+										<button
+											type="button"
+											class="back-button"
+											onclick={() => (galleryPublishStep = false)}
+										>
+											<SvgIcon path={mdiArrowLeft} size={18} />
+											Back
+										</button>
+										<IconButton
+											path={mdiClose}
+											label="Close publish settings"
+											onClick={() => (galleryPublishStep = false)}
+										/>
+									</div>
+									<PublishPanel bind:status={galleryStatus} bind:visibility={galleryVisibility} />
+									<div class="publish-actions">
+										<Button
+											type="submit"
+											variant="secondary"
+											onClick={() => (galleryStatus = 'draft')}
+										>
+											Save draft
+										</Button>
+										<Button type="submit" onClick={() => (galleryStatus = 'published')}>
+											Publish
+										</Button>
+									</div>
+								</div>
+							</div>
+						{/if}
+					</div>
+					{#if !galleryPublishStep}
+						<footer class="modal-footer modal-footer--end">
+							<Button
+								type="button"
+								disabled={!galleryDestination}
+								onClick={() => (galleryPublishStep = true)}
+							>
+								Continue
+							</Button>
+						</footer>
+					{/if}
+				</form>
+			{:else}
+				<form method="POST" action="?/createVideo" enctype="multipart/form-data" use:enhance>
+					<input type="hidden" name="status" value={videoStatus} />
+					<input type="hidden" name="visibility" value={videoVisibility} />
+					<input type="hidden" name="collectionMode" value={videoCollectionMode} />
+					<input
+						type="hidden"
+						name="existingVideoCollectionId"
+						value={videoCollectionMode === 'existing' ? videoDestination : ''}
+					/>
+					<div class="modal-body modal-body--compact">
+						<section class="collection-choice">
+							<Select
+								label="Video playlist"
+								options={videoCollectionOptions}
+								bind:value={videoDestination}
+								required
+							/>
+						</section>
+
+						<Input label="Video title" name="title" required />
+						<label class="field">
+							<span>Description</span>
+							<textarea name="description" rows="4"></textarea>
+						</label>
+						<FileUpload
+							label="Video file"
+							name="video"
+							accept="video/mp4,video/webm,video/quicktime"
+							maxSize={250}
+							required
+							preview={false}
+						/>
+
+						{#if videoPublishStep}
+							<div class="inline-overlay" role="dialog" aria-label="Publish video settings">
+								<div class="inline-overlay__panel inline-overlay__panel--publish">
+									<div class="inline-overlay__header">
+										<button
+											type="button"
+											class="back-button"
+											onclick={() => (videoPublishStep = false)}
+										>
+											<SvgIcon path={mdiArrowLeft} size={18} />
+											Back
+										</button>
+										<IconButton
+											path={mdiClose}
+											label="Close publish settings"
+											onClick={() => (videoPublishStep = false)}
+										/>
+									</div>
+									<PublishPanel bind:status={videoStatus} bind:visibility={videoVisibility} />
+									<div class="publish-actions">
+										<Button
+											type="submit"
+											variant="secondary"
+											onClick={() => (videoStatus = 'draft')}
+										>
+											Save draft
+										</Button>
+										<Button type="submit" onClick={() => (videoStatus = 'published')}>
+											Publish
+										</Button>
+									</div>
+								</div>
+							</div>
+						{/if}
+					</div>
+					{#if !videoPublishStep}
+						<footer class="modal-footer modal-footer--end">
+							<Button type="button" onClick={() => (videoPublishStep = true)}>Continue</Button>
+						</footer>
+					{/if}
+				</form>
+			{/if}
+
+			<CollectionCreateOverlay
+				open={galleryCreateOpen}
+				title="Create gallery"
+				submitLabel="Create gallery"
+				onCreate={createPhotoAlbum}
+				onCancel={() => (galleryCreateOpen = false)}
+			/>
+			<CollectionCreateOverlay
+				open={videoCollectionCreateOpen}
+				title="Create playlist"
+				submitLabel="Create playlist"
+				onCreate={createVideoCollection}
+				onCancel={() => (videoCollectionCreateOpen = false)}
+			/>
+		</div>
+	</div>
+{/if}
+
+<style lang="scss">
+	.modal-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 100;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: var(--space-6);
+		background: rgba(0, 0, 0, 0.5);
+	}
+
+	.backdrop-button {
+		position: absolute;
+		inset: 0;
+		border: 0;
+		background: transparent;
+		cursor: default;
+	}
+
+	.composer-modal {
+		position: relative;
+		z-index: 1;
+		width: min(880px, 100%);
+		max-height: min(760px, calc(100vh - var(--space-12)));
+		display: grid;
+		grid-template-rows: auto minmax(0, 1fr);
+		overflow: hidden;
+		border: 1px solid var(--border-primary);
+		border-radius: var(--radius-lg);
+		background: var(--bg-surface);
+		box-shadow: var(--shadow-xl);
+	}
+
+	.modal-header {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: var(--space-4);
+		padding: var(--space-4) var(--space-5);
+		border-bottom: 1px solid var(--border-primary);
+		background: color-mix(in srgb, var(--bg-surface) 92%, var(--bg-secondary));
+	}
+
+	.identity {
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+
+		h2,
+		p {
+			margin: 0;
+		}
+
+		h2 {
+			color: var(--text-primary);
+			font-size: var(--font-size-lg);
+			line-height: 1.2;
+		}
+
+		p {
+			margin-top: var(--space-1);
+			color: var(--text-secondary);
+			font-size: var(--font-size-xs);
+		}
+	}
+
+	.avatar {
+		width: 44px;
+		height: 44px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+		border-radius: var(--radius-full);
+		background: var(--bg-tertiary);
+		color: var(--text-primary);
+		font-weight: var(--font-weight-semibold);
+		flex-shrink: 0;
+
+		img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+		}
+	}
+
+	form {
+		min-height: 0;
+		display: grid;
+		grid-template-rows: minmax(0, 1fr) auto;
+	}
+
+	.modal-body {
+		position: relative;
+		min-height: 0;
+		display: grid;
+		gap: var(--space-3);
+		padding: var(--space-5) var(--space-6);
+		overflow-y: auto;
+	}
+
+	.modal-body--post {
+		overflow: hidden;
+	}
+
+	.modal-body--compact {
+		max-width: 680px;
+		width: 100%;
+		margin: 0 auto;
+	}
+
+	.title-input {
+		width: 100%;
+		min-height: 52px;
+		box-sizing: border-box;
+		padding: 0;
+		border: 0;
+		border-bottom: 1px solid var(--border-primary);
+		background: transparent;
+		color: var(--text-primary);
+		font-size: var(--font-size-2xl);
+		font-weight: var(--font-weight-medium);
+		outline: none;
+
+		&::placeholder {
+			color: var(--text-tertiary);
+			font-weight: var(--font-weight-normal);
+		}
+
+		&:focus {
+			border-bottom-color: var(--border-focus);
+		}
+	}
+
+	.inline-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 4;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: var(--space-6);
+		background: color-mix(in srgb, var(--bg-primary) 58%, transparent);
+		backdrop-filter: blur(2px);
+	}
+
+	.inline-overlay--hidden {
+		display: none;
+	}
+
+	.inline-overlay__panel {
+		width: min(620px, 100%);
+		max-height: min(520px, 100%);
+		overflow-y: auto;
+		padding: var(--space-5);
+		border: 1px solid var(--border-primary);
+		border-radius: var(--radius-lg);
+		background: var(--bg-surface);
+		box-shadow: var(--shadow-xl);
+	}
+
+	.inline-overlay__panel--publish {
+		width: min(460px, 100%);
+	}
+
+	.inline-overlay__header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		margin-bottom: var(--space-4);
+
+		h3 {
+			margin: 0;
+			color: var(--text-primary);
+			font-size: var(--font-size-lg);
+		}
+	}
+
+	.inline-overlay__actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.remove-widget {
+		min-height: 40px;
+		padding: 0 var(--space-3);
+		border: 1px solid var(--border-primary);
+		border-radius: var(--radius-md);
+		background: transparent;
+		color: var(--text-secondary);
+		cursor: pointer;
+		font-size: var(--font-size-sm);
+
+		&:hover {
+			border-color: var(--error);
+			color: var(--error);
+		}
+	}
+
+	.widget-panel--hidden {
+		display: none;
+	}
+
+	.modal-footer {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-4);
+		padding: var(--space-3) var(--space-5);
+		border-top: 1px solid var(--border-primary);
+		background: color-mix(in srgb, var(--bg-surface) 92%, var(--bg-secondary));
+	}
+
+	.modal-footer--end {
+		justify-content: flex-end;
+	}
+
+	.composer-tools {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		min-width: 0;
+	}
+
+	.tool-divider {
+		width: 1px;
+		height: 32px;
+		background: var(--border-primary);
+	}
+
+	.widget-toolbar,
+	.submit-area {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.back-button {
+		min-height: 40px;
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		border: 0;
+		background: transparent;
+		color: var(--text-secondary);
+		cursor: pointer;
+		font-weight: var(--font-weight-medium);
+	}
+
+	.publish-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: var(--space-3);
+		margin-top: var(--space-5);
+	}
+
+	.field {
+		display: grid;
+		gap: var(--space-2);
+
+		span {
+			color: var(--text-primary);
+			font-size: var(--font-size-sm);
+			font-weight: var(--font-weight-medium);
+		}
+
+		textarea {
+			width: 100%;
+			box-sizing: border-box;
+			padding: var(--space-3) var(--space-4);
+			border: 1px solid var(--border-primary);
+			border-radius: var(--radius-md);
+			background: var(--bg-surface);
+			color: var(--text-primary);
+			font-family: var(--font-family-sans);
+			font-size: var(--font-size-sm);
+			resize: vertical;
+
+			&:focus {
+				outline: none;
+				border-color: var(--border-focus);
+			}
+		}
+	}
+
+	.collection-choice {
+		display: grid;
+		gap: var(--space-4);
+	}
+
+	@media (max-width: 760px) {
+		.modal-backdrop {
+			align-items: stretch;
+			padding: var(--space-3);
+		}
+
+		.composer-modal {
+			max-height: 100%;
+		}
+
+		.modal-footer {
+			align-items: stretch;
+			flex-direction: column;
+		}
+
+		.composer-tools {
+			flex-wrap: wrap;
+		}
+
+		.widget-toolbar,
+		.submit-area {
+			justify-content: space-between;
+		}
+	}
+</style>
