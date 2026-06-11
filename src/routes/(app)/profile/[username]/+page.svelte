@@ -17,7 +17,9 @@
 		affiliate: Affiliate
 	};
 
-	const tabs = [
+	type ProfileTab = { id: string; label: string };
+
+	const tabs: ProfileTab[] = [
 		{ id: 'overview', label: 'Overview' },
 		{ id: 'playlists', label: 'Playlists' },
 		{ id: 'subscriptions', label: 'Subscriptions' },
@@ -28,7 +30,7 @@
 	const activeTabId = $derived(activeTab?.id);
 	let ViewComponent = $derived(viewsMap[activeTabId]);
 	$inspect(profileUser);
-	function handleTabChange(tab) {
+	function handleTabChange(tab: ProfileTab) {
 		activeTab = tab;
 	}
 </script>

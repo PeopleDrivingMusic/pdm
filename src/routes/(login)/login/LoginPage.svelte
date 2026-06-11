@@ -8,7 +8,8 @@
 	const formError = $derived(form?.error as string | undefined);
 	const errorMessage = $derived.by(() => {
 		if (formError) return formError;
-		if (queryError === 'oauth_error') return 'An error occurred while logging in with Google. Please try again.';
+		if (queryError === 'oauth_error')
+			return 'An error occurred while logging in with Google. Please try again.';
 		if (queryError === 'invalid_credentials') return 'Invalid email or password.';
 		if (queryError) return 'An error occurred. Please try again.';
 		return '';
@@ -24,6 +25,14 @@
 	function switchMode(event: MouseEvent, newMode: 'login' | 'register') {
 		event.preventDefault();
 		mode = newMode;
+	}
+
+	function getActionError(data: unknown) {
+		if (data && typeof data === 'object' && 'error' in data) {
+			const error = (data as { error?: unknown }).error;
+			return typeof error === 'string' ? error : 'An error occurred';
+		}
+		return 'An error occurred';
 	}
 </script>
 
@@ -50,7 +59,7 @@
 						if (result.type === 'redirect') {
 							notificationStore.success('Welcome! Redirecting...');
 						} else if (result.type === 'failure') {
-							notificationStore.error(result.data?.error || 'An error occurred');
+							notificationStore.error(getActionError(result.data));
 						}
 						await applyAction(result);
 					};

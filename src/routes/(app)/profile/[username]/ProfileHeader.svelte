@@ -7,7 +7,7 @@
 
 	interface Props {
 		user: User;
-		currentUser: User | null;
+		currentUser: Omit<User, 'hashedPassword'> | null;
 	}
 
 	const { user, currentUser }: Props = $props();
@@ -33,7 +33,7 @@
 				name={user.displayName || user.username || user.email}
 				src={user.avatarUrl}
 				size="lg"
-				alt={user.name}
+				alt={user.displayName || user.username || user.email}
 			/>
 		</div>
 

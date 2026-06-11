@@ -8,6 +8,7 @@
 		onClick?: () => void;
 		children?: () => any;
 		full?: boolean;
+		fullWidth?: boolean;
 	}
 
 	let {
@@ -17,9 +18,12 @@
 		href = '',
 		size = 'md',
 		full = false,
+		fullWidth = false,
 		onClick,
 		children
 	}: Props = $props();
+
+	full = full || fullWidth;
 </script>
 
 {#if href}
@@ -113,13 +117,13 @@
 			}
 		}
 
-    &.md {
-      padding: var(--space-2) var(--space-4);
-      font-size: var(--font-size-xs);
-    }
-    &.sm {
-      padding: var(--space-1) var(--space-2);
-      font-size: var(--font-size-xs);
-    }
+		&.md {
+			padding: var(--space-2) var(--space-4);
+			font-size: var(--font-size-xs);
+		}
+		&.sm {
+			padding: var(--space-1) var(--space-2);
+			font-size: var(--font-size-xs);
+		}
 	}
 </style>

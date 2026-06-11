@@ -22,15 +22,13 @@
 	const passwordTouched = $derived(confirmPassword.length > 0);
 	const isPasswordValid = $derived(
 		password.length >= passwordMinLength &&
-		/[A-Z]/.test(password) &&
-		/[a-z]/.test(password) &&
-		/[0-9]/.test(password)
+			/[A-Z]/.test(password) &&
+			/[a-z]/.test(password) &&
+			/[0-9]/.test(password)
 	);
 
 	const isStepOneValid = $derived(!!name.trim() && !!listenersCount);
-	const isStepTwoValid = $derived(
-		!!instagram.trim() || !!spotify.trim() || !!youtube.trim()
-	);
+	const isStepTwoValid = $derived(!!instagram.trim() || !!spotify.trim() || !!youtube.trim());
 	const isStepThreeValid = $derived(
 		!!login.trim() && isPasswordValid && passwordsMatch && passwordTouched
 	);
@@ -68,6 +66,14 @@
 		{ label: '100k - 1M', value: '100k-1m' },
 		{ label: '1M+', value: '1m-plus' }
 	];
+
+	function getActionError(data: unknown) {
+		if (data && typeof data === 'object' && 'error' in data) {
+			const error = (data as { error?: unknown }).error;
+			return typeof error === 'string' ? error : 'An error occurred';
+		}
+		return 'An error occurred';
+	}
 </script>
 
 <svelte:head>
@@ -80,7 +86,7 @@
 		<div class="form-container">
 			<div class="form-header">
 				<h1>Artist registration</h1>
-                <p>Build your fanbase and grow your sound</p>
+				<p>Build your fanbase and grow your sound</p>
 			</div>
 
 			<form
@@ -94,7 +100,7 @@
 						if (result.type === 'redirect') {
 							notificationStore.success('Request submitted');
 						} else if (result.type === 'failure') {
-							notificationStore.error(result.data?.error || 'An error occurred');
+							notificationStore.error(getActionError(result.data));
 						}
 						await applyAction(result);
 					};
@@ -181,7 +187,8 @@
 							/>
 							{#if password.length > 0 && !isPasswordValid}
 								<div class="password-hint">
-									Password must be at least {passwordMinLength} characters and contain uppercase, lowercase, and number
+									Password must be at least {passwordMinLength} characters and contain uppercase, lowercase,
+									and number
 								</div>
 							{/if}
 						</div>
@@ -196,9 +203,7 @@
 								error={hasError || (passwordTouched && !passwordsMatch)}
 							/>
 							{#if passwordTouched && !passwordsMatch}
-								<div class="password-error">
-									Passwords do not match
-								</div>
+								<div class="password-error">Passwords do not match</div>
 							{/if}
 						</div>
 					</div>
@@ -206,13 +211,25 @@
 
 				<div class="form-actions" class:single-action={step === 1}>
 					{#if step > 1}
-						<Button type="button" variant="secondary" full={true} disabled={loading} onClick={goBack}>
+						<Button
+							type="button"
+							variant="secondary"
+							full={true}
+							disabled={loading}
+							onClick={goBack}
+						>
 							Back
 						</Button>
 					{/if}
 
 					{#if step < 3}
-						<Button type="button" variant="primary" full={true} disabled={!canProceed || loading} onClick={goNext}>
+						<Button
+							type="button"
+							variant="primary"
+							full={true}
+							disabled={!canProceed || loading}
+							onClick={goNext}
+						>
 							Next
 						</Button>
 					{:else}

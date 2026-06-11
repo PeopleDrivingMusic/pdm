@@ -1,115 +1,115 @@
 <script lang="ts">
-  interface Props {
-    type?: HTMLInputElement['type'];
-    placeholder?: string;
-    value?: string | number;
-    label?: string;
-    required?: boolean;
-    disabled?: boolean;
-    id?: string;
-    name?: string;
-    onInput?: (e: InputEvent) => any
-    error?: boolean;
-    min?: number;
-    max?: number;
-  }
+	interface Props {
+		type?: HTMLInputElement['type'];
+		placeholder?: string;
+		value?: string | number;
+		label?: string;
+		required?: boolean;
+		disabled?: boolean;
+		id?: string;
+		name?: string;
+		onInput?: (e: Event) => any;
+		error?: boolean;
+		min?: number;
+		max?: number;
+	}
 
-  let {
-    type = 'text',
-    placeholder = '',
-    value = $bindable(''),
-    label = '',
-    required = false,
-    disabled = false,
-    id = label || `input-${Math.random().toString(36).substr(2, 9)}`,
-    name = '',
-    onInput,
-    error = false,
-    ...rest
-  }: Props = $props();
+	let {
+		type = 'text',
+		placeholder = '',
+		value = $bindable(''),
+		label = '',
+		required = false,
+		disabled = false,
+		id = label || `input-${Math.random().toString(36).substr(2, 9)}`,
+		name = '',
+		onInput,
+		error = false,
+		...rest
+	}: Props = $props();
 </script>
 
 <div class="input-group" oninput={(e) => onInput && onInput(e)}>
-  {#if label}
-    <label class="input-label" for={id}>
-      {label}
-      {#if required}
-        <span class="required-indicator" aria-hidden="true">*</span>
-      {/if}
-    </label>
-  {/if}
-  
-  <input
-    {id}
-    {name}
-    class="input"
-    class:input--error={error}
-    {type}
-    {placeholder}
-    bind:value
-    {required}
-    {disabled}
-    {...rest}
-  />
+	{#if label}
+		<label class="input-label" for={id}>
+			{label}
+			{#if required}
+				<span class="required-indicator" aria-hidden="true">*</span>
+			{/if}
+		</label>
+	{/if}
+
+	<input
+		{id}
+		{name}
+		class="input"
+		class:input--error={error}
+		{type}
+		{placeholder}
+		bind:value
+		{required}
+		{disabled}
+		{...rest}
+	/>
 </div>
 
 <style lang="scss">
-  .input-group {
-    width: 100%;
-  }
+	.input-group {
+		width: 100%;
+	}
 
-  .input-label {
-    display: block;
-    margin-bottom: var(--space-2);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    color: var(--text-primary);
-    font-family: var(--font-family-sans);
-  }
+	.input-label {
+		display: block;
+		margin-bottom: var(--space-2);
+		font-size: var(--font-size-sm);
+		font-weight: var(--font-weight-medium);
+		color: var(--text-primary);
+		font-family: var(--font-family-sans);
+	}
 
-  .required-indicator {
-    color: var(--text-danger, var(--border-error));
-    margin-left: var(--space-1, 0.25rem);
-  }
+	.required-indicator {
+		color: var(--text-danger, var(--border-error));
+		margin-left: var(--space-1, 0.25rem);
+	}
 
-  .input {
-    width: 100%;
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-family: var(--font-family-sans);
-    background-color: var(--bg-surface);
-    color: var(--text-primary);
-    transition: all var(--duration-normal) var(--easing-ease-out);
-    box-sizing: border-box;
+	.input {
+		width: 100%;
+		padding: var(--space-3) var(--space-4);
+		border: 1px solid var(--border-primary);
+		border-radius: var(--radius-md);
+		font-size: var(--font-size-sm);
+		font-family: var(--font-family-sans);
+		background-color: var(--bg-surface);
+		color: var(--text-primary);
+		transition: all var(--duration-normal) var(--easing-ease-out);
+		box-sizing: border-box;
 
-    &:focus {
-      outline: none;
-      border-color: var(--border-focus);
-    }
+		&:focus {
+			outline: none;
+			border-color: var(--border-focus);
+		}
 
-    &:hover:not(:disabled):not(:focus) {
-      border-color: var(--border-secondary);
-    }
+		&:hover:not(:disabled):not(:focus) {
+			border-color: var(--border-secondary);
+		}
 
-    &:disabled {
-      background-color: var(--bg-tertiary);
-      color: var(--text-disabled);
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
+		&:disabled {
+			background-color: var(--bg-tertiary);
+			color: var(--text-disabled);
+			cursor: not-allowed;
+			opacity: 0.6;
+		}
 
-    &::placeholder {
-      color: var(--text-tertiary);
-    }
+		&::placeholder {
+			color: var(--text-tertiary);
+		}
 
-    &:invalid:not(:placeholder-shown) {
-      border-color: var(--border-error);
-    }
-  }
+		&:invalid:not(:placeholder-shown) {
+			border-color: var(--border-error);
+		}
+	}
 
-  .input--error {
-    border-color: var(--border-error);
-  }
+	.input--error {
+		border-color: var(--border-error);
+	}
 </style>

@@ -69,7 +69,6 @@
 		"@tiptap/pm": "^3.26.0",
 		"@tiptap/starter-kit": "^3.26.0",
 		"arctic": "^3.7.0",
-		"colorthief": "^2.6.0",
 		"dotenv": "^17.2.1",
 		"drizzle-orm": "^0.44.4",
 		"music-metadata": "^11.12.0",

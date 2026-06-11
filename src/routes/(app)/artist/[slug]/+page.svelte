@@ -16,17 +16,16 @@
 	import MusicAlbum from '$lib/ui/components/MusicAlbum.svelte';
 	import Progress from '$lib/ui/Progress.svelte';
 	import Tabs from '$lib/ui/Tabs.svelte';
-	import { derived } from 'svelte/store';
 	$inspect(page.data);
 	const { artist, tracks, albums } = $derived(page.data as PageData);
-	const albumMap = $derived(new Map(albums.map((album) => ([album.id, album]))))
+	const albumMap = $derived(new Map(albums.map((album) => [album.id, album])));
 	const tabs = [
-		{label: 'Feed', id: "feed"},
-		{label: 'Music', id: "music"},
-		{label: 'Photos', id: "photos"},
-		{label: 'Posts', id: "posts"},
-		{label: 'Lives', id: "lives"},
-		{label: 'Shop', id: "shop"}
+		{ label: 'Feed', id: 'feed' },
+		{ label: 'Music', id: 'music' },
+		{ label: 'Photos', id: 'photos' },
+		{ label: 'Posts', id: 'posts' },
+		{ label: 'Lives', id: 'lives' },
+		{ label: 'Shop', id: 'shop' }
 	];
 	let tab = $state('Feed');
 	const concerts = [
@@ -94,10 +93,10 @@
 					<h1 class="name">{artist?.name || 'Unknown Artist'}</h1>
 					<div class="community">
 						<div class="followers">
-							<strong>{artist.followersCount || '1.5m'}</strong> Followers
+							<strong>1.5m</strong> Followers
 						</div>
 						<div class="subscribers">
-							<strong>{artist.likesCount || '100k'}</strong> Subscribers
+							<strong>100k</strong> Subscribers
 						</div>
 					</div>
 					<!-- <p class="genre">{data.tracks ? data.tracks.genre : ''}</p> -->
@@ -110,15 +109,19 @@
 		</div>
 		<div class="section">
 			<div class="tabs-wrapper">
-				<Tabs tabs={tabs} activeTab={tabs[0]} type="pill" />
-				
+				<Tabs {tabs} activeTab={tabs[0]} type="pill" />
 			</div>
 			{#if tab === 'Feed'}
 				<div class="feed-content">
 					<h3>Top Music</h3>
 					<div class="track-wrapper">
 						{#each tracks as track}
-							<MusicTrack track={track.track} isLiked={track.isLiked}  {artist} album={albumMap.get(track.albumId || "")}/>
+							<MusicTrack
+								track={track.track}
+								isLiked={track.isLiked}
+								{artist}
+								album={albumMap.get(track.track.albumId || '')}
+							/>
 						{/each}
 					</div>
 				</div>
@@ -198,7 +201,6 @@
 									<span class="option-label">Track C — Experimental</span>
 									<Progress progress={10} />
 								</label>
-
 							</form>
 						</article>
 					</div>
@@ -590,7 +592,6 @@
 						font-weight: 600;
 					}
 
-
 					&:has(input:checked) {
 						box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06);
 					}
@@ -606,83 +607,79 @@
 	}
 
 	.concert-list {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-        z-index: 1;
-        max-height: 400px;
-        overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		z-index: 1;
+		max-height: 400px;
+		overflow-y: auto;
 
-        .concert-item {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-            padding: var(--space-3);
-            background: rgba(255, 255, 255, 0.02);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: all 200ms ease;
+		.concert-item {
+			display: flex;
+			align-items: center;
+			gap: var(--space-3);
+			padding: var(--space-3);
+			background: rgba(255, 255, 255, 0.02);
+			border-radius: 12px;
+			border: 1px solid rgba(255, 255, 255, 0.05);
+			transition: all 200ms ease;
 
-            &:hover {
-                background: rgba(255, 255, 255, 0.04);
-                border-color: rgba(255, 255, 255, 0.1);
-            }
+			&:hover {
+				background: rgba(255, 255, 255, 0.04);
+				border-color: rgba(255, 255, 255, 0.1);
+			}
 
-            .concert-date {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
+			.concert-date {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
 				width: 80px;
 				aspect-ratio: 1/1;
 				flex-shrink: 0;
-                padding: var(--space-2);
-                background: linear-gradient(
-                    135deg,
-                    var(--color-brand-600),
-                    var(--color-brand-800)
-                );
-                border-radius: 10px;
+				padding: var(--space-2);
+				background: linear-gradient(135deg, var(--color-brand-600), var(--color-brand-800));
+				border-radius: 10px;
 
-                .day {
-                    @include text-sm();
-                    font-weight: 700;
-                    color: var(--text-primary);
-                }
+				.day {
+					@include text-sm();
+					font-weight: 700;
+					color: var(--text-primary);
+				}
 
-                .time {
-                    @include text-xs();
-                    color: var(--text-secondary);
-                    margin-top: 2px;
-                }
-            }
+				.time {
+					@include text-xs();
+					color: var(--text-secondary);
+					margin-top: 2px;
+				}
+			}
 
-            .concert-info {
-                flex-grow: 1;
-                display: flex;
-                flex-direction: column;
-                gap: var(--space-1);
+			.concert-info {
+				flex-grow: 1;
+				display: flex;
+				flex-direction: column;
+				gap: var(--space-1);
 
-                .venue {
-                    @include text-sm();
-                    font-weight: 600;
-                    color: var(--text-primary);
-                }
+				.venue {
+					@include text-sm();
+					font-weight: 600;
+					color: var(--text-primary);
+				}
 
-                .location {
-                    display: flex;
-                    align-items: center;
-                    gap: var(--space-1);
-                    @include text-xs();
-                    color: var(--text-secondary);
-                }
-            }
+				.location {
+					display: flex;
+					align-items: center;
+					gap: var(--space-1);
+					@include text-xs();
+					color: var(--text-secondary);
+				}
+			}
 
 			.button {
 				flex-shrink: 0;
 				// width: 155px;
 			}
-        }
-    }
+		}
+	}
 	/* your styles go here */
 </style>

@@ -5,12 +5,12 @@
 	import type { NotificationType } from '$lib/stores/notification.svelte';
 
 	interface Props {
-		type: NotificationType;
+		type?: NotificationType;
 		message: string;
 		onClose?: () => void;
 	}
 
-	const { type, message, onClose } = $props();
+	const { type = 'info' as NotificationType, message, onClose } = $props();
 
 	const iconMap: Record<NotificationType, string> = {
 		success: mdiCheckCircle,
@@ -200,6 +200,4 @@
 			}
 		}
 	}
-
-	
 </style>

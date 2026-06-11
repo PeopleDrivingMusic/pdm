@@ -2,12 +2,14 @@
 // for information about these interfaces
 import type { User, Session } from '$lib/db/schema';
 
+type SafeUser = Omit<User, 'hashedPassword'>;
+
 declare global {
 	namespace App {
 		// interface Error {}
 		interface Locals {
 			requestId?: string;
-			user: User | null;
+			user: SafeUser | null;
 			session: Session | null;
 		}
 		// interface PageData {}

@@ -9,6 +9,14 @@
 	let login = $state('');
 	let password = $state('');
 	let loading = $state(false);
+
+	function getActionError(data: unknown) {
+		if (data && typeof data === 'object' && 'error' in data) {
+			const error = (data as { error?: unknown }).error;
+			return typeof error === 'string' ? error : 'An error occurred';
+		}
+		return 'An error occurred';
+	}
 </script>
 
 <svelte:head>
@@ -34,7 +42,7 @@
 						if (result.type === 'redirect') {
 							notificationStore.success('Welcome back!');
 						} else if (result.type === 'failure') {
-							notificationStore.error(result.data?.error || 'An error occurred');
+							notificationStore.error(getActionError(result.data));
 						}
 						await applyAction(result);
 					};
