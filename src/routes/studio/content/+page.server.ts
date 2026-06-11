@@ -1,15 +1,8 @@
 import type { Actions, PageServerLoad } from './$types';
 import { error, fail } from '@sveltejs/kit';
-import {
-	ContentMediaService,
-	GalleryService,
-	PostService,
-	StudioContentService,
-	VideoService,
-	type ContentStatus,
-	type ContentVisibility
-} from '$lib/db/services/ContentService';
+import { type ContentStatus, type ContentVisibility } from '$lib/db/services/ContentService';
 import { getArtistByCookie } from '$lib/server/artist-session';
+import { ContentApplicationService } from '$lib/server/content';
 import { uploadFile, uploadImage } from '$lib/server/upload';
 
 const STATUS_VALUES = new Set(['draft', 'scheduled', 'published', 'archived']);
@@ -59,10 +52,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		throw error(401, 'Unauthorized');
 	}
 
-	const [content, attachableMusic] = await Promise.all([
-		StudioContentService.getOverview(artist.id),
-		StudioContentService.getAttachableMusic(artist.id)
-	]);
+	const { content, attachableMusic } = await ContentApplicationService.getStudioContent(artist.id);
 
 	return {
 		content,
@@ -96,12 +86,13 @@ export const actions: Actions = {
 			return fail(400, { error: 'Poll needs at least two options' });
 		}
 
-		const [tracksOwned, albumsOwned] = await Promise.all([
-			StudioContentService.assertTrackOwnership(artist.id, trackIds),
-			StudioContentService.assertAlbumOwnership(artist.id, albumIds)
-		]);
+		const canAttachMusic = await ContentApplicationService.canAttachMusic({
+			artistId: artist.id,
+			trackIds,
+			albumIds
+		});
 
-		if (!tracksOwned || !albumsOwned) {
+		if (!canAttachMusic) {
 			return fail(403, { error: 'Attached music does not belong to this artist' });
 		}
 
@@ -120,7 +111,7 @@ export const actions: Actions = {
 			if (!upload.success || !upload.path) {
 				return fail(400, { error: upload.error || 'Failed to upload image' });
 			}
-			const media = await ContentMediaService.createMedia({
+			const media = await ContentApplicationService.createMedia({
 				artistId: artist.id,
 				type: 'image',
 				fileUrl: upload.path
@@ -128,7 +119,7 @@ export const actions: Actions = {
 			mediaIds.push(media.id);
 		}
 
-		const post = await PostService.createPost({
+		const post = await ContentApplicationService.createPost({
 			artistId: artist.id,
 			title,
 			bodyJson,
@@ -186,7 +177,7 @@ export const actions: Actions = {
 			return fail(400, { error: upload.error || 'Failed to upload photo' });
 		}
 
-		const media = await ContentMediaService.createMedia({
+		const media = await ContentApplicationService.createMedia({
 			artistId: artist.id,
 			type: 'image',
 			fileUrl: upload.path
@@ -194,12 +185,12 @@ export const actions: Actions = {
 
 		const album =
 			collectionMode === 'existing'
-				? await GalleryService.addPhotoToAlbum({
+				? await ContentApplicationService.addPhotoToAlbum({
 						artistId: artist.id,
 						albumId: existingAlbumId,
 						mediaId: media.id
 					})
-				: await GalleryService.createAlbum({
+				: await ContentApplicationService.createPhotoAlbumWithMedia({
 						artistId: artist.id,
 						title: newAlbumTitle,
 						description,
@@ -249,13 +240,13 @@ export const actions: Actions = {
 			return fail(400, { error: upload.error || 'Failed to upload video' });
 		}
 
-		const media = await ContentMediaService.createMedia({
+		const media = await ContentApplicationService.createMedia({
 			artistId: artist.id,
 			type: 'video',
 			fileUrl: upload.path
 		});
 
-		const video = await VideoService.createVideo({
+		const video = await ContentApplicationService.createVideo({
 			artistId: artist.id,
 			title,
 			description,

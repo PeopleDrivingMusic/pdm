@@ -1,6 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { GalleryService, type ContentVisibility } from '$lib/db/services/ContentService';
+import type { ContentVisibility } from '$lib/db/services/ContentService';
 import { getArtistByCookie } from '$lib/server/artist-session';
+import { ContentApplicationService } from '$lib/server/content';
 
 const VISIBILITY_VALUES = new Set(['public', 'followers', 'subscribers', 'investors']);
 
@@ -23,13 +24,12 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Title is required' }, { status: 400 });
 	}
 
-	const album = await GalleryService.createAlbum({
+	const album = await ContentApplicationService.createPhotoAlbum({
 		artistId: artist.id,
 		title,
 		description,
 		visibility,
-		status: 'draft',
-		mediaIds: []
+		status: 'draft'
 	});
 
 	return json({ album });

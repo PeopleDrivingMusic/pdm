@@ -1,6 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { VideoService, type ContentVisibility } from '$lib/db/services/ContentService';
+import type { ContentVisibility } from '$lib/db/services/ContentService';
 import { getArtistByCookie } from '$lib/server/artist-session';
+import { ContentApplicationService } from '$lib/server/content';
 
 const VISIBILITY_VALUES = new Set(['public', 'followers', 'subscribers', 'investors']);
 
@@ -23,7 +24,7 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Title is required' }, { status: 400 });
 	}
 
-	const collection = await VideoService.createCollection({
+	const collection = await ContentApplicationService.createVideoCollection({
 		artistId: artist.id,
 		title,
 		description,

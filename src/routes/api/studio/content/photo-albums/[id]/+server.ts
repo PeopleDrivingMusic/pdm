@@ -1,10 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import {
-	GalleryService,
-	type ContentStatus,
-	type ContentVisibility
-} from '$lib/db/services/ContentService';
+import type { ContentStatus, ContentVisibility } from '$lib/db/services/ContentService';
 import { getArtistByCookie } from '$lib/server/artist-session';
+import { ContentApplicationService } from '$lib/server/content';
 
 const STATUS_VALUES = new Set(['draft', 'scheduled', 'published', 'archived']);
 const VISIBILITY_VALUES = new Set(['public', 'followers', 'subscribers', 'investors']);
@@ -36,9 +33,9 @@ export const PATCH: RequestHandler = async (event) => {
 		return json({ error: 'Title is required' }, { status: 400 });
 	}
 
-	const album = await GalleryService.updateAlbum({
+	const album = await ContentApplicationService.updatePhotoAlbum({
 		artistId: artist.id,
-		albumId,
+		collectionId: albumId,
 		title,
 		description,
 		visibility,
@@ -57,9 +54,9 @@ export const DELETE: RequestHandler = async (event) => {
 	const albumId = event.params.id;
 	if (!albumId) return json({ error: 'Gallery id is required' }, { status: 400 });
 
-	const deleted = await GalleryService.deleteAlbum({
+	const deleted = await ContentApplicationService.deletePhotoAlbum({
 		artistId: artist.id,
-		albumId
+		collectionId: albumId
 	});
 
 	if (!deleted) return json({ error: 'Gallery not found' }, { status: 404 });

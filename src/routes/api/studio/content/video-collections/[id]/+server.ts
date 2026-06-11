@@ -1,10 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import {
-	VideoService,
-	type ContentStatus,
-	type ContentVisibility
-} from '$lib/db/services/ContentService';
+import type { ContentStatus, ContentVisibility } from '$lib/db/services/ContentService';
 import { getArtistByCookie } from '$lib/server/artist-session';
+import { ContentApplicationService } from '$lib/server/content';
 
 const STATUS_VALUES = new Set(['draft', 'scheduled', 'published', 'archived']);
 const VISIBILITY_VALUES = new Set(['public', 'followers', 'subscribers', 'investors']);
@@ -36,7 +33,7 @@ export const PATCH: RequestHandler = async (event) => {
 		return json({ error: 'Title is required' }, { status: 400 });
 	}
 
-	const collection = await VideoService.updateCollection({
+	const collection = await ContentApplicationService.updateVideoCollection({
 		artistId: artist.id,
 		collectionId,
 		title,
@@ -57,7 +54,7 @@ export const DELETE: RequestHandler = async (event) => {
 	const collectionId = event.params.id;
 	if (!collectionId) return json({ error: 'Playlist id is required' }, { status: 400 });
 
-	const deleted = await VideoService.deleteCollection({
+	const deleted = await ContentApplicationService.deleteVideoCollection({
 		artistId: artist.id,
 		collectionId
 	});
