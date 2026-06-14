@@ -6,12 +6,14 @@
 
 	interface Props {
 		editor?: Editor | null;
+		initialContent?: Record<string, unknown> | string | null;
 	}
 
 	let editorElement: HTMLDivElement;
-	let { editor = $bindable(null) }: Props = $props();
+	let { editor = $bindable(null), initialContent = null }: Props = $props();
 	let bodyJson = $state('');
 	let bodyHtml = $state('');
+	let appliedInitialContent = $state<unknown>(null);
 
 	function syncEditor(nextEditor: Editor) {
 		bodyJson = JSON.stringify(nextEditor.getJSON());
@@ -28,7 +30,7 @@
 					placeholder: 'Write an update, add context for a poll, or tease the next release...'
 				})
 			],
-			content: '',
+			content: initialContent || '',
 			editorProps: {
 				attributes: {
 					class: 'tiptap-editor__surface'
@@ -46,6 +48,13 @@
 		return () => {
 			instance.destroy();
 		};
+	});
+
+	$effect(() => {
+		if (!editor || appliedInitialContent === initialContent) return;
+		appliedInitialContent = initialContent;
+		editor.commands.setContent(initialContent || '', { emitUpdate: false });
+		syncEditor(editor);
 	});
 </script>
 

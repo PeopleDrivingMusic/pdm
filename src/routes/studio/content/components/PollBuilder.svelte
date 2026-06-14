@@ -13,9 +13,30 @@
 		{ label: 'After close', value: 'after_close' }
 	];
 
+	interface Props {
+		initialPoll?: {
+			question: string | null;
+			mode: string;
+			showResults: string;
+			closesAt: Date | string | null;
+			options: Array<{ label: string }>;
+		} | null;
+	}
+
+	let { initialPoll = null }: Props = $props();
+	let pollQuestion = $state('');
 	let pollMode = $state('single');
 	let pollShowResults = $state('after_vote');
+	let pollClosesAt = $state('');
 	let optionValues = $state(['', '']);
+
+	function toDatetimeLocal(value: Date | string | null | undefined) {
+		if (!value) return '';
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) return '';
+		const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+		return offsetDate.toISOString().slice(0, 16);
+	}
 
 	function addOption() {
 		optionValues = [...optionValues, ''];
@@ -25,11 +46,30 @@
 		if (optionValues.length <= 2) return;
 		optionValues = optionValues.filter((_, optionIndex) => optionIndex !== index);
 	}
+
+	$effect(() => {
+		pollQuestion = initialPoll?.question ?? '';
+		pollMode = initialPoll?.mode === 'multiple' ? 'multiple' : 'single';
+		pollShowResults =
+			initialPoll?.showResults === 'always' || initialPoll?.showResults === 'after_close'
+				? initialPoll.showResults
+				: 'after_vote';
+		pollClosesAt = toDatetimeLocal(initialPoll?.closesAt);
+		optionValues =
+			initialPoll?.options && initialPoll.options.length >= 2
+				? initialPoll.options.map((option) => option.label)
+				: ['', ''];
+	});
 </script>
 
 <section class="poll-builder">
 	<div class="poll-fields">
-		<Input label="Question" name="pollQuestion" placeholder="What should fans vote on?" />
+		<Input
+			label="Question"
+			name="pollQuestion"
+			placeholder="Optional poll title"
+			bind:value={pollQuestion}
+		/>
 		<div class="grid">
 			<Select label="Voting mode" name="pollMode" options={modeOptions} bind:value={pollMode} />
 			<Select
@@ -39,7 +79,7 @@
 				bind:value={pollShowResults}
 			/>
 		</div>
-		<Input type="datetime-local" label="Close date" name="pollClosesAt" />
+		<Input type="datetime-local" label="Close date" name="pollClosesAt" bind:value={pollClosesAt} />
 
 		<div class="options">
 			<span class="options-label">Options</span>
@@ -49,6 +89,7 @@
 						name="pollOptions"
 						placeholder={`Option ${index + 1}`}
 						bind:value={optionValues[index]}
+						required
 					/>
 					<IconButton
 						path={mdiClose}

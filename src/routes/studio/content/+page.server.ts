@@ -76,13 +76,14 @@ export const actions: Actions = {
 		const albumIds = getStringList(data, 'albumIds');
 		const pollQuestion = getString(data, 'pollQuestion');
 		const pollOptions = getStringList(data, 'pollOptions');
+		const pollEnabled = getString(data, 'pollEnabled') === 'true';
 		const imageFile = data.get('coverImage') as File | null;
 
 		if (!title) return fail(400, { error: 'Title is required' });
 		if (status === 'scheduled' && !scheduledAt) {
 			return fail(400, { error: 'Scheduled posts need a valid date' });
 		}
-		if (pollQuestion && pollOptions.length < 2) {
+		if (pollEnabled && pollOptions.length < 2) {
 			return fail(400, { error: 'Poll needs at least two options' });
 		}
 
@@ -130,9 +131,9 @@ export const actions: Actions = {
 			mediaIds,
 			trackIds,
 			albumIds,
-			poll: pollQuestion
+			poll: pollEnabled
 				? {
-						question: pollQuestion,
+						question: pollQuestion || null,
 						mode: getString(data, 'pollMode') === 'multiple' ? 'multiple' : 'single',
 						options: pollOptions,
 						closesAt: parseDate(getString(data, 'pollClosesAt')),
@@ -147,6 +148,128 @@ export const actions: Actions = {
 		});
 
 		return { success: true, post };
+	},
+
+	updatePost: async (event) => {
+		const artist = await getArtistByCookie(event);
+		if (!artist) return fail(401, { error: 'Unauthorized' });
+
+		const data = await event.request.formData();
+		const postId = getString(data, 'postId');
+		const title = getString(data, 'title');
+		const bodyHtml = sanitizeHtml(getString(data, 'bodyHtml'));
+		const bodyJsonRaw = getString(data, 'bodyJson');
+		const status = getStatus(data.get('status'));
+		const visibility = getVisibility(data.get('visibility'));
+		const scheduledAt = parseDate(getString(data, 'scheduledAt'));
+		const existingMediaIds = getStringList(data, 'existingMediaIds');
+		const trackIds = getStringList(data, 'trackIds');
+		const albumIds = getStringList(data, 'albumIds');
+		const pollQuestion = getString(data, 'pollQuestion');
+		const pollOptions = getStringList(data, 'pollOptions');
+		const pollEnabled = getString(data, 'pollEnabled') === 'true';
+		const imageFile = data.get('coverImage') as File | null;
+
+		if (!postId) return fail(400, { error: 'Post is required' });
+		if (!title) return fail(400, { error: 'Title is required' });
+		if (status === 'scheduled' && !scheduledAt) {
+			return fail(400, { error: 'Scheduled posts need a valid date' });
+		}
+		if (pollEnabled && pollOptions.length < 2) {
+			return fail(400, { error: 'Poll needs at least two options' });
+		}
+
+		const canAttachMusic = await ContentApplicationService.canAttachMusic({
+			artistId: artist.id,
+			trackIds,
+			albumIds
+		});
+
+		if (!canAttachMusic) {
+			return fail(403, { error: 'Attached music does not belong to this artist' });
+		}
+
+		let bodyJson: Record<string, unknown> | null = null;
+		if (bodyJsonRaw) {
+			try {
+				bodyJson = JSON.parse(bodyJsonRaw);
+			} catch {
+				return fail(400, { error: 'Invalid editor document' });
+			}
+		}
+
+		let mediaIds = [...existingMediaIds];
+		if (imageFile && imageFile.size > 0) {
+			const upload = await uploadImage(imageFile, `content/posts/${artist.id}`);
+			if (!upload.success || !upload.path) {
+				return fail(400, { error: upload.error || 'Failed to upload image' });
+			}
+			const media = await ContentApplicationService.createMedia({
+				artistId: artist.id,
+				type: 'image',
+				fileUrl: upload.path
+			});
+			mediaIds = [media.id];
+		}
+
+		let post;
+		try {
+			post = await ContentApplicationService.updatePost({
+				artistId: artist.id,
+				postId,
+				title,
+				bodyJson,
+				bodyHtml,
+				visibility,
+				status,
+				scheduledAt,
+				mediaIds,
+				trackIds,
+				albumIds,
+				pollEnabled,
+				poll: pollEnabled
+					? {
+							question: pollQuestion || null,
+							mode: getString(data, 'pollMode') === 'multiple' ? 'multiple' : 'single',
+							options: pollOptions,
+							closesAt: parseDate(getString(data, 'pollClosesAt')),
+							showResults:
+								getString(data, 'pollShowResults') === 'always'
+									? 'always'
+									: getString(data, 'pollShowResults') === 'after_close'
+										? 'after_close'
+										: 'after_vote'
+						}
+					: null
+			});
+		} catch (error) {
+			if (error instanceof Error && error.message.startsWith('Poll already has votes')) {
+				return fail(400, { error: error.message });
+			}
+			throw error;
+		}
+
+		if (!post) return fail(404, { error: 'Post not found' });
+
+		return { success: true, post };
+	},
+
+	deletePost: async (event) => {
+		const artist = await getArtistByCookie(event);
+		if (!artist) return fail(401, { error: 'Unauthorized' });
+
+		const data = await event.request.formData();
+		const postId = getString(data, 'postId');
+		if (!postId) return fail(400, { error: 'Post is required' });
+
+		const deleted = await ContentApplicationService.deletePost({
+			artistId: artist.id,
+			postId
+		});
+
+		if (!deleted) return fail(404, { error: 'Post not found' });
+
+		return { success: true };
 	},
 
 	createGallery: async (event) => {

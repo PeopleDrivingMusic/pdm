@@ -9,9 +9,9 @@
 	];
 
 	const statusOptions = [
-		{ label: 'Draft', value: 'draft' },
+		{ label: 'Publish now', value: 'published' },
 		{ label: 'Schedule', value: 'scheduled' },
-		{ label: 'Publish now', value: 'published' }
+		{ label: 'Draft', value: 'draft' }
 	];
 
 	interface Props {
@@ -21,7 +21,7 @@
 	}
 
 	let {
-		status = $bindable('draft'),
+		status = $bindable('published'),
 		visibility = $bindable('public'),
 		prefix = ''
 	}: Props = $props();

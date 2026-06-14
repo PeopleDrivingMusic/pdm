@@ -37,8 +37,8 @@
 		onCreateGallery: () => void;
 		onCreateVideo: () => void;
 		onEditCollection: (item: FeedItem) => void;
-		onPublishCollection: (item: FeedItem) => void;
-		onDeleteCollection: (item: FeedItem) => void;
+		onPublishCollection: (item: FeedItem) => void | Promise<void>;
+		onDeleteCollection: (item: FeedItem) => void | Promise<void>;
 	}
 
 	let {

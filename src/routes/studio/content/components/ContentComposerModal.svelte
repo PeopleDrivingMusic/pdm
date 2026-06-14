@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import { deserialize, enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { mdiArrowLeft, mdiClose, mdiImageOutline, mdiMusicNotePlus, mdiPoll } from '@mdi/js';
 	import { Button, FileUpload, IconButton, Input, Select, SvgIcon } from '$lib/ui';
@@ -11,9 +11,31 @@
 	import PostEditorToolbar from './PostEditorToolbar.svelte';
 	import PublishPanel from './PublishPanel.svelte';
 
+	interface EditablePost {
+		id: string;
+		title: string;
+		bodyJson: Record<string, unknown> | null;
+		bodyHtml: string | null;
+		visibility: string;
+		status: string;
+		scheduledAt: Date | string | null;
+		mediaIds: string[];
+		trackIds: string[];
+		albumIds: string[];
+		poll: {
+			question: string | null;
+			mode: string;
+			showResults: string;
+			closesAt: Date | string | null;
+			options: Array<{ label: string }>;
+		} | null;
+	}
+
 	interface Props {
 		open: boolean;
 		type: 'post' | 'gallery' | 'video';
+		mode?: 'create' | 'edit';
+		initialPost?: EditablePost | null;
 		artist: {
 			name: string;
 			avatar?: string | null;
@@ -35,13 +57,27 @@
 		photoAlbums: Array<{ id: string; title: string; status: string }>;
 		videoCollections: Array<{ id: string; title: string; status: string }>;
 		onClose: () => void;
+		onSuccess?: (message: string) => void;
+		onError?: (message: string) => void;
 	}
 
-	let { open, type, artist, attachableMusic, photoAlbums, videoCollections, onClose }: Props =
-		$props();
+	let {
+		open,
+		type,
+		mode = 'create',
+		initialPost = null,
+		artist,
+		attachableMusic,
+		photoAlbums,
+		videoCollections,
+		onClose,
+		onSuccess,
+		onError
+	}: Props = $props();
 
 	let postStatus = $state('draft');
 	let postVisibility = $state('public');
+	let postTitle = $state('');
 	let galleryStatus = $state('draft');
 	let galleryVisibility = $state('public');
 	let videoStatus = $state('draft');
@@ -60,10 +96,20 @@
 	let musicEnabled = $state(false);
 	let pollEnabled = $state(false);
 	let editor = $state<Editor | null>(null);
+	let submitError = $state('');
+	let isSubmitting = $state(false);
 
 	const title = $derived(
-		type === 'post' ? 'Create post' : type === 'gallery' ? 'Create gallery' : 'Upload video'
+		type === 'post'
+			? mode === 'edit'
+				? 'Edit post'
+				: 'Create post'
+			: type === 'gallery'
+				? 'Create gallery'
+				: 'Upload video'
 	);
+	const postAction = $derived(mode === 'edit' && initialPost ? '?/updatePost' : '?/createPost');
+	const initialEditorContent = $derived(initialPost?.bodyJson ?? initialPost?.bodyHtml ?? '');
 	const photoAlbumOptions = $derived([
 		{ label: '+ Create new gallery', value: '__create__' },
 		...localPhotoAlbums.map((album) => ({
@@ -90,7 +136,23 @@
 			videoPublishStep = false;
 			galleryCreateOpen = false;
 			videoCollectionCreateOpen = false;
+			submitError = '';
+			isSubmitting = false;
 		}
+	});
+
+	$effect(() => {
+		if (!open || type !== 'post') return;
+
+		postTitle = initialPost?.title ?? '';
+		postStatus = initialPost?.status ?? 'draft';
+		postVisibility = initialPost?.visibility ?? 'public';
+		coverEnabled = Boolean(initialPost?.mediaIds?.length);
+		musicEnabled = Boolean(initialPost?.trackIds?.length || initialPost?.albumIds?.length);
+		pollEnabled = Boolean(initialPost?.poll);
+		activeWidget = 'none';
+		publishStep = false;
+		submitError = '';
 	});
 
 	$effect(() => {
@@ -135,7 +197,98 @@
 
 	function openPublishStep() {
 		activeWidget = 'none';
+		postStatus = 'published';
 		publishStep = true;
+	}
+
+	function openGalleryPublishStep() {
+		galleryStatus = 'published';
+		galleryPublishStep = true;
+	}
+
+	function openVideoPublishStep() {
+		videoStatus = 'published';
+		videoPublishStep = true;
+	}
+
+	function getSuccessMessage(contentType: 'post' | 'gallery' | 'video', formData: FormData) {
+		const status = String(formData.get('status') || 'published');
+		const noun = contentType === 'post' ? 'Post' : contentType === 'gallery' ? 'Gallery' : 'Video';
+		const isUpdate = contentType === 'post' && Boolean(formData.get('postId'));
+
+		if (isUpdate && status !== 'published' && status !== 'scheduled') return `${noun} updated.`;
+		if (status === 'draft') return `${noun} draft saved.`;
+		if (status === 'scheduled') return `${noun} scheduled.`;
+		return `${noun} published.`;
+	}
+
+	function getFailureMessage(resultData: unknown) {
+		if (resultData && typeof resultData === 'object' && 'error' in resultData) {
+			const error = (resultData as { error?: unknown }).error;
+			if (typeof error === 'string' && error.trim()) return error;
+		}
+
+		return 'Could not save content. Your draft is still here.';
+	}
+
+	async function submitWithRetry(
+		action: URL,
+		formData: FormData,
+		contentType: 'post' | 'gallery' | 'video'
+	) {
+		isSubmitting = true;
+		submitError = '';
+
+		for (let attempt = 0; attempt < 2; attempt += 1) {
+			try {
+				const response = await fetch(action, {
+					method: 'POST',
+					body: formData
+				});
+				const result = deserialize(await response.text());
+
+				if (result.type === 'success' || result.type === 'redirect') {
+					await invalidateAll();
+					const message = getSuccessMessage(contentType, formData);
+					onSuccess?.(message);
+					onClose();
+					return;
+				}
+
+				if (result.type === 'failure') {
+					const message = getFailureMessage(result.data);
+					submitError = message;
+					onError?.(message);
+					return;
+				}
+
+				if (result.type === 'error') {
+					if (attempt === 0 && response.status >= 500) continue;
+					throw new Error(result.error?.message || 'Could not save content. Your draft is still here.');
+				}
+			} catch (err) {
+				if (attempt === 0) continue;
+
+				const message = err instanceof Error ? err.message : 'Could not save content. Your draft is still here.';
+				submitError = message;
+				onError?.(message);
+				return;
+			}
+		}
+
+		const message = 'Could not save content. Your draft is still here.';
+		submitError = message;
+		onError?.(message);
+		isSubmitting = false;
+	}
+
+	function createSubmitHandler(contentType: 'post' | 'gallery' | 'video') {
+		return ({ action, formData, cancel }: { action: URL; formData: FormData; cancel: () => void }) => {
+			cancel();
+			void submitWithRetry(action, formData, contentType).finally(() => {
+				isSubmitting = false;
+			});
+		};
 	}
 
 	async function createPhotoAlbum(payload: {
@@ -201,7 +354,9 @@
 						<h2>{type === 'post' ? artist?.name || 'Artist' : title}</h2>
 						<p>
 							{type === 'post'
-								? 'Create something for your audience'
+								? mode === 'edit'
+									? 'Update post content and widgets'
+									: 'Create something for your audience'
 								: type === 'gallery'
 									? 'Add a photo gallery to your artist page'
 									: 'Upload video content for your fans'}
@@ -213,18 +368,33 @@
 			</header>
 
 			{#if type === 'post'}
-				<form method="POST" action="?/createPost" enctype="multipart/form-data" use:enhance>
+				<form
+					method="POST"
+					action={postAction}
+					enctype="multipart/form-data"
+					use:enhance={createSubmitHandler('post')}
+				>
+					{#if mode === 'edit' && initialPost}
+						<input type="hidden" name="postId" value={initialPost.id} />
+					{/if}
 					<input type="hidden" name="status" value={postStatus} />
 					<input type="hidden" name="visibility" value={postVisibility} />
+					<input type="hidden" name="pollEnabled" value={pollEnabled ? 'true' : 'false'} />
+					{#if coverEnabled}
+						{#each initialPost?.mediaIds ?? [] as mediaId}
+							<input type="hidden" name="existingMediaIds" value={mediaId} />
+						{/each}
+					{/if}
 					<div class="modal-body modal-body--post">
 						<input
 							class="title-input"
 							name="title"
 							aria-label="Post title"
 							placeholder="What do you want to share with fans?"
+							bind:value={postTitle}
 							required
 						/>
-						<PostEditor bind:editor />
+						<PostEditor bind:editor initialContent={initialEditorContent} />
 
 						{#if coverEnabled || musicEnabled || pollEnabled}
 							<div
@@ -278,13 +448,15 @@
 											<MusicAttachmentPicker
 												tracks={attachableMusic.tracks}
 												albums={attachableMusic.albums}
+												selectedTrackIds={initialPost?.trackIds ?? []}
+												selectedAlbumIds={initialPost?.albumIds ?? []}
 											/>
 										</div>
 									{/if}
 
 									{#if pollEnabled}
 										<div class:widget-panel--hidden={activeWidget !== 'poll'}>
-											<PollBuilder />
+											<PollBuilder initialPoll={initialPost?.poll ?? null} />
 										</div>
 									{/if}
 								</div>
@@ -306,16 +478,24 @@
 										/>
 									</div>
 									<PublishPanel bind:status={postStatus} bind:visibility={postVisibility} />
+									{#if submitError}
+										<p class="submit-error" role="alert">{submitError}</p>
+									{/if}
 									<div class="publish-actions">
 										<Button
 											type="submit"
 											variant="secondary"
+											disabled={isSubmitting}
 											onClick={() => (postStatus = 'draft')}
 										>
-											Save draft
+											{isSubmitting && postStatus === 'draft' ? 'Saving...' : 'Save draft'}
 										</Button>
-										<Button type="submit" onClick={() => (postStatus = 'published')}>
-											Publish
+										<Button
+											type="submit"
+											disabled={isSubmitting}
+											onClick={() => (postStatus = 'published')}
+										>
+											{isSubmitting && postStatus === 'published' ? 'Publishing...' : 'Publish'}
 										</Button>
 									</div>
 								</div>
@@ -351,13 +531,18 @@
 							</div>
 
 							<div class="submit-area">
-								<Button type="button" onClick={openPublishStep}>Continue</Button>
-							</div>
-						</footer>
-					{/if}
-				</form>
-			{:else if type === 'gallery'}
-				<form method="POST" action="?/createGallery" enctype="multipart/form-data" use:enhance>
+							<Button type="button" disabled={isSubmitting} onClick={openPublishStep}>Continue</Button>
+						</div>
+					</footer>
+				{/if}
+			</form>
+		{:else if type === 'gallery'}
+				<form
+					method="POST"
+					action="?/createGallery"
+					enctype="multipart/form-data"
+					use:enhance={createSubmitHandler('gallery')}
+				>
 					<input type="hidden" name="status" value={galleryStatus} />
 					<input type="hidden" name="visibility" value={galleryVisibility} />
 					<input type="hidden" name="collectionMode" value={galleryCollectionMode} />
@@ -404,16 +589,24 @@
 										/>
 									</div>
 									<PublishPanel bind:status={galleryStatus} bind:visibility={galleryVisibility} />
+									{#if submitError}
+										<p class="submit-error" role="alert">{submitError}</p>
+									{/if}
 									<div class="publish-actions">
 										<Button
 											type="submit"
 											variant="secondary"
+											disabled={isSubmitting}
 											onClick={() => (galleryStatus = 'draft')}
 										>
-											Save draft
+											{isSubmitting && galleryStatus === 'draft' ? 'Saving...' : 'Save draft'}
 										</Button>
-										<Button type="submit" onClick={() => (galleryStatus = 'published')}>
-											Publish
+										<Button
+											type="submit"
+											disabled={isSubmitting}
+											onClick={() => (galleryStatus = 'published')}
+										>
+											{isSubmitting && galleryStatus === 'published' ? 'Publishing...' : 'Publish'}
 										</Button>
 									</div>
 								</div>
@@ -424,8 +617,8 @@
 						<footer class="modal-footer modal-footer--end">
 							<Button
 								type="button"
-								disabled={!galleryDestination}
-								onClick={() => (galleryPublishStep = true)}
+								disabled={!galleryDestination || isSubmitting}
+								onClick={openGalleryPublishStep}
 							>
 								Continue
 							</Button>
@@ -433,7 +626,12 @@
 					{/if}
 				</form>
 			{:else}
-				<form method="POST" action="?/createVideo" enctype="multipart/form-data" use:enhance>
+				<form
+					method="POST"
+					action="?/createVideo"
+					enctype="multipart/form-data"
+					use:enhance={createSubmitHandler('video')}
+				>
 					<input type="hidden" name="status" value={videoStatus} />
 					<input type="hidden" name="visibility" value={videoVisibility} />
 					<input type="hidden" name="collectionMode" value={videoCollectionMode} />
@@ -485,16 +683,24 @@
 										/>
 									</div>
 									<PublishPanel bind:status={videoStatus} bind:visibility={videoVisibility} />
+									{#if submitError}
+										<p class="submit-error" role="alert">{submitError}</p>
+									{/if}
 									<div class="publish-actions">
 										<Button
 											type="submit"
 											variant="secondary"
+											disabled={isSubmitting}
 											onClick={() => (videoStatus = 'draft')}
 										>
-											Save draft
+											{isSubmitting && videoStatus === 'draft' ? 'Saving...' : 'Save draft'}
 										</Button>
-										<Button type="submit" onClick={() => (videoStatus = 'published')}>
-											Publish
+										<Button
+											type="submit"
+											disabled={isSubmitting}
+											onClick={() => (videoStatus = 'published')}
+										>
+											{isSubmitting && videoStatus === 'published' ? 'Publishing...' : 'Publish'}
 										</Button>
 									</div>
 								</div>
@@ -503,7 +709,9 @@
 					</div>
 					{#if !videoPublishStep}
 						<footer class="modal-footer modal-footer--end">
-							<Button type="button" onClick={() => (videoPublishStep = true)}>Continue</Button>
+							<Button type="button" disabled={isSubmitting} onClick={openVideoPublishStep}>
+								Continue
+							</Button>
 						</footer>
 					{/if}
 				</form>
@@ -785,6 +993,17 @@
 		justify-content: flex-end;
 		gap: var(--space-3);
 		margin-top: var(--space-5);
+	}
+
+	.submit-error {
+		margin: var(--space-4) 0 0;
+		padding: var(--space-3);
+		border: 1px solid color-mix(in srgb, var(--error) 40%, transparent);
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--error) 10%, transparent);
+		color: var(--error);
+		font-size: var(--font-size-sm);
+		line-height: 1.4;
 	}
 
 	.field {

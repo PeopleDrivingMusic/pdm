@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import ContentComposerModal from './ContentComposerModal.svelte';
 	import ContentHeader from './ContentHeader.svelte';
@@ -18,6 +19,26 @@
 		status: string;
 	}
 
+	interface EditablePost {
+		id: string;
+		title: string;
+		bodyJson: Record<string, unknown> | null;
+		bodyHtml: string | null;
+		visibility: string;
+		status: string;
+		scheduledAt: Date | string | null;
+		mediaIds: string[];
+		trackIds: string[];
+		albumIds: string[];
+		poll: {
+			question: string;
+			mode: string;
+			showResults: string;
+			closesAt: Date | string | null;
+			options: Array<{ label: string }>;
+		} | null;
+	}
+
 	interface Props {
 		data: any;
 		form?: { error?: string; success?: boolean } | null;
@@ -28,7 +49,10 @@
 	let activeTab = $state<{ id: ContentTabId; label: string }>({ id: 'all', label: 'All' });
 	let composerOpen = $state(false);
 	let composerType = $state<'post' | 'gallery' | 'video'>('post');
+	let composerMode = $state<'create' | 'edit'>('create');
+	let composerInitialPost = $state<EditablePost | null>(null);
 	let editingItem = $state<ManageableContentItem | null>(null);
+	let notice = $state<{ type: 'success' | 'error'; text: string } | null>(null);
 
 	const content = $derived(data.content);
 	const attachableMusic = $derived(data.attachableMusic);
@@ -36,11 +60,39 @@
 
 	function openComposer(type: 'post' | 'gallery' | 'video') {
 		composerType = type;
+		composerMode = 'create';
+		composerInitialPost = null;
 		composerOpen = true;
+		notice = null;
+	}
+
+	function findPostForEdit(item: ManageableContentItem) {
+		return (
+			(content.posts as EditablePost[]).find((post) => post.id === getItemId(item)) ??
+			null
+		);
+	}
+
+	function openPostEditor(item: ManageableContentItem) {
+		const post = findPostForEdit(item);
+		if (!post) {
+			notice = { type: 'error', text: 'Post not found.' };
+			return;
+		}
+
+		composerType = 'post';
+		composerMode = 'edit';
+		composerInitialPost = post;
+		composerOpen = true;
+		notice = null;
+	}
+
+	function getItemId(item: ManageableContentItem) {
+		return item.id.includes(':') ? item.id.split(':')[1] : item.id;
 	}
 
 	function getCollectionRequest(item: ManageableContentItem) {
-		const id = item.id.includes(':') ? item.id.split(':')[1] : item.id;
+		const id = getItemId(item);
 		const collectionType = item.sourceType === 'photo_album' ? 'gallery' : 'playlist';
 		const endpoint =
 			item.sourceType === 'photo_album'
@@ -48,6 +100,70 @@
 				: `/api/studio/content/video-collections/${id}`;
 
 		return { endpoint, collectionType };
+	}
+
+	async function submitPostAction(action: string, payload: Record<string, string>) {
+		const formData = new FormData();
+		for (const [key, value] of Object.entries(payload)) {
+			formData.set(key, value);
+		}
+
+		const response = await fetch(action, {
+			method: 'POST',
+			body: formData
+		});
+		const result = deserialize(await response.text());
+
+		if (result.type === 'failure') {
+			const data = result.data as { error?: string } | undefined;
+			throw new Error(data?.error || 'Could not update post');
+		}
+
+		if (result.type === 'error') {
+			throw new Error(result.error?.message || 'Could not update post');
+		}
+
+		if (!response.ok) {
+			throw new Error('Could not update post');
+		}
+	}
+
+	async function submitPostUpdateFromPost(post: EditablePost, overrides: Partial<EditablePost>) {
+		const formData = new FormData();
+		formData.set('postId', post.id);
+		formData.set('title', overrides.title ?? post.title);
+		formData.set('bodyHtml', post.bodyHtml ?? '');
+		formData.set('bodyJson', post.bodyJson ? JSON.stringify(post.bodyJson) : '');
+		formData.set('visibility', overrides.visibility ?? post.visibility);
+		formData.set('status', overrides.status ?? post.status);
+
+		for (const mediaId of post.mediaIds ?? []) formData.append('existingMediaIds', mediaId);
+		for (const trackId of post.trackIds ?? []) formData.append('trackIds', trackId);
+		for (const albumId of post.albumIds ?? []) formData.append('albumIds', albumId);
+
+		if (post.poll) {
+			formData.set('pollEnabled', 'true');
+			formData.set('pollQuestion', post.poll.question);
+			formData.set('pollMode', post.poll.mode);
+			formData.set('pollShowResults', post.poll.showResults);
+			if (post.poll.closesAt) formData.set('pollClosesAt', String(post.poll.closesAt));
+			for (const option of post.poll.options) formData.append('pollOptions', option.label);
+		}
+
+		const response = await fetch('?/updatePost', {
+			method: 'POST',
+			body: formData
+		});
+		const result = deserialize(await response.text());
+
+		if (result.type === 'failure') {
+			const data = result.data as { error?: string } | undefined;
+			throw new Error(data?.error || 'Could not update post');
+		}
+
+		if (result.type === 'error') {
+			throw new Error(result.error?.message || 'Could not update post');
+		}
 	}
 
 	async function updateCollection(
@@ -80,28 +196,88 @@
 		await invalidateAll();
 	}
 
-	async function publishCollection(item: ManageableContentItem) {
-		await updateCollection(item, {
-			title: item.title,
-			description: item.previewText ?? '',
-			visibility: item.visibility as CollectionVisibility,
-			status: 'published'
-		});
-	}
+	async function updateItem(
+		item: ManageableContentItem,
+		payload: {
+			title: string;
+			description: string;
+			visibility: CollectionVisibility;
+			status?: CollectionStatus;
+		}
+	) {
+		notice = null;
 
-	async function deleteCollection(item: ManageableContentItem, confirmDelete = true) {
-		if (confirmDelete && !window.confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
-
-		const { endpoint } = getCollectionRequest(item);
-		const response = await fetch(endpoint, { method: 'DELETE' });
-		const result = await response.json();
-
-		if (!response.ok) {
-			throw new Error(result.error || 'Could not delete collection');
+		if (item.sourceType === 'post') {
+			const post = findPostForEdit(item);
+			if (!post) throw new Error('Post not found.');
+			await submitPostUpdateFromPost(post, {
+				title: payload.title,
+				visibility: payload.visibility,
+				status: payload.status ?? item.status
+			});
+			editingItem = null;
+			notice = { type: 'success', text: 'Post updated.' };
+			await invalidateAll();
+			return;
 		}
 
-		editingItem = null;
-		await invalidateAll();
+		await updateCollection(item, payload);
+		notice = { type: 'success', text: 'Collection updated.' };
+	}
+
+	async function publishItem(item: ManageableContentItem) {
+		try {
+			await updateItem(item, {
+				title: item.title,
+				description: item.previewText ?? '',
+				visibility: item.visibility as CollectionVisibility,
+				status: 'published'
+			});
+			notice = {
+				type: 'success',
+				text: item.sourceType === 'post' ? 'Post published.' : 'Collection published.'
+			};
+		} catch (err) {
+			notice = {
+				type: 'error',
+				text: err instanceof Error ? err.message : 'Could not publish content.'
+			};
+		}
+	}
+
+	async function deleteItem(item: ManageableContentItem, confirmDelete = true) {
+		if (confirmDelete && !window.confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
+		notice = null;
+
+		try {
+			if (item.sourceType === 'post') {
+				await submitPostAction('?/deletePost', {
+					postId: getItemId(item)
+				});
+				editingItem = null;
+				notice = { type: 'success', text: 'Post deleted.' };
+				await invalidateAll();
+				return;
+			}
+
+			const { endpoint } = getCollectionRequest(item);
+			const response = await fetch(endpoint, { method: 'DELETE' });
+			const result = await response.json();
+
+			if (!response.ok) {
+				throw new Error(result.error || 'Could not delete collection');
+			}
+
+			editingItem = null;
+			notice = { type: 'success', text: 'Collection deleted.' };
+			await invalidateAll();
+		} catch (err) {
+			notice = {
+				type: 'error',
+				text: err instanceof Error ? err.message : 'Could not delete content.'
+			};
+			throw err;
+		}
 	}
 </script>
 
@@ -113,7 +289,11 @@
 		onCreateVideo={() => openComposer('video')}
 	/>
 
-	{#if form?.error}
+	{#if notice}
+		<p class:form-message--error={notice.type === 'error'} class="form-message" role="status">
+			{notice.text}
+		</p>
+	{:else if form?.error}
 		<p class="form-message form-message--error" role="alert">{form.error}</p>
 	{:else if form?.success}
 		<p class="form-message" role="status">Saved.</p>
@@ -130,9 +310,15 @@
 				onCreatePost={() => openComposer('post')}
 				onCreateGallery={() => openComposer('gallery')}
 				onCreateVideo={() => openComposer('video')}
-				onEditCollection={(item) => (editingItem = item)}
-				onPublishCollection={publishCollection}
-				onDeleteCollection={deleteCollection}
+				onEditCollection={(item) => {
+					if (item.sourceType === 'post') {
+						openPostEditor(item);
+						return;
+					}
+					editingItem = item;
+				}}
+				onPublishCollection={publishItem}
+				onDeleteCollection={deleteItem}
 			/>
 		</div>
 	</div>
@@ -140,26 +326,39 @@
 	<ContentComposerModal
 		open={composerOpen}
 		type={composerType}
+		mode={composerMode}
+		initialPost={composerInitialPost}
 		{artist}
 		{attachableMusic}
 		photoAlbums={content.photoAlbums}
 		videoCollections={content.videoCollections}
-		onClose={() => (composerOpen = false)}
+		onClose={() => {
+			composerOpen = false;
+			composerMode = 'create';
+			composerInitialPost = null;
+		}}
+		onSuccess={(message) => {
+			composerOpen = false;
+			notice = { type: 'success', text: message };
+		}}
+		onError={(message) => {
+			notice = { type: 'error', text: message };
+		}}
 	/>
 
 	<CollectionCreateOverlay
 		open={Boolean(editingItem)}
-		title={editingItem?.sourceType === 'photo_album' ? 'Edit gallery' : 'Edit playlist'}
+		title={editingItem?.sourceType === 'post' ? 'Edit post' : editingItem?.sourceType === 'photo_album' ? 'Edit gallery' : 'Edit playlist'}
 		submitLabel="Save changes"
 		initialTitle={editingItem?.title ?? ''}
 		initialDescription={editingItem?.previewText ?? ''}
 		initialVisibility={(editingItem?.visibility ?? 'public') as CollectionVisibility}
 		initialStatus={(editingItem?.status ?? 'draft') as CollectionStatus}
 		showStatus
-		deleteLabel={editingItem?.sourceType === 'photo_album' ? 'Delete gallery' : 'Delete playlist'}
+		deleteLabel={editingItem?.sourceType === 'post' ? 'Delete post' : editingItem?.sourceType === 'photo_album' ? 'Delete gallery' : 'Delete playlist'}
 		onCreate={(payload) => {
 			if (!editingItem) return Promise.resolve();
-			return updateCollection(editingItem, {
+			return updateItem(editingItem, {
 				title: payload.title,
 				description: payload.description,
 				visibility: payload.visibility,
@@ -168,7 +367,7 @@
 		}}
 		onDelete={() => {
 			if (!editingItem) return Promise.resolve();
-			return deleteCollection(editingItem, false);
+			return deleteItem(editingItem, false);
 		}}
 		onCancel={() => (editingItem = null)}
 	/>

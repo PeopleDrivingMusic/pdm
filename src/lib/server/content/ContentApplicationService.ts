@@ -6,7 +6,8 @@ import {
 	VideoService,
 	type ContentStatus,
 	type ContentVisibility,
-	type CreatePostInput
+	type CreatePostInput,
+	type UpdatePostInput
 } from '$lib/db/services/ContentService';
 import type { NewContentMedia } from '$lib/db';
 
@@ -43,6 +44,14 @@ export class ContentApplicationService {
 
 	static async createPost(input: CreatePostInput) {
 		return await PostService.createPost(input);
+	}
+
+	static async updatePost(input: UpdatePostInput) {
+		return await PostService.updatePost(input);
+	}
+
+	static async deletePost(input: { artistId: string; postId: string }) {
+		return await PostService.deletePost(input);
 	}
 
 	static async canAttachMusic(input: { artistId: string; trackIds: string[]; albumIds: string[] }) {

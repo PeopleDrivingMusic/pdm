@@ -134,7 +134,7 @@ export const postPolls = contentDbSchema.table(
 	{
 		id: uuid().defaultRandom().primaryKey().notNull(),
 		postId: uuid('post_id').notNull(),
-		question: varchar({ length: 280 }).notNull(),
+		question: varchar({ length: 280 }),
 		mode: varchar({ length: 16 }).default('single').notNull(),
 		closesAt: timestamp('closes_at'),
 		showResults: varchar('show_results', { length: 24 }).default('after_vote').notNull(),

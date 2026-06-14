@@ -25,14 +25,16 @@
 	interface Props {
 		item: FeedItem;
 		onEdit?: (item: FeedItem) => void;
-		onPublish?: (item: FeedItem) => void;
-		onDelete?: (item: FeedItem) => void;
+		onPublish?: (item: FeedItem) => void | Promise<void>;
+		onDelete?: (item: FeedItem) => void | Promise<void>;
 	}
 
 	let { item, onEdit, onPublish, onDelete }: Props = $props();
 
-	const canManageCollection = $derived(
-		item.sourceType === 'photo_album' || item.sourceType === 'video_collection'
+	const canManageItem = $derived(
+		item.sourceType === 'post' ||
+			item.sourceType === 'photo_album' ||
+			item.sourceType === 'video_collection'
 	);
 
 	const typeMeta = $derived.by(() => {
@@ -82,16 +84,20 @@
 	</div>
 
 	<div class="actions">
-		{#if canManageCollection}
+		{#if canManageItem}
 			{#if item.status !== 'published'}
 				<IconButton
 					path={mdiCheckCircleOutline}
 					label="Publish"
-					onClick={() => onPublish?.(item)}
+					onClick={() => void Promise.resolve(onPublish?.(item)).catch(() => undefined)}
 				/>
 			{/if}
 			<IconButton path={mdiFileDocumentEditOutline} label="Edit" onClick={() => onEdit?.(item)} />
-			<IconButton path={mdiDeleteOutline} label="Delete" onClick={() => onDelete?.(item)} />
+			<IconButton
+				path={mdiDeleteOutline}
+				label="Delete"
+				onClick={() => void Promise.resolve(onDelete?.(item)).catch(() => undefined)}
+			/>
 		{:else}
 			<IconButton path={mdiFileDocumentEditOutline} label="Open editor" disabled />
 		{/if}
