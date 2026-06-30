@@ -30,6 +30,7 @@ export const albums = catalogDbSchema.table('albums', {
 	releaseDate: timestamp('release_date'),
 	price: integer('price'),
 	isPublished: boolean('is_published').default(false),
+	visibility: varchar('visibility', { length: 16 }).default('public').notNull(),
 	genres: jsonb('genres').$type<string[]>(),
 	metadata: jsonb('metadata'),
 	createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -52,6 +53,8 @@ export const tracks = catalogDbSchema.table('tracks', {
 	genre: jsonb('genres').$type<string[]>(),
 	status: varchar('status', { length: 32 }).default('draft').notNull(),
 	isPublished: boolean('is_published').default(false),
+	visibility: varchar('visibility', { length: 16 }).default('public').notNull(),
+	contentId: uuid('content_id'),
 	metadata: jsonb('metadata'),
 	createdAt: timestamp('created_at').defaultNow().notNull(),
 	updatedAt: timestamp('updated_at').defaultNow().notNull()
