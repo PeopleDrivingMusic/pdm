@@ -28,3 +28,5 @@ docker/postgres/data/
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+coverage/
