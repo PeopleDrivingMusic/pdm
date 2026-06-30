@@ -6,7 +6,7 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	resolve: {
 		alias: {
-			$styles: path.resolve("./src/styles")
+			$styles: path.resolve('./src/styles')
 		}
 	},
 	css: {
@@ -18,6 +18,16 @@ export default defineConfig({
 	},
 	test: {
 		expect: { requireAssertions: true },
+		coverage: {
+			provider: 'v8',
+			include: [
+				'src/lib/server/music/**',
+				'src/lib/server/events/**',
+				'src/lib/server/media/validation.ts',
+				'src/lib/server/security/**'
+			],
+			thresholds: { lines: 90, branches: 90, functions: 90, statements: 90 }
+		},
 		projects: [
 			{
 				extends: './vite.config.ts',
