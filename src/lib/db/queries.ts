@@ -33,6 +33,11 @@ import type {
 	NewAlbumTrack
 } from './index';
 import { logger } from '$lib/utils/logger';
+import { deleteFileFromR2 } from './services/R2Service';
+
+function playableTrackStatus() {
+	return or(eq(tracks.status, 'uploaded'), eq(tracks.status, 'ready'));
+}
 
 // User operations
 export class UserService {
@@ -377,7 +382,7 @@ export class TrackService {
 						and(eq(tracks.id, userFavorites.trackId), eq(userFavorites.userId, userId))
 					);
 				const result = await query
-					.where(and(eq(tracks.artistId, artistId), eq(tracks.isPublished, true)))
+					.where(and(eq(tracks.artistId, artistId), eq(tracks.isPublished, true), playableTrackStatus()))
 					.orderBy(desc(tracks.createdAt))
 					.limit(limit);
 				return result;
@@ -395,7 +400,7 @@ export class TrackService {
 		return await db
 			.select()
 			.from(tracks)
-			.where(and(eq(tracks.albumId, albumId), eq(tracks.isPublished, true)))
+			.where(and(eq(tracks.albumId, albumId), eq(tracks.isPublished, true), playableTrackStatus()))
 			.orderBy(tracks.trackNumber);
 	}
 
@@ -406,6 +411,7 @@ export class TrackService {
 			.where(
 				and(
 					eq(tracks.isPublished, true),
+					playableTrackStatus(),
 					or(like(tracks.title, `%${query}%`), like(tracks.genre, `%${query}%`))
 				)
 			)
@@ -438,7 +444,7 @@ export class TrackService {
 					);
 
 				const result = await query
-					.where(eq(tracks.isPublished, true))
+					.where(and(eq(tracks.isPublished, true), playableTrackStatus()))
 					.orderBy(desc(trackStats.playCount))
 					.limit(limit)
 					.offset(offset);
@@ -791,6 +797,13 @@ export class TrackService {
 	static async deleteTrack(id: string): Promise<boolean> {
 		return await withDbLogging('TrackService.deleteTrack', async () => {
 			try {
+				const track = await this.getTrackById(id);
+				if (track?.audioUrl) {
+					await deleteFileFromR2({ uniqueKey: track.audioUrl, bucket: 'music' });
+				}
+				if (track?.imageUrl) {
+					await deleteFileFromR2({ uniqueKey: track.imageUrl, bucket: 'images' });
+				}
 				await db.delete(tracks).where(eq(tracks.id, id));
 				logger.info('Track deleted', {
 					component: 'database',
@@ -1214,7 +1227,7 @@ export class AnalyticsService {
 		const [result] = await db
 			.select({ count: count() })
 			.from(tracks)
-			.where(eq(tracks.isPublished, true));
+			.where(and(eq(tracks.isPublished, true), playableTrackStatus()));
 		return result.count;
 	}
 }

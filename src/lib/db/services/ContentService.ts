@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db, withDbLogging } from '$lib/db';
+import { PUBLIC_R2_IMAGES_BUCKET } from '$env/static/public';
 import {
 	albums,
 	artistFeedItems,
@@ -243,9 +244,13 @@ function buildExcerpt(bodyHtml?: string | null, fallback?: string | null) {
 
 function normalizeSourceUrl(pathOrUrl: string | null | undefined) {
 	if (!pathOrUrl) return null;
+	if (/^(https?:|data:|blob:)/i.test(pathOrUrl)) return pathOrUrl;
 	if (pathOrUrl.startsWith('/uploads/')) return pathOrUrl;
 	if (pathOrUrl.startsWith('uploads/')) return `/${pathOrUrl}`;
-	return `/uploads/${pathOrUrl}`;
+	if (pathOrUrl.startsWith('/')) return pathOrUrl;
+	if (!PUBLIC_R2_IMAGES_BUCKET) return pathOrUrl;
+	const encodedKey = pathOrUrl.split('/').map(encodeURIComponent).join('/');
+	return `${PUBLIC_R2_IMAGES_BUCKET.replace(/\/+$/g, '')}/${encodedKey}`;
 }
 
 function canViewVisibility(visibility: ContentVisibility, viewer: ArtistContentViewer) {

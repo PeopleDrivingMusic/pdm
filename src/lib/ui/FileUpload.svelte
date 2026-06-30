@@ -29,13 +29,36 @@
 	let fileInput: HTMLInputElement;
 	let error = $state('');
 	let previewUrl = $state<string | null>(null);
+	let previewFile = $state<File | null>(null);
+	let previewRequestId = 0;
 
 	// Sync input when value is cleared externally
 	$effect(() => {
 		if (value === null && fileInput) {
 			fileInput.value = '';
 			previewUrl = null;
+			previewFile = null;
 		}
+	});
+
+	$effect(() => {
+		if (!preview || !value || !value.type.startsWith('image/')) {
+			previewUrl = null;
+			previewFile = null;
+			return;
+		}
+
+		if (value === previewFile) return;
+
+		previewFile = value;
+		const requestId = ++previewRequestId;
+		const reader = new FileReader();
+		reader.onload = (event) => {
+			if (requestId === previewRequestId && previewFile === value) {
+				previewUrl = event.target?.result as string;
+			}
+		};
+		reader.readAsDataURL(value);
 	});
 
 	function handleFileChange(event: Event) {
@@ -57,22 +80,12 @@
 
 		error = '';
 		value = file;
-
-		// Generate preview for images
-		if (preview && file.type.startsWith('image/')) {
-			const reader = new FileReader();
-			reader.onload = (e) => {
-				previewUrl = e.target?.result as string;
-			};
-			reader.readAsDataURL(file);
-		} else {
-			previewUrl = null;
-		}
 	}
 
 	function clearFile() {
 		value = null;
 		previewUrl = null;
+		previewFile = null;
 		error = '';
 		if (fileInput) {
 			fileInput.value = '';
@@ -91,7 +104,7 @@
 		const k = 1024;
 		const sizes = ['Bytes', 'KB', 'MB', 'GB'];
 		const i = Math.floor(Math.log(bytes) / Math.log(k));
-		return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+		return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 	}
 </script>
 
@@ -147,7 +160,7 @@
 					type="button"
 					class="file-preview__remove"
 					onclick={clearFile}
-					disabled={disabled}
+					{disabled}
 					aria-label="Remove file"
 				>
 					<SvgIcon path={mdiClose} size={20} />

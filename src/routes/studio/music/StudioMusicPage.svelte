@@ -9,7 +9,10 @@
 		mdiDelete,
 		mdiLink,
 		mdiLinkOff,
-		mdiContentSave
+		mdiContentSave,
+		mdiAlertCircleOutline,
+		mdiRefresh,
+		mdiUpload
 	} from '@mdi/js';
 	import StatCard from '$lib/ui/StatCard.svelte';
 	import Button from '$lib/ui/Button.svelte';
@@ -17,9 +20,21 @@
 	import Input from '$lib/ui/Input.svelte';
 	import FileUpload from '$lib/ui/FileUpload.svelte';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
-	import { enhance } from '$app/forms';
+	import { deserialize, enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import { onDestroy } from 'svelte';
+	import type { SubmitFunction } from '@sveltejs/kit';
 	import { notificationStore } from '$lib/stores/notification.svelte';
 	import Checkbox from '$lib/ui/Checkbox.svelte';
+	import {
+		clearUploadResumeState,
+		extractTrackMetadata,
+		resolveR2ImageUrl,
+		uploadR2Target,
+		type ClientMediaUploadTarget,
+		type ClientUploadResult,
+		type TrackMetadata
+	} from '$lib/utils/helpers';
 
 	let { data } = $props();
 
@@ -52,12 +67,43 @@
 	let trackImageFile = $state<File | null>(null);
 	let trackDuration = $state<number | null>(null);
 	let durationRequestId = 0;
-	let lastDurationFile = $state<File | null>(null);
+	let metadataRequestId = 0;
+	let lastMetadataFile = $state<File | null>(null);
+	let autoTrackTitle = $state('');
+	let selectedTrackMetadata = $state<TrackMetadata | null>(null);
+
+	type TrackUploadJob = {
+		trackId: string;
+		audioFile: File;
+		coverFile: File | null;
+		uploadTargets: {
+			audio: ClientMediaUploadTarget;
+			cover: ClientMediaUploadTarget | null;
+		};
+		coverPreviewUrl: string | null;
+		state: 'uploading' | 'finalizing' | 'failed';
+		error: string;
+		attempt: number;
+	};
+
+	let trackUploadJobs = $state<Record<string, TrackUploadJob>>({});
+
+	onDestroy(() => {
+		Object.values(trackUploadJobs).forEach(revokeCoverPreviewUrl);
+	});
 
 	$effect(() => {
-		if (trackAudioFile && trackAudioFile !== lastDurationFile) {
-			lastDurationFile = trackAudioFile;
-			updateTrackDuration(trackAudioFile);
+		if (trackAudioFile && trackAudioFile !== lastMetadataFile) {
+			lastMetadataFile = trackAudioFile;
+			void applySelectedTrackMetadata(trackAudioFile);
+		}
+
+		if (!trackAudioFile) {
+			lastMetadataFile = null;
+			selectedTrackMetadata = null;
+			trackDuration = null;
+			autoTrackTitle = '';
+			metadataRequestId += 1;
 		}
 	});
 
@@ -93,6 +139,38 @@
 		}
 	}
 
+	async function applySelectedTrackMetadata(file: File) {
+		const requestId = ++metadataRequestId;
+
+		try {
+			const metadata = await extractTrackMetadata(file);
+			if (requestId !== metadataRequestId || trackAudioFile !== file) return;
+
+			selectedTrackMetadata = metadata;
+
+			if (metadata.duration !== null) {
+				trackDuration = metadata.duration;
+			} else {
+				await updateTrackDuration(file);
+			}
+
+			const title = metadata.title?.trim();
+			if (title && (!trackForm.title.trim() || trackForm.title === autoTrackTitle)) {
+				trackForm.title = title;
+				autoTrackTitle = title;
+			}
+
+			if (!trackImageFile && metadata.coverImageFile) {
+				trackImageFile = metadata.coverImageFile;
+			}
+		} catch {
+			if (requestId === metadataRequestId && trackAudioFile === file) {
+				selectedTrackMetadata = null;
+				await updateTrackDuration(file);
+			}
+		}
+	}
+
 	function openCreateAlbum() {
 		editingAlbum = null;
 		albumForm = { title: '', description: '', releaseDate: '', genres: '' };
@@ -118,6 +196,8 @@
 		trackAudioFile = null;
 		trackImageFile = null;
 		trackDuration = null;
+		selectedTrackMetadata = null;
+		autoTrackTitle = '';
 		showTrackModal = true;
 	}
 
@@ -130,6 +210,8 @@
 		trackAudioFile = null;
 		trackImageFile = null;
 		trackDuration = null;
+		selectedTrackMetadata = null;
+		autoTrackTitle = '';
 		showTrackModal = true;
 	}
 
@@ -161,6 +243,240 @@
 			day: 'numeric'
 		});
 	}
+
+	function getActionError(data: unknown, fallback: string) {
+		if (data && typeof data === 'object' && 'error' in data) {
+			const error = (data as { error?: unknown }).error;
+			if (typeof error === 'string' && error.trim()) return error;
+		}
+		return fallback;
+	}
+
+	async function postAction(action: string, formData: FormData) {
+		const response = await fetch(action, {
+			method: 'POST',
+			body: formData
+		});
+		const result = deserialize(await response.text());
+
+		if (result.type === 'success') {
+			return (result.data ?? {}) as Record<string, unknown>;
+		}
+
+		if (result.type === 'failure') {
+			throw new Error(getActionError(result.data, 'Upload could not be completed'));
+		}
+
+		throw new Error('Upload could not be completed');
+	}
+
+	function storageKey(trackId: string, kind: 'audio' | 'cover') {
+		return `pdm:track-upload:${trackId}:${kind}`;
+	}
+
+	function wait(ms: number) {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
+
+	function createCoverPreviewUrl(file: File | null) {
+		return file?.type.startsWith('image/') ? URL.createObjectURL(file) : null;
+	}
+
+	function revokeCoverPreviewUrl(job?: TrackUploadJob | null) {
+		if (job?.coverPreviewUrl) {
+			URL.revokeObjectURL(job.coverPreviewUrl);
+		}
+	}
+
+	function updateTrackUploadJob(trackId: string, patch: Partial<TrackUploadJob>) {
+		const current = trackUploadJobs[trackId];
+		if (!current) return;
+		trackUploadJobs[trackId] = { ...current, ...patch };
+	}
+
+	function removeTrackUploadJob(trackId: string) {
+		revokeCoverPreviewUrl(trackUploadJobs[trackId]);
+		const { [trackId]: _removed, ...rest } = trackUploadJobs;
+		trackUploadJobs = rest;
+	}
+
+	function getUploadLabel(trackId: string, status?: string) {
+		const job = trackUploadJobs[trackId];
+		if (job?.state === 'failed') return 'Upload failed';
+		if (job?.state === 'finalizing') return 'Verifying upload';
+		if (job?.state === 'uploading') return 'Uploading';
+		if (status === 'failed') return 'Upload failed';
+		if (status === 'pending_upload' || status === 'processing') return 'Upload pending';
+		return '';
+	}
+
+	async function renewTrackUploadTargets(trackId: string) {
+		const job = trackUploadJobs[trackId];
+		if (!job) throw new Error('Upload job not found');
+
+		const formData = new FormData();
+		formData.set('trackId', trackId);
+		const data = await postAction('?/resumeTrackUpload', formData);
+		const uploadTargets = data.uploadTargets as {
+			audio: ClientMediaUploadTarget;
+			cover: ClientMediaUploadTarget | null;
+		};
+
+		updateTrackUploadJob(trackId, { uploadTargets });
+		return uploadTargets;
+	}
+
+	async function runTrackUpload(trackId: string, attempt = 1) {
+		const job = trackUploadJobs[trackId];
+		if (!job) return;
+
+		updateTrackUploadJob(trackId, {
+			state: 'uploading',
+			error: '',
+			attempt
+		});
+
+		try {
+			const [audioResult, coverResult] = await Promise.all([
+				uploadR2Target({
+					file: job.audioFile,
+					upload: job.uploadTargets.audio,
+					storageKey: storageKey(trackId, 'audio')
+				}),
+				job.coverFile && job.uploadTargets.cover
+					? uploadR2Target({
+							file: job.coverFile,
+							upload: job.uploadTargets.cover,
+							storageKey: storageKey(trackId, 'cover')
+						})
+					: Promise.resolve<ClientUploadResult | null>(null)
+			]);
+
+			updateTrackUploadJob(trackId, { state: 'finalizing' });
+			const finalizeData = new FormData();
+			finalizeData.set('trackId', trackId);
+			finalizeData.set('audioParts', JSON.stringify(audioResult.parts));
+			finalizeData.set('coverUploaded', coverResult || !job.uploadTargets.cover ? 'true' : 'false');
+			await postAction('?/finalizeTrackUpload', finalizeData);
+
+			clearUploadResumeState(storageKey(trackId, 'audio'));
+			clearUploadResumeState(storageKey(trackId, 'cover'));
+			removeTrackUploadJob(trackId);
+			await invalidateAll();
+			notificationStore.success('Track uploaded successfully');
+		} catch (err) {
+			if (attempt < 3) {
+				await wait(750 * attempt);
+				try {
+					await renewTrackUploadTargets(trackId);
+					await runTrackUpload(trackId, attempt + 1);
+					return;
+				} catch {
+					// Fall through to the visible failed state with the original upload error.
+				}
+			}
+
+			const error = err instanceof Error ? err.message : 'Upload failed. Try again.';
+			updateTrackUploadJob(trackId, {
+				state: 'failed',
+				error,
+				attempt
+			});
+			notificationStore.error(error);
+		}
+	}
+
+	async function retryTrackUpload(trackId: string) {
+		const job = trackUploadJobs[trackId];
+		if (!job) return;
+
+		try {
+			await renewTrackUploadTargets(trackId);
+			await runTrackUpload(trackId);
+		} catch (err) {
+			const error = err instanceof Error ? err.message : 'Could not resume upload.';
+			updateTrackUploadJob(trackId, {
+				state: 'failed',
+				error
+			});
+			notificationStore.error(error);
+		}
+	}
+
+	const handleTrackSubmit: SubmitFunction = async ({ formData }) => {
+		const fileToUpload = trackAudioFile;
+		let imageToUpload = trackImageFile;
+
+		if (fileToUpload) {
+			try {
+				const metadata = selectedTrackMetadata ?? (await extractTrackMetadata(fileToUpload));
+				formData.delete('audioFile'); // Remove the file from formData since we'll handle upload separately
+				formData.delete('trackImage');
+				const { coverImageFile, ...restMetadata } = metadata;
+				if (!imageToUpload && coverImageFile) {
+					imageToUpload = coverImageFile;
+				}
+				formData.set('metadata', JSON.stringify(restMetadata));
+				formData.set('type', fileToUpload.type);
+				formData.set('file_name', fileToUpload.name);
+				formData.set('file_size', String(fileToUpload.size));
+				if (imageToUpload) {
+					formData.set('cover_type', imageToUpload.type);
+					formData.set('cover_title', imageToUpload.name);
+					formData.set('cover_size', String(imageToUpload.size));
+				}
+			} catch (err) {
+				// do nothing
+			}
+		}
+
+		return async ({ result, update }) => {
+			if (result.type === 'success') {
+				const resultData = result.data as
+					| {
+							track?: { id: string };
+							uploadTargets?: {
+								audio: ClientMediaUploadTarget;
+								cover: ClientMediaUploadTarget | null;
+							};
+					  }
+					| undefined;
+
+				if (resultData?.uploadTargets?.audio && resultData.track?.id && fileToUpload) {
+					const trackId = resultData.track.id;
+					revokeCoverPreviewUrl(trackUploadJobs[trackId]);
+					trackUploadJobs[trackId] = {
+						trackId: resultData.track.id,
+						audioFile: fileToUpload,
+						coverFile: imageToUpload,
+						uploadTargets: resultData.uploadTargets,
+						coverPreviewUrl: createCoverPreviewUrl(imageToUpload),
+						state: 'uploading',
+						error: '',
+						attempt: 1
+					};
+					showTrackModal = false;
+					trackAudioFile = null;
+					trackImageFile = null;
+					trackDuration = null;
+					selectedTrackMetadata = null;
+					autoTrackTitle = '';
+					notificationStore.info('Track created. Uploading on the track card.');
+					await update();
+					void runTrackUpload(trackId);
+					return;
+				} else {
+					showTrackModal = false;
+					notificationStore.success(
+						editingTrack ? 'Track updated successfully' : 'Track saved successfully'
+					);
+				}
+			} else if (result.type === 'failure') {
+				notificationStore.error(getFormError(result.data, 'Failed to save track'));
+			}
+			await update();
+		};
+	};
 </script>
 
 <svelte:head>
@@ -217,7 +533,7 @@
 					<div class="album-card">
 						<div class="album-cover">
 							{#if album.coverImageUrl}
-								<img src={album.coverImageUrl} alt={album.title} />
+								<img src={resolveR2ImageUrl(album.coverImageUrl) ?? ''} alt={album.title} />
 							{:else}
 								<div class="album-cover-placeholder">
 									<SvgIcon path={mdiAlbum} size={48} />
@@ -302,14 +618,60 @@
 			<div class="tracks-list">
 				{#each data.tracks as { track, stats }}
 					{@const trackLinks = getTrackLinks(track.id)}
+					{@const uploadJob = trackUploadJobs[track.id]}
+					{@const uploadLabel = getUploadLabel(track.id, track.status)}
+					{@const shouldUseStoredTrackImage =
+						!uploadJob && track.status !== 'pending_upload' && track.status !== 'processing'}
+					{@const trackImageSrc =
+						uploadJob?.coverPreviewUrl ??
+						(shouldUseStoredTrackImage ? resolveR2ImageUrl(track.imageUrl) : null)}
+					{@const isTrackUploadBusy =
+						uploadJob?.state === 'uploading' ||
+						uploadJob?.state === 'finalizing' ||
+						(!uploadJob && (track.status === 'pending_upload' || track.status === 'processing'))}
+					{@const isTrackUploadFailed = uploadJob?.state === 'failed' || track.status === 'failed'}
 					<div class="track-row">
 						<div class="track-info">
-							<div class="track-image">
-								{#if track.imageUrl}
-									<img src={track.imageUrl} alt={track.title} />
+							<div
+								class="track-image"
+								class:uploading={isTrackUploadBusy}
+								class:failed={isTrackUploadFailed}
+							>
+								{#if trackImageSrc}
+									<img src={trackImageSrc} alt={track.title} />
 								{:else}
 									<div class="track-image-placeholder">
 										<SvgIcon path={mdiMusicNote} size={20} />
+									</div>
+								{/if}
+								{#if uploadLabel}
+									<div
+										class="track-image-upload-overlay"
+										role="status"
+										aria-live="polite"
+										title={uploadJob?.error || uploadLabel}
+									>
+										{#if isTrackUploadFailed}
+											{#if uploadJob}
+												<button
+													type="button"
+													class="track-image-upload-action"
+													title="Retry upload"
+													aria-label="Retry upload"
+													onclick={() => void retryTrackUpload(track.id)}
+												>
+													<SvgIcon path={mdiRefresh} size={18} />
+												</button>
+											{:else}
+												<span class="track-image-upload-action static">
+													<SvgIcon path={mdiAlertCircleOutline} size={18} />
+												</span>
+											{/if}
+										{:else}
+											<span class="track-image-upload-loader" aria-label={uploadLabel}>
+												<SvgIcon path={mdiUpload} size={18} />
+											</span>
+										{/if}
 									</div>
 								{/if}
 							</div>
@@ -474,19 +836,7 @@
 		method="POST"
 		action={editingTrack ? '?/updateTrack' : '?/createTrack'}
 		enctype="multipart/form-data"
-		use:enhance={() => {
-			return async ({ result, update }) => {
-				if (result.type === 'success') {
-					showTrackModal = false;
-					notificationStore.success(
-						editingTrack ? 'Track updated successfully' : 'Track created successfully'
-					);
-				} else if (result.type === 'failure') {
-					notificationStore.error(getFormError(result.data, 'Failed to save track'));
-				}
-				await update();
-			};
-		}}
+		use:enhance={handleTrackSubmit}
 		class="modal-form"
 	>
 		{#if editingTrack}
@@ -846,11 +1196,16 @@
 				overflow: hidden;
 				flex-shrink: 0;
 				background: var(--bg-tertiary);
+				position: relative;
 
 				img {
 					width: 100%;
 					height: 100%;
 					object-fit: cover;
+					display: block;
+					transition:
+						filter var(--duration-normal),
+						transform var(--duration-normal);
 				}
 
 				.track-image-placeholder {
@@ -860,6 +1215,83 @@
 					align-items: center;
 					justify-content: center;
 					color: var(--text-tertiary);
+					transition: filter var(--duration-normal);
+				}
+
+				&.uploading,
+				&.failed {
+					img,
+					.track-image-placeholder {
+						filter: brightness(0.58) saturate(0.9);
+					}
+				}
+
+				.track-image-upload-overlay {
+					position: absolute;
+					inset: 0;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					background: rgba(10, 12, 18, 0.34);
+					color: var(--color-white);
+				}
+
+				.track-image-upload-loader {
+					position: relative;
+					display: inline-flex;
+					width: 30px;
+					height: 30px;
+					align-items: center;
+					justify-content: center;
+					border-radius: var(--radius-full);
+					background: rgba(0, 0, 0, 0.18);
+
+					&::before {
+						content: '';
+						position: absolute;
+						inset: 0;
+						border: 2px solid rgba(255, 255, 255, 0.28);
+						border-top-color: var(--color-white);
+						border-radius: inherit;
+						animation: upload-spin 0.9s linear infinite;
+					}
+
+					:global(svg) {
+						position: relative;
+						z-index: 1;
+						filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
+						animation: upload-arrow 1.1s ease-in-out infinite;
+					}
+				}
+
+				.track-image-upload-action {
+					display: inline-flex;
+					width: 32px;
+					height: 32px;
+					align-items: center;
+					justify-content: center;
+					border: 1px solid rgba(255, 255, 255, 0.42);
+					border-radius: var(--radius-full);
+					background: rgba(0, 0, 0, 0.34);
+					color: var(--color-white);
+					cursor: pointer;
+					transition:
+						background var(--duration-fast),
+						transform var(--duration-fast);
+
+					&:hover {
+						background: rgba(0, 0, 0, 0.52);
+						transform: scale(1.04);
+					}
+
+					&.static {
+						cursor: default;
+
+						&:hover {
+							background: rgba(0, 0, 0, 0.34);
+							transform: none;
+						}
+					}
 				}
 			}
 
@@ -879,6 +1311,7 @@
 
 				.track-meta {
 					display: flex;
+					flex-wrap: wrap;
 					gap: var(--space-3);
 					font-size: var(--font-size-xs);
 					color: var(--text-tertiary);
@@ -995,6 +1428,31 @@
 			justify-content: flex-end;
 			gap: var(--space-3);
 			margin-top: var(--space-4);
+		}
+	}
+
+	@keyframes upload-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@keyframes upload-arrow {
+		0%,
+		100% {
+			transform: translateY(1px);
+			opacity: 0.78;
+		}
+		50% {
+			transform: translateY(-2px);
+			opacity: 1;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.track-image-upload-loader::before,
+		.track-image-upload-loader :global(svg) {
+			animation: none;
 		}
 	}
 

@@ -16,7 +16,7 @@
 - **Split:** 80% to the artist, 20% to the platform.
 - **Listening revenue:** The pool from subscriptions is distributed among tracks in proportion to listening time by a specific user (User-Centric Model).
 
-### 2.2. Crowdfunding and Investments (Revenue Share)
+### 2.2. Crowdfunding and Investments (Revenue Share) (2nd phase)
 - An artist can offer a share (e.g., 20%) of future royalties for a track via crowdfunding.
 - Fans buy these shares with fiat/crypto.
 - Shareholders receive a percentage of the track’s revenue not only inside PDM, but also from external platforms (Spotify, Apple Music, YouTube), where PDM acts as the aggregator-licensee.

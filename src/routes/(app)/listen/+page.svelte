@@ -204,6 +204,7 @@
 											createdAt: new Date(),
 											updatedAt: new Date(),
 											genre: null,
+											status: 'uploaded',
 											artistId: '1',
 											title: 'Metallica',
 											isPublished: null,

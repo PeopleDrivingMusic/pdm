@@ -4,6 +4,7 @@ import { type ContentStatus, type ContentVisibility } from '$lib/db/services/Con
 import { getArtistByCookie } from '$lib/server/artist-session';
 import { ContentApplicationService } from '$lib/server/content';
 import { uploadFile, uploadImage } from '$lib/server/upload';
+import { headR2Object } from '$lib/db/services/R2Service';
 
 const STATUS_VALUES = new Set(['draft', 'scheduled', 'published', 'archived']);
 const VISIBILITY_VALUES = new Set(['public', 'followers', 'subscribers', 'investors']);
@@ -29,6 +30,20 @@ function getStringList(data: FormData, key: string) {
 		.filter((value): value is string => typeof value === 'string')
 		.map((value) => value.trim())
 		.filter(Boolean);
+}
+
+function getCommaList(value: string) {
+	return value
+		.split(',')
+		.map((item) => item.trim().toLowerCase())
+		.filter(Boolean);
+}
+
+function getNumber(data: FormData, key: string) {
+	const value = data.get(key);
+	if (typeof value !== 'string') return null;
+	const parsed = Number(value);
+	return Number.isFinite(parsed) ? parsed : null;
 }
 
 function parseDate(value: string) {
@@ -283,6 +298,10 @@ export const actions: Actions = {
 		const visibility = getVisibility(data.get('visibility'));
 		const scheduledAt = parseDate(getString(data, 'scheduledAt'));
 		const photoFile = data.get('photo') as File | null;
+		const uploadedPhotoKey = getString(data, 'uploadedPhotoKey');
+		const photoFileType = getString(data, 'photoFileType');
+		const photoFileSize = getNumber(data, 'photoFileSize');
+		const photoTags = getCommaList(getString(data, 'photoTags'));
 		const collectionMode = getString(data, 'collectionMode') || 'new';
 		const existingAlbumId = getString(data, 'existingPhotoAlbumId');
 		const newAlbumTitle = getString(data, 'newPhotoAlbumTitle') || title;
@@ -293,17 +312,45 @@ export const actions: Actions = {
 		if (collectionMode === 'existing' && !existingAlbumId) {
 			return fail(400, { error: 'Choose a gallery' });
 		}
-		if (!photoFile || photoFile.size === 0) return fail(400, { error: 'Photo is required' });
+		let photoKey = uploadedPhotoKey;
+		let metadata: Record<string, unknown> = {
+			tags: photoTags,
+			uploadStatus: uploadedPhotoKey ? 'uploaded' : 'server_uploaded'
+		};
 
-		const upload = await uploadImage(photoFile, `content/galleries/${artist.id}`);
-		if (!upload.success || !upload.path) {
-			return fail(400, { error: upload.error || 'Failed to upload photo' });
+		if (!photoKey) {
+			if (!photoFile || photoFile.size === 0) return fail(400, { error: 'Photo is required' });
+
+			const upload = await uploadImage(photoFile, `content/galleries/${artist.id}`);
+			if (!upload.success || !upload.path) {
+				return fail(400, { error: upload.error || 'Failed to upload photo' });
+			}
+			photoKey = upload.path;
+			metadata = {
+				...metadata,
+				contentType: photoFile.type,
+				size: photoFile.size
+			};
+		} else {
+			const object = await headR2Object({ bucket: 'images', key: photoKey });
+			if (!object.exists) {
+				return fail(400, { error: 'Uploaded photo was not found in storage' });
+			}
+			if (photoFileSize && typeof object.contentLength === 'number' && object.contentLength !== photoFileSize) {
+				return fail(400, { error: 'Uploaded photo size does not match metadata' });
+			}
+			metadata = {
+				...metadata,
+				contentType: photoFileType || null,
+				size: photoFileSize
+			};
 		}
 
 		const media = await ContentApplicationService.createMedia({
 			artistId: artist.id,
 			type: 'image',
-			fileUrl: upload.path
+			fileUrl: photoKey,
+			metadata
 		});
 
 		const album =

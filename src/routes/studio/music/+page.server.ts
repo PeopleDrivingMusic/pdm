@@ -9,7 +9,8 @@ import {
 	buildSourceAudioFileName,
 	buildCoverFileName
 } from '$lib/server/upload';
-import { extractTrackMetadata } from '$lib/server/music-metadata';
+import { extractTrackMetadata, type TrackMetadata } from '$lib/server/music-metadata';
+import { MediaUploadService, type StoredUploadTarget } from '$lib/server/media';
 
 function getUploadRelativePath(urlOrPath: string | null | undefined) {
 	if (!urlOrPath) return null;
@@ -24,9 +25,10 @@ function getUploadRelativePath(urlOrPath: string | null | undefined) {
 
 function normalizeUploadUrl(pathOrUrl: string | null | undefined) {
 	if (!pathOrUrl) return null;
+	if (/^(https?:|data:|blob:)/i.test(pathOrUrl)) return pathOrUrl;
 	if (pathOrUrl.startsWith('/uploads/')) return pathOrUrl;
 	if (pathOrUrl.startsWith('uploads/')) return `/${pathOrUrl}`;
-	return `/uploads/${pathOrUrl}`;
+	return pathOrUrl;
 }
 
 function normalizeGenres(genresString: string | null | undefined) {
@@ -38,6 +40,58 @@ function normalizeGenres(genresString: string | null | undefined) {
 
 function isOwnedByArtist(record: { artistId: string } | null | undefined, artistId: string) {
 	return !!record && record.artistId === artistId;
+}
+
+type TrackUploadMetadata = {
+	sourceFileName?: string;
+	coverFileName?: string | null;
+	uploads?: {
+		audio?: StoredUploadTarget;
+		cover?: StoredUploadTarget;
+	};
+	uploadedAt?: string;
+	failedReason?: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+	return value && typeof value === 'object' && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: {};
+}
+
+function getUploadMetadata(metadata: unknown): TrackUploadMetadata {
+	const record = asRecord(metadata);
+	const uploadRecord = asRecord(record.upload);
+	return uploadRecord as TrackUploadMetadata;
+}
+
+function mergeUploadMetadata(metadata: unknown, upload: TrackUploadMetadata) {
+	return {
+		...asRecord(metadata),
+		upload
+	};
+}
+
+function getPositiveNumber(value: FormDataEntryValue | null) {
+	if (typeof value !== 'string') return 0;
+	const parsed = Number(value);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function parseUploadParts(value: FormDataEntryValue | null) {
+	if (typeof value !== 'string' || !value.trim()) return [];
+	try {
+		const parts = JSON.parse(value);
+		if (!Array.isArray(parts)) return [];
+		return parts
+			.map((part) => ({
+				partNumber: Number(part.partNumber),
+				etag: typeof part.etag === 'string' ? part.etag : ''
+			}))
+			.filter((part) => Number.isInteger(part.partNumber) && part.partNumber > 0 && part.etag);
+	} catch {
+		return [];
+	}
 }
 
 export const load: PageServerLoad = async ({ parent }) => {
@@ -280,15 +334,21 @@ export const actions: Actions = {
 			const data = await request.formData();
 			const title = data.get('title') as string;
 			const genresString = data.get('genres') as string;
-			const audioFile = data.get('audioFile') as File | null;
-			const trackImageFile = data.get('trackImage') as File | null;
-
-			const trackMetadata =
-				audioFile && audioFile.size > 0 ? await extractTrackMetadata(audioFile) : null;
+			const trackMetadataJSON = data.get('metadata') as string | null;
+			const file_name = data.get('file_name') as string;
+			const file_type = data.get('type') as string;
+			const file_size = getPositiveNumber(data.get('file_size'));
+			const cover_type = data.get('cover_type') as string | null;
+			const cover_title = data.get('cover_title') as string | null;
+			const cover_size = getPositiveNumber(data.get('cover_size'));
+			const trackMetadata: TrackMetadata | null = trackMetadataJSON ? JSON.parse(trackMetadataJSON) : null;
 			const resolvedTitle = title?.trim() || trackMetadata?.title || '';
 
 			if (!resolvedTitle) {
 				return fail(400, { error: 'Title is required' });
+			}
+			if (!file_name || !file_type || file_size <= 0) {
+				return fail(400, { error: 'Audio file metadata is required' });
 			}
 
 			const genres = normalizeGenres(genresString);
@@ -298,6 +358,7 @@ export const actions: Actions = {
 				artistId: artist.id,
 				title: resolvedTitle,
 				genre: genres.length > 0 ? genres : null,
+				status: 'pending_upload',
 				audioUrl: null,
 				imageUrl: null,
 				duration,
@@ -305,67 +366,169 @@ export const actions: Actions = {
 				albumId: null
 			});
 
-			const uploadedPaths: string[] = [];
-			const updateData: { audioUrl?: string | null; imageUrl?: string | null } = {};
+			const audioUpload = await MediaUploadService.createTrackAudioUpload({
+				artistId: artist.id,
+				trackId: track.id,
+				fileName: file_name,
+				contentType: file_type,
+				size: file_size
+			});
+			const coverUpload =
+				cover_title && cover_type && cover_size > 0
+					? await MediaUploadService.createTrackCoverUpload({
+							artistId: artist.id,
+							trackId: track.id,
+							fileName: cover_title,
+							contentType: cover_type,
+							size: cover_size
+						})
+					: null;
 
-			if (audioFile && audioFile.size > 0) {
-				const uploadResult = await uploadAudio(
-					audioFile,
-					`audio/${artist.id}/${track.id}`,
-					buildSourceAudioFileName(audioFile)
-				);
-				if (uploadResult.success) {
-					updateData.audioUrl = uploadResult.path!;
-					uploadedPaths.push(uploadResult.path!);
-				} else {
-					await TrackService.deleteTrack(track.id);
-					return fail(400, { error: uploadResult.error || 'Failed to upload audio file' });
+			const uploadMetadata: TrackUploadMetadata = {
+				sourceFileName: file_name,
+				coverFileName: cover_title,
+				uploads: {
+					audio: MediaUploadService.toStoredTarget(audioUpload),
+					cover: coverUpload ? MediaUploadService.toStoredTarget(coverUpload) : undefined
 				}
-			}
+			};
 
-			if (trackImageFile && trackImageFile.size > 0) {
-				const uploadResult = await uploadImage(
-					trackImageFile,
-					`covers/tracks/${artist.id}`,
-					buildCoverFileName(track.id, trackImageFile)
-				);
-				if (uploadResult.success) {
-					updateData.imageUrl = uploadResult.path!;
-					uploadedPaths.push(uploadResult.path!);
-				} else {
-					uploadedPaths.forEach(deleteFile);
-					await TrackService.deleteTrack(track.id);
-					return fail(400, { error: uploadResult.error || 'Failed to upload track image' });
-				}
-			} else if (trackMetadata?.coverImageFile) {
-				const uploadResult = await uploadImage(
-					trackMetadata.coverImageFile,
-					`covers/tracks/${artist.id}`,
-					buildCoverFileName(track.id, trackMetadata.coverImageFile)
-				);
-				if (uploadResult.success) {
-					updateData.imageUrl = uploadResult.path!;
-					uploadedPaths.push(uploadResult.path!);
-				} else {
-					uploadedPaths.forEach(deleteFile);
-					await TrackService.deleteTrack(track.id);
-					return fail(400, { error: uploadResult.error || 'Failed to upload track image' });
-				}
-			}
-
-			if (Object.keys(updateData).length > 0) {
-				track = (await TrackService.updateTrack(track.id, updateData)) ?? track;
-			}
+			track =
+				(await TrackService.updateTrack(track.id, {
+					audioUrl: audioUpload.key,
+					imageUrl: coverUpload?.key ?? null,
+					metadata: mergeUploadMetadata(track.metadata, uploadMetadata)
+				})) ?? track;
 
 			// Create genres if they don't exist
 			if (genres.length > 0) {
 				await GenreService.getOrCreateGenres(genres);
 			}
 
-			return { success: true, track };
+			return {
+				success: true,
+				track,
+				uploadTargets: {
+					audio: audioUpload,
+					cover: coverUpload
+				}
+			};
 		} catch (err) {
 			console.error('Failed to create track:', err);
 			return fail(500, { error: 'Failed to create track' });
+		}
+	},
+
+	resumeTrackUpload: async (event) => {
+		const { request } = event;
+		const artist = await getArtistByCookie(event);
+
+		if (!artist) {
+			return fail(401, { error: 'Unauthorized' });
+		}
+
+		try {
+			const data = await request.formData();
+			const trackId = data.get('trackId') as string;
+			if (!trackId) return fail(400, { error: 'Track ID is required' });
+
+			const track = await TrackService.getTrackById(trackId);
+			if (!track || track.artistId !== artist.id) {
+				return fail(404, { error: 'Track not found' });
+			}
+
+			const uploadMetadata = getUploadMetadata(track.metadata);
+			const audio = uploadMetadata.uploads?.audio;
+			if (!audio) {
+				return fail(400, { error: 'No pending upload exists for this track' });
+			}
+
+			return {
+				success: true,
+				track,
+				uploadTargets: {
+					audio: await MediaUploadService.renewStoredTarget(audio),
+					cover: uploadMetadata.uploads?.cover
+						? await MediaUploadService.renewStoredTarget(uploadMetadata.uploads.cover)
+						: null
+				}
+			};
+		} catch (err) {
+			console.error('Failed to resume track upload:', err);
+			return fail(500, { error: 'Failed to resume upload' });
+		}
+	},
+
+	finalizeTrackUpload: async (event) => {
+		const { request } = event;
+		const artist = await getArtistByCookie(event);
+
+		if (!artist) {
+			return fail(401, { error: 'Unauthorized' });
+		}
+
+		try {
+			const data = await request.formData();
+			const trackId = data.get('trackId') as string;
+			if (!trackId) return fail(400, { error: 'Track ID is required' });
+
+			const track = await TrackService.getTrackById(trackId);
+			if (!track || track.artistId !== artist.id) {
+				return fail(404, { error: 'Track not found' });
+			}
+
+			const uploadMetadata = getUploadMetadata(track.metadata);
+			const audio = uploadMetadata.uploads?.audio;
+			if (!audio) {
+				return fail(400, { error: 'No audio upload metadata found' });
+			}
+
+			await MediaUploadService.completeMultipart({
+				upload: audio,
+				parts: parseUploadParts(data.get('audioParts'))
+			});
+
+			const audioVerification = await MediaUploadService.verifyObject(audio);
+			if (!audioVerification.ok) {
+				await TrackService.updateTrack(trackId, {
+					status: 'failed',
+					metadata: mergeUploadMetadata(track.metadata, {
+						...uploadMetadata,
+						failedReason: audioVerification.reason
+					})
+				});
+				return fail(400, { error: audioVerification.reason });
+			}
+
+			const cover = uploadMetadata.uploads?.cover;
+			if (cover && data.get('coverUploaded') === 'true') {
+				const coverVerification = await MediaUploadService.verifyObject(cover);
+				if (!coverVerification.ok) {
+					await TrackService.updateTrack(trackId, {
+						status: 'failed',
+						metadata: mergeUploadMetadata(track.metadata, {
+							...uploadMetadata,
+							failedReason: coverVerification.reason
+						})
+					});
+					return fail(400, { error: coverVerification.reason });
+				}
+			}
+
+			const finalizedMetadata: TrackUploadMetadata = {
+				...uploadMetadata,
+				uploadedAt: new Date().toISOString(),
+				failedReason: undefined
+			};
+			const finalizedTrack = await TrackService.updateTrack(trackId, {
+				status: 'uploaded',
+				metadata: mergeUploadMetadata(track.metadata, finalizedMetadata)
+			});
+
+			return { success: true, track: finalizedTrack };
+		} catch (err) {
+			console.error('Failed to finalize track upload:', err);
+			return fail(500, { error: 'Failed to finalize upload' });
 		}
 	},
 
@@ -512,21 +675,10 @@ export const actions: Actions = {
 				return fail(404, { error: 'Track not found' });
 			}
 
-			const previousAudioPath = getUploadRelativePath(existingTrack.audioUrl);
-			const previousImagePath = getUploadRelativePath(existingTrack.imageUrl);
 			const success = await TrackService.deleteTrack(trackId);
-
 			if (!success) {
 				return fail(500, { error: 'Failed to delete track' });
 			}
-
-			if (previousAudioPath) {
-				deleteFile(previousAudioPath);
-			}
-			if (previousImagePath) {
-				deleteFile(previousImagePath);
-			}
-
 			return { success: true };
 		} catch (err) {
 			console.error('Failed to delete track:', err);

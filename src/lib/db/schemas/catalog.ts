@@ -50,6 +50,7 @@ export const tracks = catalogDbSchema.table('tracks', {
 	imageUrl: text('image_url'),
 	trackNumber: integer('track_number'),
 	genre: jsonb('genres').$type<string[]>(),
+	status: varchar('status', { length: 32 }).default('draft').notNull(),
 	isPublished: boolean('is_published').default(false),
 	metadata: jsonb('metadata'),
 	createdAt: timestamp('created_at').defaultNow().notNull(),

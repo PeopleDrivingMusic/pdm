@@ -10,6 +10,7 @@
 	import PostEditor from './PostEditor.svelte';
 	import PostEditorToolbar from './PostEditorToolbar.svelte';
 	import PublishPanel from './PublishPanel.svelte';
+	import { uploadR2Target, type ClientMediaUploadTarget } from '$lib/utils/helpers';
 
 	interface EditablePost {
 		id: string;
@@ -98,6 +99,10 @@
 	let editor = $state<Editor | null>(null);
 	let submitError = $state('');
 	let isSubmitting = $state(false);
+	let mediaUpload = $state({
+		active: false,
+		progress: 0
+	});
 
 	const title = $derived(
 		type === 'post'
@@ -138,6 +143,8 @@
 			videoCollectionCreateOpen = false;
 			submitError = '';
 			isSubmitting = false;
+			mediaUpload.active = false;
+			mediaUpload.progress = 0;
 		}
 	});
 
@@ -241,15 +248,17 @@
 
 		for (let attempt = 0; attempt < 2; attempt += 1) {
 			try {
+				const preparedFormData =
+					contentType === 'gallery' ? await prepareGalleryUpload(formData) : formData;
 				const response = await fetch(action, {
 					method: 'POST',
-					body: formData
+					body: preparedFormData
 				});
 				const result = deserialize(await response.text());
 
 				if (result.type === 'success' || result.type === 'redirect') {
 					await invalidateAll();
-					const message = getSuccessMessage(contentType, formData);
+					const message = getSuccessMessage(contentType, preparedFormData);
 					onSuccess?.(message);
 					onClose();
 					return;
@@ -259,6 +268,7 @@
 					const message = getFailureMessage(result.data);
 					submitError = message;
 					onError?.(message);
+					mediaUpload.active = false;
 					return;
 				}
 
@@ -272,6 +282,7 @@
 				const message = err instanceof Error ? err.message : 'Could not save content. Your draft is still here.';
 				submitError = message;
 				onError?.(message);
+				mediaUpload.active = false;
 				return;
 			}
 		}
@@ -279,7 +290,47 @@
 		const message = 'Could not save content. Your draft is still here.';
 		submitError = message;
 		onError?.(message);
+		mediaUpload.active = false;
 		isSubmitting = false;
+	}
+
+	async function prepareGalleryUpload(formData: FormData) {
+		const file = formData.get('photo');
+		if (!(file instanceof File) || file.size === 0) return formData;
+
+		mediaUpload.active = true;
+		mediaUpload.progress = 0;
+		const response = await fetch('/api/studio/media/upload-target', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				kind: 'content-photo',
+				fileName: file.name,
+				contentType: file.type,
+				size: file.size
+			})
+		});
+		const result = await response.json();
+
+		if (!response.ok) {
+			throw new Error(result.error || 'Could not prepare photo upload');
+		}
+
+		const upload = result.upload as ClientMediaUploadTarget;
+		await uploadR2Target({
+			file,
+			upload,
+			onProgress: (percent) => {
+				mediaUpload.progress = Math.max(0, Math.min(100, Math.round(percent)));
+			}
+		});
+
+		formData.delete('photo');
+		formData.set('uploadedPhotoKey', upload.key);
+		formData.set('photoFileType', file.type);
+		formData.set('photoFileSize', String(file.size));
+		mediaUpload.progress = 100;
+		return formData;
 	}
 
 	function createSubmitHandler(contentType: 'post' | 'gallery' | 'video') {
@@ -567,8 +618,26 @@
 							name="photo"
 							accept="image/jpeg,image/png,image/webp"
 							maxSize={5}
+							disabled={isSubmitting}
 							required
 						/>
+
+						<Input
+							label="Photo tags"
+							name="photoTags"
+							placeholder="backstage, live, studio"
+							disabled={isSubmitting}
+						/>
+
+						{#if mediaUpload.active}
+							<div class="media-upload-progress" role="status" aria-live="polite">
+								<div class="media-upload-progress__meta">
+									<span>Uploading photo</span>
+									<strong>{mediaUpload.progress}%</strong>
+								</div>
+								<progress max="100" value={mediaUpload.progress}></progress>
+							</div>
+						{/if}
 
 						{#if galleryPublishStep}
 							<div class="inline-overlay" role="dialog" aria-label="Publish gallery settings">
@@ -1004,6 +1073,45 @@
 		color: var(--error);
 		font-size: var(--font-size-sm);
 		line-height: 1.4;
+	}
+
+	.media-upload-progress {
+		display: grid;
+		gap: var(--space-2);
+		padding: var(--space-3);
+		border: 1px solid var(--border-primary);
+		border-radius: var(--radius-md);
+		background: var(--bg-secondary);
+
+		progress {
+			width: 100%;
+			height: 8px;
+			border: 0;
+			border-radius: var(--radius-full);
+			overflow: hidden;
+		}
+
+		progress::-webkit-progress-bar {
+			background: var(--bg-tertiary);
+		}
+
+		progress::-webkit-progress-value {
+			background: var(--primary);
+		}
+	}
+
+	.media-upload-progress__meta {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		color: var(--text-secondary);
+		font-size: var(--font-size-xs);
+
+		strong {
+			color: var(--text-primary);
+			font-variant-numeric: tabular-nums;
+		}
 	}
 
 	.field {

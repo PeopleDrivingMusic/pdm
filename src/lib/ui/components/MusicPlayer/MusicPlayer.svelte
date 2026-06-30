@@ -20,11 +20,12 @@
 	import Aurora from '$lib/ui/backgrounds/Aurora.svelte';
 	import { TrackClient } from '$lib/client/tracks';
 	import SaveTrackModal from '$lib/ui/components/Modal/SaveTrackModal.svelte';
-
+	import { resolveR2ImageUrl } from '$lib/utils/helpers';
 	const currentTrack = $derived(playerStore.currentTrack);
 	const track = $derived(currentTrack?.track);
 	const artist = $derived(currentTrack?.artist);
 	const album = $derived(currentTrack?.album);
+	const coverUrl = $derived(resolveR2ImageUrl(track?.imageUrl || album?.coverImageUrl || artist?.avatar));
 	const isLiked = $derived(currentTrack?.isLiked ?? false);
 	const socialTabs = [
 		{ id: 'lyrics', label: 'Lyrics' },
@@ -52,7 +53,7 @@
 	let showSaveModal = $state(false);
 	let saveTrackId = $state('');
 	$effect(() => {
-		extractColors(track?.imageUrl || album?.coverImageUrl || artist?.avatar);
+		extractColors(coverUrl);
 	});
 
 	async function extractColors(imageUrl?: string | null) {
@@ -84,7 +85,7 @@
 								<Avatar
 									size="s"
 									square={true}
-									src={track.imageUrl || album?.coverImageUrl || artist?.avatar}
+									src={resolveR2ImageUrl(track.imageUrl || album?.coverImageUrl || artist?.avatar)}
 								/>
 								<div class="track-info">
 									<h3 class="track-title">{track.title}</h3>

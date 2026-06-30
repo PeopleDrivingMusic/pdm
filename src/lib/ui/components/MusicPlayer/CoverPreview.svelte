@@ -15,7 +15,7 @@
 	import { TrackClient } from '$lib/client/tracks';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import SaveTrackModal from '$lib/ui/components/Modal/SaveTrackModal.svelte';
-
+	import { resolveR2ImageUrl } from '$lib/utils/helpers';
 	const views = [
 		{ id: 'info', label: 'Info' },
 		{ id: 'facts', label: 'Facts' },
@@ -28,6 +28,7 @@
 	);
 	let showSaveModal = $state(false);
 	let saveTrackId = $state("")
+	const coverUrl = $derived(resolveR2ImageUrl(track.imageUrl || album?.coverImageUrl || artist?.avatar));
 </script>
 
 <SaveTrackModal trackId={saveTrackId} bind:show={showSaveModal}></SaveTrackModal>
@@ -35,7 +36,7 @@
 <div class="preview">
 	<div
 		class="track-bg"
-		style="background-image: url('{track.imageUrl || album?.coverImageUrl || artist?.avatar}')"
+		style:background-image={coverUrl ? `url('${coverUrl}')` : undefined}
 	></div>
 	<div class="info-box">
 		<Tabs type="underline" showTrack={true} tabs={views} activeTab={views[0]} />
