@@ -13,7 +13,14 @@ The core mechanics the product is built around:
 
 A later phase adds **fintech** (royalty crowdfunding / micro-investment in tracks, merch store, crypto payouts) — present in the data model (`finance` schema, `purchases`) and business docs, but not the current focus. Don't let fintech framing drive day-to-day decisions; the music + social + recommendation loop is the product today.
 
-Two distinct audiences share one app: **listeners** (the public app) and **artists** (the Studio dashboard). Domain/business context lives in `.claude/business/` and `ArtistFlow.md`.
+Two distinct audiences share one app: **listeners** (the public app) and **artists** (the Studio dashboard).
+
+## Project Wiki
+
+Product, business, architecture, and domain knowledge live in an LLM-maintained wiki at **`.claude/wiki/`**. It is the single source of truth for the "why" behind PDM (strategy, economic model, system design, decisions). Read `.claude/wiki/WIKI.md` for how it is organized and maintained, and `.claude/wiki/index.md` to locate pages.
+
+- For questions about product/business/architecture, **consult the wiki first** (start at `.claude/wiki/home.md`).
+- When you learn something durable about the project, **file it into the wiki** per `.claude/wiki/WIKI.md` (this is project knowledge, distinct from Claude Code `memory/`, which is about the user and working context).
 
 ## Commands
 
@@ -50,7 +57,7 @@ Path aliases: `$lib` (src/lib), `$styles` (src/styles, auto-injects `variables` 
 ### Guiding principle: build for scale and microservice-readiness
 PDM aims to operate at Spotify / Instagram / YouTube scale, so every architectural decision is made with **horizontal scalability and fault tolerance** in mind. The target is a microservice architecture; the codebase today is a SvelteKit monolith, but it must stay **ready to split into independent services on separate servers** with minimal rework. Concretely:
 
-- Keep clear service boundaries (e.g. `src/lib/server/content/`, `src/lib/server/media/`) that routes call instead of reaching into DB code directly — these are the seams along which the app will be carved into services (Content, Media, …). See `.claude/business/PDM_CONTENT_MICROSERVICE_STRATEGY.md` and `PDM_SYSTEM_DESIGN.md`.
+- Keep clear service boundaries (e.g. `src/lib/server/content/`, `src/lib/server/media/`) that routes call instead of reaching into DB code directly — these are the seams along which the app will be carved into services (Content, Media, …). See `.claude/wiki/architecture/content-and-scale-strategy.md` and `.claude/wiki/architecture/system-design.md`.
 - Treat each boundary as if its implementation could become a remote (HTTP/RPC) client tomorrow: no leaking of Drizzle types or DB sessions across it, no cross-domain transactions that assume one database.
 - Prefer stateless request handling (sessions are token-in-cookie + DB lookup, no server memory), and design media/heavy I/O to go direct-to-storage (R2 presigned uploads) rather than through the app server.
 
@@ -77,7 +84,7 @@ Schema is **split by domain** under `src/lib/db/schemas/` (`users`, `artist`, `c
 Access patterns, in increasing abstraction:
 1. `src/lib/db/queries.ts` — static class services (`UserService`, `ArtistService`, `TrackService`, `AlbumService`, `AnalyticsService`, …) for core catalog/user data.
 2. `src/lib/db/services/` — feature DB services (`ContentService` with `PostService`/`GalleryService`/`VideoService`/`StudioContentService`, `MediaService`, `PlaylistService`, `R2Service`).
-3. `src/lib/server/content/` and `src/lib/server/media/` — **application-service boundaries** (`ContentApplicationService`, `MediaUploadService`) that route loads/actions call. These exist deliberately so the in-process DB implementation can later be swapped for a remote Content/Media microservice (see `.claude/business/PDM_CONTENT_MICROSERVICE_STRATEGY.md`). Prefer calling these from routes rather than reaching into DB services directly.
+3. `src/lib/server/content/` and `src/lib/server/media/` — **application-service boundaries** (`ContentApplicationService`, `MediaUploadService`) that route loads/actions call. These exist deliberately so the in-process DB implementation can later be swapped for a remote Content/Media microservice (see `.claude/wiki/architecture/service-boundaries.md`). Prefer calling these from routes rather than reaching into DB services directly.
 
 Wrap notable DB operations in `withDbLogging(name, fn)` (from `src/lib/db/index.ts`) for structured timing logs.
 
