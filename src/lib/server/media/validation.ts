@@ -39,3 +39,9 @@ export function validateAudioUpload(input: { contentType: string; size: number }
 export function validateImageUpload(input: { contentType: string; size: number }): Result {
 	return validate(IMAGE_MIME_TYPES, MAX_IMAGE_SIZE, 'Image', input);
 }
+
+export function assertPartCount(size: number, partSize: number): void {
+	if (Math.ceil(size / partSize) > MAX_MULTIPART_PARTS) {
+		throw new Error('Upload exceeds maximum part count');
+	}
+}

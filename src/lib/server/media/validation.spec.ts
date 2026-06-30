@@ -2,9 +2,15 @@ import { describe, it, expect } from 'vitest';
 import {
 	validateAudioUpload,
 	validateImageUpload,
+	assertPartCount,
 	MAX_AUDIO_SIZE,
-	MAX_IMAGE_SIZE
+	MAX_IMAGE_SIZE,
+	MAX_MULTIPART_PARTS
 } from './validation';
+
+// Local literal mirrors R2_MULTIPART_PART_SIZE; importing R2Service would pull
+// $env/static/private + the S3 client into a pure unit test.
+const PART_SIZE = 8 * 1024 * 1024;
 
 describe('validateAudioUpload', () => {
 	it('accepts a valid mp3 within size', () => {
@@ -35,5 +41,15 @@ describe('validateImageUpload', () => {
 		expect(validateImageUpload({ contentType: 'image/png', size: MAX_IMAGE_SIZE + 1 }).ok).toBe(
 			false
 		);
+	});
+});
+
+describe('assertPartCount', () => {
+	it('passes for a normal file', () => {
+		expect(() => assertPartCount(50 * 1024 * 1024, PART_SIZE)).not.toThrow();
+	});
+	it('throws when part count exceeds the cap', () => {
+		const oversize = (MAX_MULTIPART_PARTS + 1) * PART_SIZE;
+		expect(() => assertPartCount(oversize, PART_SIZE)).toThrow('maximum part count');
 	});
 });
