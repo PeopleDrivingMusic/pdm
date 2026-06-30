@@ -35,6 +35,14 @@ microservice-ready) and hardened against abuse.
    Upload Dock/Composer + GateControl + unified status/gate badges + responsive + a11y.
    Search, filter-chips, sort, bulk-select, and sparklines are **backlog**, not this
    branch.
+7. **Strict TDD + ≥90% coverage on the server seam.** All server-side boundary code
+   (`src/lib/server/music/`, `src/lib/server/events/`, and the upload validation/key
+   logic in `src/lib/server/media/`) is built **test-first** (red → green → refactor)
+   and must reach **≥90% line+branch coverage**, enforced as a CI gate (§10.1).
+8. **Reusable UI molecules live in `src/lib/ui/`, are catalogued, and are tested.** Any
+   genuinely reusable interface component introduced by this work goes into
+   `src/lib/ui/` (not buried in route `components/`), is registered in the wiki UI
+   catalogue, and ships with component tests + e2e coverage (§5.0, §10.3).
 
 ### Out of scope (explicitly)
 
@@ -217,23 +225,62 @@ Migration is **additive and safe** (defaults backfill existing rows).
 
 ## 5. UI Redesign
 
+### 5.0 Reusable UI molecules policy (rule for this work)
+
+Distinguish **reusable primitives/molecules** (no feature/domain coupling — usable on
+any screen) from **feature components** (orchestration that knows about music/albums/
+tracks). The split is mandatory, not stylistic:
+
+- **Reusable → `src/lib/ui/`.** Generic molecules go here, take only generic props +
+  callbacks, import no `$lib/server`/route data, and are documented + tested (§10.3).
+  New reusable molecules introduced by this work:
+  - `Badge.svelte` — generic status/label badge (variant + icon + text); dark-correct
+    tint pairs. (Replaces today's ad-hoc per-screen status pills.)
+  - `SegmentedControl.svelte` — generic 2+ option segmented control (`$bindable value`,
+    options, icons, `aria-pressed`/arrow-key nav).
+  - `VisibilityToggle.svelte` — platform gate control (`public | subscribers_only` +
+    inheritance cue), composed on top of `SegmentedControl`. Reusable because the gate
+    is a platform-wide concept (the content domain has the same notion).
+  - `UploadDropzone.svelte` — generic real drag&drop + multi-file picker (`onFiles`,
+    `accept`, `maxSizeMb`, keyboard-operable). The missing real-drop surface;
+    `FileUpload.svelte` stays for single-file.
+  - **Reuse, don't duplicate:** the existing `src/lib/ui/Progress.svelte` is the
+    determinate progress bar — extend it if needed rather than adding a new one. Audit
+    `Tabs`, `Modal`, `IconButton`, `StatCard`, `Select`, `Checkbox`, `Button` for reuse
+    before creating anything.
+- **Feature-specific → `src/routes/studio/music/components/`.** Anything that knows
+  about the music domain or orchestrates this screen.
+
+Every reusable component added/changed here is registered in the wiki UI catalogue
+(`.claude/wiki/product/design-system.md`, extended with a "UI component inventory"
+section: name, path, purpose, props summary, test status) — so we always know what
+exists and avoid re-inventing molecules. Updating that catalogue is a checklist item of
+the UI phase (§9.7), and a `feedback` memory records the "reusable → `ui/` + catalogue +
+tests" rule for future sessions.
+
 ### 5.1 Component decomposition
 
 ```
-src/routes/studio/music/
+src/lib/ui/                          ← REUSABLE molecules (generic, tested, catalogued)
+    Badge.svelte                     NEW status/gate badge
+    SegmentedControl.svelte          NEW generic segmented control
+    VisibilityToggle.svelte          NEW gate control (composes SegmentedControl)
+    UploadDropzone.svelte            NEW real drag&drop + multi-file
+    Progress.svelte                  EXISTING — reuse for determinate bars
+
+src/routes/studio/music/             ← FEATURE components (music-coupled)
   +page.svelte                      (unchanged: <MusicCatalogShell {data} />)
   +page.server.ts                   (thin wrappers over MusicApplicationService)
   components/
     MusicCatalogShell.svelte        orchestrator (replaces StudioMusicPage)
     MusicStatsBar.svelte            pure; wraps StatCard
-    UploadDropzone.svelte           NEW real drag&drop + multi-file
     UploadDock.svelte               persistent queue panel (survives tab switch/nav)
     UploadQueue.svelte              list of TrackUploadJobCard
-    TrackUploadJobCard.svelte       per-file progress / status / retry
+    TrackUploadJobCard.svelte       per-file progress / status / retry (uses Progress)
     AlbumGrid.svelte / AlbumCard.svelte
     TrackList.svelte / TrackRow.svelte
-    VisibilityToggle.svelte         reusable (cards + modals + dock)
     AlbumFormModal.svelte / TrackFormModal.svelte / LinkTrackModal.svelte
+
 src/lib/studio/music/
     uploadController.svelte.ts       NEW rune-backed factory controller
     types.ts                         TrackUploadJob, StudioTrack, StudioAlbum
@@ -444,6 +491,9 @@ Loki/Grafana stack — **no new infra**.
 
 ## 9. Implementation phases
 
+All server-side phases (1, 3–6) are done **test-first** (§10.1) and must keep the seam
+at **≥90% coverage** before the phase is considered done.
+
 1. **Security baseline (cheap, first):** audio/image MIME+size allowlists + max, cap
    `partCount`, origin check on the JSON endpoint, in-memory per-artist rate limit,
    document bucket CORS. (No new infra.)
@@ -461,10 +511,13 @@ Loki/Grafana stack — **no new infra**.
    track audio/image edits to presigned flow, fix album-cover R2 cleanup, remove
    music's dependency on `$lib/server/upload.ts` (grep for other importers first; leave
    the module if non-music callers remain).
-7. **UI redesign:** tokens + StatCard theming fix → GateControl + Badge primitives →
-   component decomposition + `uploadController` extraction (with `onProgress` +
-   concurrency cap) → UploadDropzone/Composer/Dock → cards/rows → empty/loading/error +
-   a11y pass.
+7. **UI redesign:** tokens + StatCard theming fix → **reusable `src/lib/ui/` molecules
+   first** (`Badge`, `SegmentedControl`, `VisibilityToggle`, `UploadDropzone`), each with
+   component + e2e tests (§10.3) and a wiki-catalogue entry
+   (`.claude/wiki/product/design-system.md`) → feature decomposition +
+   `uploadController` extraction (with `onProgress` + concurrency cap) →
+   UploadDock/Composer → cards/rows → empty/loading/error + a11y pass. Record the
+   "reusable → `ui/` + catalogue + tests" rule as a `feedback` memory.
 8. **Observability:** counters/histograms/logs, wire `recordMusicUpload`, Grafana panel.
 
 Each phase is independently shippable and reversible. Phases 1–3 harden + isolate
@@ -472,16 +525,59 @@ without UI change; 4–6 add gates + unify uploads; 7 redesigns; 8 instruments.
 
 ## 10. Testing
 
-- **Unit (vitest, node):** `MusicApplicationService` ownership enforcement, visibility
-  inherit-on-link + album cascade, DTO mapping (no Drizzle leakage), MIME/size
-  validation + `partCount` cap, `LogEventPublisher` emission on finalize/visibility/
-  delete. Media key derivation (server-side, artist-namespaced).
-- **Unit (vitest, client):** `uploadController` job lifecycle — queued→uploading→
-  finalizing→uploaded, progress threading, retry ×3 + backoff + renew, concurrency cap,
-  preview revocation on destroy. `VisibilityToggle` inheritance/override states.
-- **e2e (playwright):** drag&drop multi-file upload happy path (mocked R2 targets);
-  per-file progress + retry on induced failure; album cover presigned upload; set track
-  / album visibility + observe inherited badge; responsive layout smoke (mobile/desktop).
-- **Regression guards:** assert the `createTrack` `FormData` contract, resume-key
-  format, and finalize order are unchanged (golden tests).
-- Run `yarn check` + `yarn lint` after each phase; `yarn test` before merge.
+### 10.1 Strict TDD + coverage gate (server seam)
+
+The server boundary is built **test-first**: for each `MusicApplicationService` /
+`EventPublisher` / media-validation behavior, write a failing test → minimal code to
+pass → refactor. No boundary code lands without a test written first (enforced via the
+superpowers `test-driven-development` workflow during implementation).
+
+**Coverage gate ≥90% (line + branch)** over the seam:
+`src/lib/server/music/**`, `src/lib/server/events/**`, and the new validation/key code
+in `src/lib/server/media/**`. Configure vitest coverage (`@vitest/coverage-v8`) with a
+`server`-project threshold scoped to these paths (`coverage.thresholds` +
+`coverage.include`) so the gate measures the seam, not the whole repo. Add a
+`yarn test:coverage` script; the gate runs in CI and blocks merge if below 90%.
+
+### 10.2 Server seam unit tests (vitest, node)
+
+`MusicApplicationService` ownership enforcement (reject cross-artist); visibility
+inherit-on-link + album cascade + no-revert-on-unlink; DTO mapping (assert **no Drizzle
+row/`$inferSelect` shape leaks** across the boundary); MIME/size validation + `partCount`
+cap + audio/image allowlists; server-side artist-namespaced key derivation (client
+cannot influence the key); `LogEventPublisher` emission on finalize / visibility-change /
+publish / delete; album-cover R2 cleanup on delete/replace.
+
+### 10.3 Reusable UI molecule tests (vitest client + playwright e2e) — required
+
+Every reusable molecule in `src/lib/ui/` introduced/changed here ships with tests
+(this also seeds the currently-empty `src/lib/ui/` test suite):
+
+- **Component tests (vitest `client` project, `*.svelte.spec.ts`):** `Badge` (variant →
+  correct tint/icon/text, color-not-only), `SegmentedControl` (select, `aria-pressed`,
+  arrow-key nav, disabled), `VisibilityToggle` (public default, switch to
+  subscribers_only, inherited/override states + cue), `UploadDropzone` (drag-over state,
+  multi-file accept, type/size rejection, keyboard Enter/Space opens picker).
+- **e2e (playwright):** each reusable molecule is exercised in a real flow (the music
+  screen), and at least `VisibilityToggle` + `UploadDropzone` get a dedicated e2e
+  assertion (gate flip persists + inherited badge; real drag&drop multi-file).
+
+### 10.4 Upload controller tests (vitest, client)
+
+`uploadController` job lifecycle queued→uploading→finalizing→uploaded; `onProgress`
+threading updates `job.progress`; retry ×3 + backoff + `renewTrackUploadTargets`;
+concurrency cap (extras stay `queued`); cover-preview revocation on `destroy()`.
+
+### 10.5 e2e flows (playwright)
+
+Drag&drop multi-file upload happy path (mocked R2 targets); per-file progress + retry on
+induced failure; album cover presigned upload; set track/album visibility + observe
+inherited badge; responsive layout smoke (mobile/desktop); Upload Dock survives tab
+switch.
+
+### 10.6 Regression guards & gates
+
+- Golden tests assert the `createTrack` `FormData` contract, resume-key format
+  (`pdm:track-upload:${trackId}:${audio|cover}`), and retry→finalize order are unchanged.
+- Run `yarn check` + `yarn lint` after each phase; `yarn test:coverage` (server gate) +
+  `yarn test` (full unit + e2e) before merge.
