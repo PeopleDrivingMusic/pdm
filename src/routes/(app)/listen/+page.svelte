@@ -208,6 +208,8 @@
 											artistId: '1',
 											title: 'Metallica',
 											isPublished: null,
+											visibility: 'public',
+											contentId: null,
 											metadata: null,
 											albumId: null,
 											audioUrl: '/music/01.mp3',

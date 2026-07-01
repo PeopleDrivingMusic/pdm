@@ -1,35 +1,12 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail, error } from '@sveltejs/kit';
-import { AlbumService, TrackService, GenreService, AlbumTrackService } from '$lib/db/queries';
 import { getArtistByCookie } from '$lib/server/artist-session';
-import {
-	uploadImage,
-	uploadAudio,
-	deleteFile,
-	buildSourceAudioFileName,
-	buildCoverFileName
-} from '$lib/server/upload';
-import { extractTrackMetadata, type TrackMetadata } from '$lib/server/music-metadata';
-import { MediaUploadService, type StoredUploadTarget } from '$lib/server/media';
+import { MusicApplicationService, MusicAccessError } from '$lib/server/music';
+import { createRateLimiter } from '$lib/server/security/rateLimiter';
+import { isSameOrigin } from '$lib/server/security/origin';
+import type { StudioMusicOverviewDTO, Visibility } from '$lib/server/music';
 
-function getUploadRelativePath(urlOrPath: string | null | undefined) {
-	if (!urlOrPath) return null;
-	if (urlOrPath.startsWith('/uploads/')) {
-		return urlOrPath.slice('/uploads/'.length);
-	}
-	if (urlOrPath.startsWith('uploads/')) {
-		return urlOrPath.slice('uploads/'.length);
-	}
-	return urlOrPath;
-}
-
-function normalizeUploadUrl(pathOrUrl: string | null | undefined) {
-	if (!pathOrUrl) return null;
-	if (/^(https?:|data:|blob:)/i.test(pathOrUrl)) return pathOrUrl;
-	if (pathOrUrl.startsWith('/uploads/')) return pathOrUrl;
-	if (pathOrUrl.startsWith('uploads/')) return `/${pathOrUrl}`;
-	return pathOrUrl;
-}
+const createTrackLimiter = createRateLimiter({ limit: 30, windowMs: 60_000 });
 
 function normalizeGenres(genresString: string | null | undefined) {
 	return (genresString ?? '')
@@ -38,38 +15,8 @@ function normalizeGenres(genresString: string | null | undefined) {
 		.filter(Boolean);
 }
 
-function isOwnedByArtist(record: { artistId: string } | null | undefined, artistId: string) {
-	return !!record && record.artistId === artistId;
-}
-
-type TrackUploadMetadata = {
-	sourceFileName?: string;
-	coverFileName?: string | null;
-	uploads?: {
-		audio?: StoredUploadTarget;
-		cover?: StoredUploadTarget;
-	};
-	uploadedAt?: string;
-	failedReason?: string;
-};
-
-function asRecord(value: unknown): Record<string, unknown> {
-	return value && typeof value === 'object' && !Array.isArray(value)
-		? (value as Record<string, unknown>)
-		: {};
-}
-
-function getUploadMetadata(metadata: unknown): TrackUploadMetadata {
-	const record = asRecord(metadata);
-	const uploadRecord = asRecord(record.upload);
-	return uploadRecord as TrackUploadMetadata;
-}
-
-function mergeUploadMetadata(metadata: unknown, upload: TrackUploadMetadata) {
-	return {
-		...asRecord(metadata),
-		upload
-	};
+function parseVisibility(value: FormDataEntryValue | null): Visibility {
+	return value === 'subscribers_only' ? 'subscribers_only' : 'public';
 }
 
 function getPositiveNumber(value: FormDataEntryValue | null) {
@@ -78,69 +25,38 @@ function getPositiveNumber(value: FormDataEntryValue | null) {
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function parseUploadParts(value: FormDataEntryValue | null) {
-	if (typeof value !== 'string' || !value.trim()) return [];
-	try {
-		const parts = JSON.parse(value);
-		if (!Array.isArray(parts)) return [];
-		return parts
-			.map((part) => ({
-				partNumber: Number(part.partNumber),
-				etag: typeof part.etag === 'string' ? part.etag : ''
-			}))
-			.filter((part) => Number.isInteger(part.partNumber) && part.partNumber > 0 && part.etag);
-	} catch {
-		return [];
-	}
+function fromError(err: unknown) {
+	if (err instanceof MusicAccessError) return fail(404, { error: err.message });
+	const message = err instanceof Error ? err.message : 'Request failed';
+	return fail(400, { error: message });
+}
+
+// TEMPORARY compat shim: maps the DTO overview back to the legacy shape the current
+// StudioMusicPage.svelte reads. Removed in Plan C (UI redesign) once the UI consumes
+// DTO keys (audioKey/imageKey/coverImageKey) directly. It reconstructs albumTracks in
+// memory from the overview — no DB access from the route.
+function toLegacyShape(overview: StudioMusicOverviewDTO) {
+	const albums = overview.albums.map((a) => ({ ...a, coverImageUrl: a.coverImageKey }));
+	const tracks = overview.tracks.map(({ track, stats }) => ({
+		track: { ...track, audioUrl: track.audioKey, imageUrl: track.imageKey, genre: track.genres },
+		stats
+	}));
+	const albumById = new Map(albums.map((a) => [a.id, a]));
+	const trackById = new Map(tracks.map((t) => [t.track.id, t.track]));
+	const albumTracks = overview.albumTracks.map((at) => ({
+		albumTrack: at,
+		album: albumById.get(at.albumId),
+		track: trackById.get(at.trackId)
+	}));
+	return { albums, tracks, albumTracks, genres: overview.genres, stats: overview.stats };
 }
 
 export const load: PageServerLoad = async ({ parent }) => {
 	const { artist } = await parent();
-
-	if (!artist) {
-		throw error(401, 'Unauthorized');
-	}
-
+	if (!artist) throw error(401, 'Unauthorized');
 	try {
-		// Fetch all albums and tracks for the artist
-		const [albums, tracksResult, genres, albumTracks] = await Promise.all([
-			AlbumService.getAlbumsByArtist(artist.id),
-			TrackService.getTracksByArtistForStudio(artist.id),
-			GenreService.getAllGenres(),
-			AlbumTrackService.getAlbumTracksByArtist(artist.id)
-		]);
-
-		const studioAlbums = albums.map((album) => ({
-			...album,
-			coverImageUrl: normalizeUploadUrl(album.coverImageUrl)
-		}));
-		const studioTracks = tracksResult.map(({ track, stats }) => ({
-			track: {
-				...track,
-				audioUrl: normalizeUploadUrl(track.audioUrl),
-				imageUrl: normalizeUploadUrl(track.imageUrl)
-			},
-			stats
-		}));
-
-		// Calculate stats
-		const stats = {
-			totalAlbums: studioAlbums.length,
-			totalTracks: tracksResult.length,
-			publishedTracks: tracksResult.filter((t) => t.track.isPublished).length,
-			draftTracks: tracksResult.filter((t) => !t.track.isPublished).length,
-			totalPlays: tracksResult.reduce((acc, t) => acc + (t.stats?.playCount || 0), 0),
-			totalLikes: tracksResult.reduce((acc, t) => acc + (t.stats?.likeCount || 0), 0),
-			totalSaves: tracksResult.reduce((acc, t) => acc + (t.stats?.saveCount || 0), 0)
-		};
-
-		return {
-			albums: studioAlbums,
-			tracks: studioTracks,
-			albumTracks,
-			genres,
-			stats
-		};
+		const overview = await MusicApplicationService.getStudioOverview(artist.id);
+		return toLegacyShape(overview);
 	} catch (err) {
 		console.error('Failed to load studio music data:', err);
 		throw error(500, 'Failed to load music data');
@@ -149,617 +65,214 @@ export const load: PageServerLoad = async ({ parent }) => {
 
 export const actions: Actions = {
 	createAlbum: async (event) => {
-		const { request } = event;
 		const artist = await getArtistByCookie(event);
-
-		if (!artist) {
-			return fail(401, { error: 'Unauthorized' });
-		}
-
+		if (!artist) return fail(401, { error: 'Unauthorized' });
 		try {
-			const data = await request.formData();
-			const title = data.get('title') as string;
-			const description = data.get('description') as string;
+			const data = await event.request.formData();
+			const title = (data.get('title') as string)?.trim();
+			if (!title) return fail(400, { error: 'Title is required' });
 			const releaseDate = data.get('releaseDate') as string;
-			const genresString = data.get('genres') as string;
-			const coverImageFile = data.get('coverImage') as File | null;
-
-			if (!title) {
-				return fail(400, { error: 'Title is required' });
-			}
-
-			const genres = normalizeGenres(genresString);
-
-			let album = await AlbumService.createAlbum({
-				artistId: artist.id,
+			const album = await MusicApplicationService.createAlbum(artist.id, {
 				title,
-				description: description || null,
+				description: (data.get('description') as string) || null,
 				releaseDate: releaseDate ? new Date(releaseDate) : null,
-				genres: genres.length > 0 ? genres : null,
-				coverImageUrl: null,
-				isPublished: false
+				genres: normalizeGenres(data.get('genres') as string),
+				visibility: parseVisibility(data.get('visibility'))
 			});
-
-			if (coverImageFile && coverImageFile.size > 0) {
-				const uploadResult = await uploadImage(
-					coverImageFile,
-					`covers/albums/${artist.id}`,
-					buildCoverFileName(album.id, coverImageFile)
-				);
-				if (uploadResult.success) {
-					album =
-						(await AlbumService.updateAlbum(album.id, { coverImageUrl: uploadResult.path })) ??
-						album;
-				} else {
-					await AlbumService.deleteAlbum(album.id);
-					return fail(400, { error: uploadResult.error || 'Failed to upload cover image' });
-				}
-			}
-
-			// Create genres if they don't exist
-			if (genres.length > 0) {
-				await GenreService.getOrCreateGenres(genres);
-			}
-
 			return { success: true, album };
 		} catch (err) {
-			console.error('Failed to create album:', err);
-			return fail(500, { error: 'Failed to create album' });
+			return fromError(err);
 		}
 	},
 
 	updateAlbum: async (event) => {
-		const { request } = event;
 		const artist = await getArtistByCookie(event);
-
-		if (!artist) {
-			return fail(401, { error: 'Unauthorized' });
-		}
-
+		if (!artist) return fail(401, { error: 'Unauthorized' });
 		try {
-			const data = await request.formData();
+			const data = await event.request.formData();
 			const albumId = data.get('albumId') as string;
-			const title = data.get('title') as string;
-			const description = data.get('description') as string;
+			if (!albumId) return fail(400, { error: 'Album ID is required' });
 			const releaseDate = data.get('releaseDate') as string;
-			const isPublished = data.get('isPublished') === 'true';
-			const genresString = data.get('genres') as string;
-			const coverImageFile = data.get('coverImage') as File | null;
-
-			if (!albumId) {
-				return fail(400, { error: 'Album ID is required' });
-			}
-
-			const existingAlbum = await AlbumService.getAlbumById(albumId);
-			if (!isOwnedByArtist(existingAlbum, artist.id)) {
-				return fail(404, { error: 'Album not found' });
-			}
-
-			const genres = normalizeGenres(genresString);
-
-			const updateData: any = {};
-			if (title) updateData.title = title;
-			if (description !== undefined) updateData.description = description || null;
-			if (releaseDate) updateData.releaseDate = new Date(releaseDate);
-			if (typeof isPublished === 'boolean') updateData.isPublished = isPublished;
-			if (genres.length > 0) {
-				updateData.genres = genres;
-				await GenreService.getOrCreateGenres(genres);
-			}
-
-			// Upload new cover image if provided
-			let previousCoverPath: string | null = null;
-			if (coverImageFile && coverImageFile.size > 0) {
-				const uploadResult = await uploadImage(
-					coverImageFile,
-					`covers/albums/${artist.id}`,
-					buildCoverFileName(albumId, coverImageFile)
-				);
-				if (uploadResult.success) {
-					updateData.coverImageUrl = uploadResult.path!;
-					previousCoverPath = getUploadRelativePath(existingAlbum.coverImageUrl);
-				} else {
-					return fail(400, { error: uploadResult.error || 'Failed to upload cover image' });
-				}
-			}
-
-			const album = await AlbumService.updateAlbum(albumId, updateData);
-			if (
-				album &&
-				previousCoverPath &&
-				previousCoverPath !== getUploadRelativePath(album.coverImageUrl)
-			) {
-				deleteFile(previousCoverPath);
-			}
-
-			if (!album) {
-				return fail(404, { error: 'Album not found' });
-			}
-
+			const genres = normalizeGenres(data.get('genres') as string);
+			const album = await MusicApplicationService.updateAlbum(artist.id, albumId, {
+				title: (data.get('title') as string) || undefined,
+				description: data.has('description')
+					? (data.get('description') as string) || null
+					: undefined,
+				releaseDate: releaseDate ? new Date(releaseDate) : undefined,
+				genres: genres.length > 0 ? genres : undefined,
+				isPublished: data.has('isPublished') ? data.get('isPublished') === 'true' : undefined,
+				visibility: data.has('visibility') ? parseVisibility(data.get('visibility')) : undefined
+			});
 			return { success: true, album };
 		} catch (err) {
-			console.error('Failed to update album:', err);
-			return fail(500, { error: 'Failed to update album' });
+			return fromError(err);
 		}
 	},
 
 	deleteAlbum: async (event) => {
-		const { request } = event;
 		const artist = await getArtistByCookie(event);
-
-		if (!artist) {
-			return fail(401, { error: 'Unauthorized' });
-		}
-
+		if (!artist) return fail(401, { error: 'Unauthorized' });
 		try {
-			const data = await request.formData();
+			const data = await event.request.formData();
 			const albumId = data.get('albumId') as string;
-
-			if (!albumId) {
-				return fail(400, { error: 'Album ID is required' });
-			}
-
-			const existingAlbum = await AlbumService.getAlbumById(albumId);
-			if (!isOwnedByArtist(existingAlbum, artist.id)) {
-				return fail(404, { error: 'Album not found' });
-			}
-
-			const previousCoverPath = getUploadRelativePath(existingAlbum.coverImageUrl);
-			const success = await AlbumService.deleteAlbum(albumId);
-
-			if (!success) {
-				return fail(500, { error: 'Failed to delete album' });
-			}
-
-			if (previousCoverPath) {
-				deleteFile(previousCoverPath);
-			}
-
+			if (!albumId) return fail(400, { error: 'Album ID is required' });
+			await MusicApplicationService.deleteAlbum(artist.id, albumId);
 			return { success: true };
 		} catch (err) {
-			console.error('Failed to delete album:', err);
-			return fail(500, { error: 'Failed to delete album' });
+			return fromError(err);
 		}
 	},
 
 	createTrack: async (event) => {
-		const { request } = event;
 		const artist = await getArtistByCookie(event);
-
-		if (!artist) {
-			return fail(401, { error: 'Unauthorized' });
-		}
-
+		if (!artist) return fail(401, { error: 'Unauthorized' });
+		if (!isSameOrigin(event)) return fail(403, { error: 'Forbidden' });
+		if (!createTrackLimiter.check(artist.id)) return fail(429, { error: 'Too many requests' });
 		try {
-			const data = await request.formData();
-			const title = data.get('title') as string;
-			const genresString = data.get('genres') as string;
-			const trackMetadataJSON = data.get('metadata') as string | null;
-			const file_name = data.get('file_name') as string;
-			const file_type = data.get('type') as string;
-			const file_size = getPositiveNumber(data.get('file_size'));
-			const cover_type = data.get('cover_type') as string | null;
+			const data = await event.request.formData();
+			const metaJson = data.get('metadata') as string | null;
+			const meta = metaJson ? JSON.parse(metaJson) : null;
+			const title = ((data.get('title') as string) || meta?.title || '').trim();
+			if (!title) return fail(400, { error: 'Title is required' });
+
 			const cover_title = data.get('cover_title') as string | null;
+			const cover_type = data.get('cover_type') as string | null;
 			const cover_size = getPositiveNumber(data.get('cover_size'));
-			const trackMetadata: TrackMetadata | null = trackMetadataJSON ? JSON.parse(trackMetadataJSON) : null;
-			const resolvedTitle = title?.trim() || trackMetadata?.title || '';
 
-			if (!resolvedTitle) {
-				return fail(400, { error: 'Title is required' });
-			}
-			if (!file_name || !file_type || file_size <= 0) {
-				return fail(400, { error: 'Audio file metadata is required' });
-			}
-
-			const genres = normalizeGenres(genresString);
-			let duration: number | null = trackMetadata?.duration ?? null;
-
-			let track = await TrackService.createTrack({
-				artistId: artist.id,
-				title: resolvedTitle,
-				genre: genres.length > 0 ? genres : null,
-				status: 'pending_upload',
-				audioUrl: null,
-				imageUrl: null,
-				duration,
-				isPublished: false,
-				albumId: null
+			const result = await MusicApplicationService.createTrack(artist.id, {
+				title,
+				genres: normalizeGenres(data.get('genres') as string),
+				visibility: parseVisibility(data.get('visibility')),
+				duration: meta?.duration ?? null,
+				audio: {
+					fileName: data.get('file_name') as string,
+					contentType: data.get('type') as string,
+					size: getPositiveNumber(data.get('file_size'))
+				},
+				cover:
+					cover_title && cover_type && cover_size > 0
+						? { fileName: cover_title, contentType: cover_type, size: cover_size }
+						: null
 			});
-
-			const audioUpload = await MediaUploadService.createTrackAudioUpload({
-				artistId: artist.id,
-				trackId: track.id,
-				fileName: file_name,
-				contentType: file_type,
-				size: file_size
-			});
-			const coverUpload =
-				cover_title && cover_type && cover_size > 0
-					? await MediaUploadService.createTrackCoverUpload({
-							artistId: artist.id,
-							trackId: track.id,
-							fileName: cover_title,
-							contentType: cover_type,
-							size: cover_size
-						})
-					: null;
-
-			const uploadMetadata: TrackUploadMetadata = {
-				sourceFileName: file_name,
-				coverFileName: cover_title,
-				uploads: {
-					audio: MediaUploadService.toStoredTarget(audioUpload),
-					cover: coverUpload ? MediaUploadService.toStoredTarget(coverUpload) : undefined
-				}
-			};
-
-			track =
-				(await TrackService.updateTrack(track.id, {
-					audioUrl: audioUpload.key,
-					imageUrl: coverUpload?.key ?? null,
-					metadata: mergeUploadMetadata(track.metadata, uploadMetadata)
-				})) ?? track;
-
-			// Create genres if they don't exist
-			if (genres.length > 0) {
-				await GenreService.getOrCreateGenres(genres);
-			}
-
-			return {
-				success: true,
-				track,
-				uploadTargets: {
-					audio: audioUpload,
-					cover: coverUpload
-				}
-			};
+			return { success: true, ...result };
 		} catch (err) {
-			console.error('Failed to create track:', err);
-			return fail(500, { error: 'Failed to create track' });
+			return fromError(err);
 		}
 	},
 
 	resumeTrackUpload: async (event) => {
-		const { request } = event;
 		const artist = await getArtistByCookie(event);
-
-		if (!artist) {
-			return fail(401, { error: 'Unauthorized' });
-		}
-
+		if (!artist) return fail(401, { error: 'Unauthorized' });
 		try {
-			const data = await request.formData();
+			const data = await event.request.formData();
 			const trackId = data.get('trackId') as string;
 			if (!trackId) return fail(400, { error: 'Track ID is required' });
-
-			const track = await TrackService.getTrackById(trackId);
-			if (!track || track.artistId !== artist.id) {
-				return fail(404, { error: 'Track not found' });
-			}
-
-			const uploadMetadata = getUploadMetadata(track.metadata);
-			const audio = uploadMetadata.uploads?.audio;
-			if (!audio) {
-				return fail(400, { error: 'No pending upload exists for this track' });
-			}
-
-			return {
-				success: true,
-				track,
-				uploadTargets: {
-					audio: await MediaUploadService.renewStoredTarget(audio),
-					cover: uploadMetadata.uploads?.cover
-						? await MediaUploadService.renewStoredTarget(uploadMetadata.uploads.cover)
-						: null
-				}
-			};
+			const result = await MusicApplicationService.resumeTrackUpload(artist.id, trackId);
+			return { success: true, ...result };
 		} catch (err) {
-			console.error('Failed to resume track upload:', err);
-			return fail(500, { error: 'Failed to resume upload' });
+			return fromError(err);
 		}
 	},
 
 	finalizeTrackUpload: async (event) => {
-		const { request } = event;
 		const artist = await getArtistByCookie(event);
-
-		if (!artist) {
-			return fail(401, { error: 'Unauthorized' });
-		}
-
+		if (!artist) return fail(401, { error: 'Unauthorized' });
 		try {
-			const data = await request.formData();
+			const data = await event.request.formData();
 			const trackId = data.get('trackId') as string;
 			if (!trackId) return fail(400, { error: 'Track ID is required' });
-
-			const track = await TrackService.getTrackById(trackId);
-			if (!track || track.artistId !== artist.id) {
-				return fail(404, { error: 'Track not found' });
-			}
-
-			const uploadMetadata = getUploadMetadata(track.metadata);
-			const audio = uploadMetadata.uploads?.audio;
-			if (!audio) {
-				return fail(400, { error: 'No audio upload metadata found' });
-			}
-
-			await MediaUploadService.completeMultipart({
-				upload: audio,
-				parts: parseUploadParts(data.get('audioParts'))
+			const raw = data.get('audioParts');
+			const audioParts =
+				typeof raw === 'string' && raw.trim()
+					? (JSON.parse(raw) as Array<{ partNumber: number; etag: string }>).filter(
+							(p) => Number.isInteger(p.partNumber) && p.partNumber > 0 && p.etag
+						)
+					: [];
+			const result = await MusicApplicationService.finalizeTrackUpload(artist.id, trackId, {
+				audioParts,
+				coverUploaded: data.get('coverUploaded') === 'true'
 			});
-
-			const audioVerification = await MediaUploadService.verifyObject(audio);
-			if (!audioVerification.ok) {
-				await TrackService.updateTrack(trackId, {
-					status: 'failed',
-					metadata: mergeUploadMetadata(track.metadata, {
-						...uploadMetadata,
-						failedReason: audioVerification.reason
-					})
-				});
-				return fail(400, { error: audioVerification.reason });
-			}
-
-			const cover = uploadMetadata.uploads?.cover;
-			if (cover && data.get('coverUploaded') === 'true') {
-				const coverVerification = await MediaUploadService.verifyObject(cover);
-				if (!coverVerification.ok) {
-					await TrackService.updateTrack(trackId, {
-						status: 'failed',
-						metadata: mergeUploadMetadata(track.metadata, {
-							...uploadMetadata,
-							failedReason: coverVerification.reason
-						})
-					});
-					return fail(400, { error: coverVerification.reason });
-				}
-			}
-
-			const finalizedMetadata: TrackUploadMetadata = {
-				...uploadMetadata,
-				uploadedAt: new Date().toISOString(),
-				failedReason: undefined
-			};
-			const finalizedTrack = await TrackService.updateTrack(trackId, {
-				status: 'uploaded',
-				metadata: mergeUploadMetadata(track.metadata, finalizedMetadata)
-			});
-
-			return { success: true, track: finalizedTrack };
+			return { success: true, ...result };
 		} catch (err) {
-			console.error('Failed to finalize track upload:', err);
-			return fail(500, { error: 'Failed to finalize upload' });
+			return fromError(err);
 		}
 	},
 
 	updateTrack: async (event) => {
-		const { request } = event;
 		const artist = await getArtistByCookie(event);
-
-		if (!artist) {
-			return fail(401, { error: 'Unauthorized' });
-		}
-
+		if (!artist) return fail(401, { error: 'Unauthorized' });
 		try {
-			const data = await request.formData();
+			const data = await event.request.formData();
 			const trackId = data.get('trackId') as string;
-			const title = data.get('title') as string;
-			const isPublished = data.get('isPublished') as string;
-			const genresString = data.get('genres') as string;
-			const audioFile = data.get('audioFile') as File | null;
-			const trackImageFile = data.get('trackImage') as File | null;
+			if (!trackId) return fail(400, { error: 'Track ID is required' });
+			const isPublished = data.get('isPublished');
 			const durationValue = data.get('duration') as string | null;
-
-			if (!trackId) {
-				return fail(400, { error: 'Track ID is required' });
-			}
-
-			const existingTrack = await TrackService.getTrackById(trackId);
-			if (!existingTrack || existingTrack.artistId !== artist.id) {
-				return fail(404, { error: 'Track not found' });
-			}
-
-			const trackMetadata =
-				audioFile && audioFile.size > 0 ? await extractTrackMetadata(audioFile) : null;
-
-			const genres = normalizeGenres(genresString);
-
-			const updateData: any = {};
-			if (title) {
-				updateData.title = title;
-			} else if (trackMetadata?.title) {
-				updateData.title = trackMetadata.title;
-			}
-			if (isPublished !== null)
-				updateData.isPublished = isPublished === 'true' || isPublished === 'on';
-			if (durationValue && durationValue.trim() !== '') {
-				const parsedDuration = Number(durationValue);
-				if (Number.isFinite(parsedDuration)) {
-					updateData.duration = Math.round(parsedDuration);
-				}
-			} else if (trackMetadata?.duration) {
-				updateData.duration = trackMetadata.duration;
-			}
-			if (genres.length > 0) {
-				updateData.genre = genres;
-				await GenreService.getOrCreateGenres(genres);
-			}
-
-			let previousAudioPath: string | null = null;
-			if (audioFile && audioFile.size > 0) {
-				const uploadResult = await uploadAudio(
-					audioFile,
-					`audio/${artist.id}/${trackId}`,
-					buildSourceAudioFileName(audioFile)
-				);
-				if (uploadResult.success) {
-					updateData.audioUrl = uploadResult.path!;
-					previousAudioPath = getUploadRelativePath(existingTrack.audioUrl);
-					if (durationValue && durationValue.trim() !== '') {
-						const parsedDuration = Number(durationValue);
-						if (Number.isFinite(parsedDuration)) {
-							updateData.duration = Math.round(parsedDuration);
-						}
-					}
-				} else {
-					return fail(400, { error: uploadResult.error || 'Failed to upload audio file' });
-				}
-			}
-
-			let previousImagePath: string | null = null;
-			if (trackImageFile && trackImageFile.size > 0) {
-				const uploadResult = await uploadImage(
-					trackImageFile,
-					`covers/tracks/${artist.id}`,
-					buildCoverFileName(trackId, trackImageFile)
-				);
-				if (uploadResult.success) {
-					updateData.imageUrl = uploadResult.path!;
-					previousImagePath = getUploadRelativePath(existingTrack.imageUrl);
-				} else {
-					return fail(400, { error: uploadResult.error || 'Failed to upload track image' });
-				}
-			} else if (trackMetadata?.coverImageFile) {
-				const uploadResult = await uploadImage(
-					trackMetadata.coverImageFile,
-					`covers/tracks/${artist.id}`,
-					buildCoverFileName(trackId, trackMetadata.coverImageFile)
-				);
-				if (uploadResult.success) {
-					updateData.imageUrl = uploadResult.path!;
-					previousImagePath = getUploadRelativePath(existingTrack.imageUrl);
-				} else {
-					return fail(400, { error: uploadResult.error || 'Failed to upload track image' });
-				}
-			}
-
-			const track = await TrackService.updateTrack(trackId, updateData);
-			if (track) {
-				if (previousAudioPath && previousAudioPath !== getUploadRelativePath(track.audioUrl)) {
-					deleteFile(previousAudioPath);
-				}
-				if (previousImagePath && previousImagePath !== getUploadRelativePath(track.imageUrl)) {
-					deleteFile(previousImagePath);
-				}
-			}
-
-			if (!track) {
-				return fail(404, { error: 'Track not found' });
-			}
-
+			const genres = normalizeGenres(data.get('genres') as string);
+			const track = await MusicApplicationService.updateTrackMetadata(artist.id, trackId, {
+				title: (data.get('title') as string) || undefined,
+				genres: genres.length > 0 ? genres : undefined,
+				visibility: data.has('visibility') ? parseVisibility(data.get('visibility')) : undefined,
+				isPublished:
+					isPublished !== null ? isPublished === 'true' || isPublished === 'on' : undefined,
+				duration:
+					durationValue && durationValue.trim() !== '' && Number.isFinite(Number(durationValue))
+						? Math.round(Number(durationValue))
+						: undefined
+			});
 			return { success: true, track };
 		} catch (err) {
-			console.error('Failed to update track:', err);
-			return fail(500, { error: 'Failed to update track' });
+			return fromError(err);
 		}
 	},
 
 	deleteTrack: async (event) => {
-		const { request } = event;
 		const artist = await getArtistByCookie(event);
-
-		if (!artist) {
-			return fail(401, { error: 'Unauthorized' });
-		}
-
+		if (!artist) return fail(401, { error: 'Unauthorized' });
 		try {
-			const data = await request.formData();
+			const data = await event.request.formData();
 			const trackId = data.get('trackId') as string;
-
-			if (!trackId) {
-				return fail(400, { error: 'Track ID is required' });
-			}
-
-			const existingTrack = await TrackService.getTrackById(trackId);
-			if (!existingTrack || existingTrack.artistId !== artist.id) {
-				return fail(404, { error: 'Track not found' });
-			}
-
-			const success = await TrackService.deleteTrack(trackId);
-			if (!success) {
-				return fail(500, { error: 'Failed to delete track' });
-			}
+			if (!trackId) return fail(400, { error: 'Track ID is required' });
+			await MusicApplicationService.deleteTrack(artist.id, trackId);
 			return { success: true };
 		} catch (err) {
-			console.error('Failed to delete track:', err);
-			return fail(500, { error: 'Failed to delete track' });
+			return fromError(err);
 		}
 	},
 
 	linkTrackToAlbum: async (event) => {
-		const { request } = event;
 		const artist = await getArtistByCookie(event);
-
-		if (!artist) {
-			return fail(401, { error: 'Unauthorized' });
-		}
-
+		if (!artist) return fail(401, { error: 'Unauthorized' });
 		try {
-			const data = await request.formData();
+			const data = await event.request.formData();
 			const albumId = data.get('albumId') as string;
 			const trackId = data.get('trackId') as string;
 			const trackNumber = data.get('trackNumber') as string;
-
-			if (!albumId || !trackId) {
-				return fail(400, { error: 'Album ID and Track ID are required' });
-			}
-
-			const [album, track] = await Promise.all([
-				AlbumService.getAlbumById(albumId),
-				TrackService.getTrackById(trackId)
-			]);
-			if (!isOwnedByArtist(album, artist.id) || !isOwnedByArtist(track, artist.id)) {
-				return fail(404, { error: 'Album or track not found' });
-			}
-
-			const albumTrack = await AlbumTrackService.linkTrackToAlbum(
+			if (!albumId || !trackId) return fail(400, { error: 'Album ID and Track ID are required' });
+			const albumTrack = await MusicApplicationService.linkTrackToAlbum(
+				artist.id,
 				albumId,
 				trackId,
 				trackNumber ? parseInt(trackNumber) : 1
 			);
-
 			return { success: true, albumTrack };
 		} catch (err) {
-			console.error('Failed to link track to album:', err);
-			return fail(500, { error: 'Failed to link track to album' });
+			return fromError(err);
 		}
 	},
 
 	unlinkTrackFromAlbum: async (event) => {
-		const { request } = event;
 		const artist = await getArtistByCookie(event);
-
-		if (!artist) {
-			return fail(401, { error: 'Unauthorized' });
-		}
-
+		if (!artist) return fail(401, { error: 'Unauthorized' });
 		try {
-			const data = await request.formData();
+			const data = await event.request.formData();
 			const albumId = data.get('albumId') as string;
 			const trackId = data.get('trackId') as string;
-
-			if (!albumId || !trackId) {
-				return fail(400, { error: 'Album ID and Track ID are required' });
-			}
-
-			const [album, track] = await Promise.all([
-				AlbumService.getAlbumById(albumId),
-				TrackService.getTrackById(trackId)
-			]);
-			if (!isOwnedByArtist(album, artist.id) || !isOwnedByArtist(track, artist.id)) {
-				return fail(404, { error: 'Album or track not found' });
-			}
-
-			const success = await AlbumTrackService.unlinkTrackFromAlbum(albumId, trackId);
-
-			if (!success) {
-				return fail(500, { error: 'Failed to unlink track from album' });
-			}
-
+			if (!albumId || !trackId) return fail(400, { error: 'Album ID and Track ID are required' });
+			await MusicApplicationService.unlinkTrackFromAlbum(artist.id, albumId, trackId);
 			return { success: true };
 		} catch (err) {
-			console.error('Failed to unlink track from album:', err);
-			return fail(500, { error: 'Failed to unlink track from album' });
+			return fromError(err);
 		}
 	}
 };
