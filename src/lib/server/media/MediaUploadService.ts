@@ -8,7 +8,7 @@ import {
 	type R2UploadTarget
 } from '$lib/db/services/R2Service';
 
-export type MediaUploadKind = 'track-audio' | 'track-cover' | 'content-photo';
+export type MediaUploadKind = 'track-audio' | 'track-cover' | 'album-cover' | 'content-photo';
 
 export interface MediaUploadTarget {
 	kind: MediaUploadKind;
@@ -52,6 +52,10 @@ function trackAudioKey(input: { artistId: string; trackId: string; fileName: str
 
 function trackCoverKey(input: { artistId: string; trackId: string; fileName: string }) {
 	return `${input.artistId}/tracks/${input.trackId}/cover${getExtension(input.fileName, '.jpg')}`;
+}
+
+function albumCoverKey(input: { artistId: string; albumId: string; fileName: string }) {
+	return `${input.artistId}/albums/${input.albumId}/cover${getExtension(input.fileName, '.jpg')}`;
 }
 
 function contentPhotoKey(input: { artistId: string; fileName: string }) {
@@ -120,6 +124,23 @@ export class MediaUploadService {
 			kind: 'track-cover',
 			bucket: 'images',
 			key: trackCoverKey(input),
+			contentType: input.contentType || 'image/jpeg',
+			size: input.size,
+			allowMultipart: false
+		});
+	}
+
+	static async createAlbumCoverUpload(input: {
+		artistId: string;
+		albumId: string;
+		fileName: string;
+		contentType: string;
+		size: number;
+	}) {
+		return createTarget({
+			kind: 'album-cover',
+			bucket: 'images',
+			key: albumCoverKey(input),
 			contentType: input.contentType || 'image/jpeg',
 			size: input.size,
 			allowMultipart: false
