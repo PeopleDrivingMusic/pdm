@@ -182,6 +182,52 @@ export class MusicApplicationService {
 		return { album: toAlbumDTO(updated), uploadTarget };
 	}
 
+	static async replaceTrackImage(artistId: string, trackId: string, intent: UploadIntent) {
+		await this.assertTrackOwned(artistId, trackId);
+		const check = validateImageUpload(intent);
+		if (!check.ok) throw new Error(check.reason);
+		const uploadTarget = await MediaUploadService.createTrackCoverUpload({
+			artistId,
+			trackId,
+			fileName: intent.fileName,
+			contentType: intent.contentType,
+			size: intent.size
+		});
+		const updated = await TrackService.updateTrack(trackId, { imageUrl: uploadTarget.key });
+		if (!updated) throw new MusicAccessError('Track not found');
+		return { track: toTrackDTO(updated), uploadTarget };
+	}
+
+	static async replaceTrackAudio(artistId: string, trackId: string, intent: UploadIntent) {
+		const track = await this.assertTrackOwned(artistId, trackId);
+		const check = validateAudioUpload(intent);
+		if (!check.ok) throw new Error(check.reason);
+		assertPartCount(intent.size, R2_MULTIPART_PART_SIZE);
+
+		const audioUpload = await MediaUploadService.createTrackAudioUpload({
+			artistId,
+			trackId,
+			fileName: intent.fileName,
+			contentType: intent.contentType,
+			size: intent.size
+		});
+		const uploadMetadata = this.getUploadMetadata(track.metadata);
+		const updated = await TrackService.updateTrack(trackId, {
+			status: 'pending_upload',
+			audioUrl: audioUpload.key,
+			metadata: this.mergeUploadMetadata(track.metadata, {
+				...uploadMetadata,
+				sourceFileName: intent.fileName,
+				uploads: {
+					...uploadMetadata.uploads,
+					audio: MediaUploadService.toStoredTarget(audioUpload)
+				}
+			})
+		});
+		if (!updated) throw new MusicAccessError('Track not found');
+		return { track: toTrackDTO(updated), uploadTargets: { audio: audioUpload, cover: null } };
+	}
+
 	private static getUploadMetadata(metadata: unknown): TrackUploadMetadata {
 		const record =
 			metadata && typeof metadata === 'object' && !Array.isArray(metadata)
