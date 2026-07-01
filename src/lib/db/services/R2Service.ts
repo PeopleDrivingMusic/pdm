@@ -12,6 +12,8 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { CLOUDFLARE_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } from '$env/static/private';
+import { logger } from '$lib/utils/logger';
+import { MetricsCollector } from '$lib/utils/metrics';
 
 export type BucketName = 'music' | 'images';
 
@@ -289,7 +291,11 @@ export async function deleteFileFromR2({
 		);
 		return true;
 	} catch (error) {
-		console.error('Error deleting file from R2:', error);
+		MetricsCollector.recordR2Error('deleteObject');
+		logger.error('R2 deleteObject failed', {
+			component: 'media',
+			metadata: { error, key: uniqueKey, bucket }
+		});
 		return false;
 	}
 }
