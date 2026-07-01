@@ -17,10 +17,20 @@ vi.mock('$lib/server/media', () => ({
 	}
 }));
 vi.mock('$lib/server/events', () => ({ eventPublisher: { publish: vi.fn() } }));
+vi.mock('$lib/utils/metrics', () => ({
+	MetricsCollector: {
+		recordUploadStarted: vi.fn(),
+		recordUploadFinalized: vi.fn(),
+		recordUploadFailed: vi.fn(),
+		recordMusicUpload: vi.fn(),
+		observeUploadDuration: vi.fn()
+	}
+}));
 
 import { TrackService, GenreService } from '$lib/db/queries';
 import { MediaUploadService } from '$lib/server/media';
 import { eventPublisher } from '$lib/server/events';
+import { MetricsCollector } from '$lib/utils/metrics';
 import { MusicApplicationService } from './MusicApplicationService';
 import { MAX_AUDIO_SIZE } from '../media/validation';
 
@@ -108,6 +118,8 @@ describe('finalizeTrackUpload', () => {
 			expect.objectContaining({ type: 'track.uploaded', trackId: 't1' })
 		);
 		expect(res.track.status).toBe('uploaded');
+		expect(MetricsCollector.recordUploadFinalized).toHaveBeenCalledWith('track-audio', 'success');
+		expect(MetricsCollector.recordMusicUpload).toHaveBeenCalledWith(expect.any(String), true);
 	});
 
 	it('marks failed and throws on verify mismatch', async () => {
@@ -124,5 +136,10 @@ describe('finalizeTrackUpload', () => {
 			})
 		).rejects.toThrow('size mismatch');
 		expect(eventPublisher.publish).not.toHaveBeenCalled();
+		expect(MetricsCollector.recordUploadFailed).toHaveBeenCalledWith(
+			'track-audio',
+			expect.any(String)
+		);
+		expect(MetricsCollector.recordMusicUpload).toHaveBeenCalledWith(expect.any(String), false);
 	});
 });

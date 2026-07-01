@@ -4,6 +4,7 @@ import { deleteFileFromR2, R2_MULTIPART_PART_SIZE } from '$lib/db/services/R2Ser
 import { eventPublisher } from '$lib/server/events';
 import { MediaUploadService, type MediaUploadTarget } from '$lib/server/media';
 import { validateAudioUpload, validateImageUpload, assertPartCount } from '../media/validation';
+import { MetricsCollector } from '$lib/utils/metrics';
 import {
 	toTrackDTO,
 	toAlbumDTO,
@@ -211,6 +212,7 @@ export class MusicApplicationService {
 			contentType: intent.contentType,
 			size: intent.size
 		});
+		MetricsCollector.recordUploadStarted('track-audio');
 		const uploadMetadata = this.getUploadMetadata(track.metadata);
 		const updated = await TrackService.updateTrack(trackId, {
 			status: 'pending_upload',
@@ -275,6 +277,7 @@ export class MusicApplicationService {
 			contentType: input.audio.contentType,
 			size: input.audio.size
 		});
+		MetricsCollector.recordUploadStarted('track-audio');
 		const coverUpload = input.cover
 			? await MediaUploadService.createTrackCoverUpload({
 					artistId,
@@ -328,6 +331,8 @@ export class MusicApplicationService {
 		const audio = uploadMetadata.uploads?.audio;
 		if (!audio) throw new Error('No audio upload metadata found');
 
+		const format = audio.contentType || 'audio';
+
 		await MediaUploadService.completeMultipart({ upload: audio, parts: input.audioParts });
 
 		const audioVerification = await MediaUploadService.verifyObject(audio);
@@ -339,6 +344,9 @@ export class MusicApplicationService {
 					failedReason: audioVerification.reason
 				})
 			});
+			MetricsCollector.recordUploadFailed('track-audio', audioVerification.reason);
+			MetricsCollector.recordUploadFinalized('track-audio', 'failure');
+			MetricsCollector.recordMusicUpload(format, false);
 			throw new Error(audioVerification.reason);
 		}
 
@@ -353,6 +361,9 @@ export class MusicApplicationService {
 						failedReason: coverVerification.reason
 					})
 				});
+				MetricsCollector.recordUploadFailed('track-audio', coverVerification.reason);
+				MetricsCollector.recordUploadFinalized('track-audio', 'failure');
+				MetricsCollector.recordMusicUpload(format, false);
 				throw new Error(coverVerification.reason);
 			}
 		}
@@ -366,6 +377,13 @@ export class MusicApplicationService {
 					failedReason: undefined
 				})
 			})) ?? track;
+
+		MetricsCollector.observeUploadDuration(
+			'track-audio',
+			(Date.now() - new Date(track.createdAt).getTime()) / 1000
+		);
+		MetricsCollector.recordUploadFinalized('track-audio', 'success');
+		MetricsCollector.recordMusicUpload(format, true);
 
 		await eventPublisher.publish({
 			type: 'track.uploaded',
