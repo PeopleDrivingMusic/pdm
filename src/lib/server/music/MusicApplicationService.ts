@@ -12,8 +12,10 @@ import {
 	type AlbumDTO,
 	type AlbumMutationInput,
 	type AlbumPatchInput,
+	type AlbumTrackDTO,
 	type CreateTrackInput,
 	type FinalizeTrackInput,
+	type TrackPatchInput,
 	type TrackUploadMetadata,
 	type StudioMusicOverviewDTO,
 	type StudioStatsDTO
@@ -306,5 +308,97 @@ export class MusicApplicationService {
 		});
 
 		return { track: toTrackDTO(finalized) };
+	}
+
+	static async updateTrackMetadata(artistId: string, trackId: string, patch: TrackPatchInput) {
+		const existing = await this.assertTrackOwned(artistId, trackId);
+		const prevVisibility = coerceVisibility((existing as { visibility?: unknown }).visibility);
+		const prevPublished = !!existing.isPublished;
+
+		const data: Record<string, unknown> = {};
+		if (patch.title !== undefined) data.title = patch.title;
+		if (patch.duration !== undefined) data.duration = patch.duration;
+		if (patch.isPublished !== undefined) data.isPublished = patch.isPublished;
+		if (patch.genres && patch.genres.length > 0) {
+			data.genre = patch.genres;
+			await GenreService.getOrCreateGenres(patch.genres);
+		}
+		const nextVisibility =
+			patch.visibility !== undefined ? coerceVisibility(patch.visibility) : prevVisibility;
+		if (patch.visibility !== undefined) data.visibility = nextVisibility;
+
+		const updated = await TrackService.updateTrack(trackId, data);
+		if (!updated) throw new MusicAccessError('Track not found');
+
+		if (nextVisibility !== prevVisibility) {
+			await eventPublisher.publish({
+				type: 'track.visibility_changed',
+				trackId,
+				artistId,
+				visibility: nextVisibility,
+				occurredAt: new Date().toISOString()
+			});
+		}
+		if (patch.isPublished === true && !prevPublished) {
+			await eventPublisher.publish({
+				type: 'track.published',
+				trackId,
+				artistId,
+				occurredAt: new Date().toISOString()
+			});
+		}
+		return toTrackDTO(updated);
+	}
+
+	static async deleteTrack(artistId: string, trackId: string): Promise<{ ok: true }> {
+		await this.assertTrackOwned(artistId, trackId);
+		const ok = await TrackService.deleteTrack(trackId);
+		if (!ok) throw new Error('Failed to delete track');
+		await eventPublisher.publish({
+			type: 'track.deleted',
+			trackId,
+			artistId,
+			occurredAt: new Date().toISOString()
+		});
+		return { ok: true };
+	}
+
+	static async linkTrackToAlbum(
+		artistId: string,
+		albumId: string,
+		trackId: string,
+		trackNumber: number
+	): Promise<AlbumTrackDTO> {
+		const album = await this.assertAlbumOwned(artistId, albumId);
+		const track = await this.assertTrackOwned(artistId, trackId);
+		const albumVisibility = coerceVisibility((album as { visibility?: unknown }).visibility);
+		const trackVisibility = coerceVisibility((track as { visibility?: unknown }).visibility);
+
+		const link = await AlbumTrackService.linkTrackToAlbum(albumId, trackId, trackNumber);
+
+		if (albumVisibility !== trackVisibility) {
+			await TrackService.updateTrack(trackId, { visibility: albumVisibility });
+			await eventPublisher.publish({
+				type: 'track.visibility_changed',
+				trackId,
+				artistId,
+				visibility: albumVisibility,
+				occurredAt: new Date().toISOString()
+			});
+		}
+
+		return { albumId: link.albumId, trackId: link.trackId, trackNumber: link.trackNumber };
+	}
+
+	static async unlinkTrackFromAlbum(
+		artistId: string,
+		albumId: string,
+		trackId: string
+	): Promise<{ ok: true }> {
+		await this.assertAlbumOwned(artistId, albumId);
+		await this.assertTrackOwned(artistId, trackId);
+		const ok = await AlbumTrackService.unlinkTrackFromAlbum(albumId, trackId);
+		if (!ok) throw new Error('Failed to unlink track from album');
+		return { ok: true };
 	}
 }
