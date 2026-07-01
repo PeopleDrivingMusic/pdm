@@ -1,7 +1,9 @@
 import { AlbumService, TrackService, GenreService, AlbumTrackService } from '$lib/db/queries';
 import type { Track, Album } from '$lib/db';
-import { deleteFileFromR2 } from '$lib/db/services/R2Service';
+import { deleteFileFromR2, R2_MULTIPART_PART_SIZE } from '$lib/db/services/R2Service';
 import { eventPublisher } from '$lib/server/events';
+import { MediaUploadService } from '$lib/server/media';
+import { validateAudioUpload, validateImageUpload, assertPartCount } from '../media/validation';
 import {
 	toTrackDTO,
 	toAlbumDTO,
@@ -10,6 +12,9 @@ import {
 	type AlbumDTO,
 	type AlbumMutationInput,
 	type AlbumPatchInput,
+	type CreateTrackInput,
+	type FinalizeTrackInput,
+	type TrackUploadMetadata,
 	type StudioMusicOverviewDTO,
 	type StudioStatsDTO
 } from './dto';
@@ -152,5 +157,154 @@ export class MusicApplicationService {
 		const ok = await AlbumService.deleteAlbum(albumId);
 		if (!ok) throw new Error('Failed to delete album');
 		return { ok: true };
+	}
+
+	private static getUploadMetadata(metadata: unknown): TrackUploadMetadata {
+		const record =
+			metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+				? (metadata as Record<string, unknown>)
+				: {};
+		const upload = record.upload;
+		return (upload && typeof upload === 'object' ? upload : {}) as TrackUploadMetadata;
+	}
+
+	private static mergeUploadMetadata(metadata: unknown, upload: TrackUploadMetadata) {
+		const base =
+			metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+				? (metadata as Record<string, unknown>)
+				: {};
+		return { ...base, upload };
+	}
+
+	static async createTrack(artistId: string, input: CreateTrackInput) {
+		const audioCheck = validateAudioUpload(input.audio);
+		if (!audioCheck.ok) throw new Error(audioCheck.reason);
+		assertPartCount(input.audio.size, R2_MULTIPART_PART_SIZE);
+		if (input.cover) {
+			const coverCheck = validateImageUpload(input.cover);
+			if (!coverCheck.ok) throw new Error(coverCheck.reason);
+		}
+
+		const genres = input.genres && input.genres.length > 0 ? input.genres : null;
+		let track = await TrackService.createTrack({
+			artistId,
+			title: input.title,
+			genre: genres,
+			status: 'pending_upload',
+			audioUrl: null,
+			imageUrl: null,
+			duration: input.duration ?? null,
+			isPublished: false,
+			albumId: null,
+			visibility: coerceVisibility(input.visibility)
+		} as Parameters<typeof TrackService.createTrack>[0]);
+
+		const audioUpload = await MediaUploadService.createTrackAudioUpload({
+			artistId,
+			trackId: track.id,
+			fileName: input.audio.fileName,
+			contentType: input.audio.contentType,
+			size: input.audio.size
+		});
+		const coverUpload = input.cover
+			? await MediaUploadService.createTrackCoverUpload({
+					artistId,
+					trackId: track.id,
+					fileName: input.cover.fileName,
+					contentType: input.cover.contentType,
+					size: input.cover.size
+				})
+			: null;
+
+		const uploadMetadata: TrackUploadMetadata = {
+			sourceFileName: input.audio.fileName,
+			coverFileName: input.cover?.fileName ?? null,
+			uploads: {
+				audio: MediaUploadService.toStoredTarget(audioUpload),
+				cover: coverUpload ? MediaUploadService.toStoredTarget(coverUpload) : undefined
+			}
+		};
+
+		track =
+			(await TrackService.updateTrack(track.id, {
+				audioUrl: audioUpload.key,
+				imageUrl: coverUpload?.key ?? null,
+				metadata: this.mergeUploadMetadata(track.metadata, uploadMetadata)
+			})) ?? track;
+
+		if (genres) await GenreService.getOrCreateGenres(genres);
+
+		return { track: toTrackDTO(track), uploadTargets: { audio: audioUpload, cover: coverUpload } };
+	}
+
+	static async resumeTrackUpload(artistId: string, trackId: string) {
+		const track = await this.assertTrackOwned(artistId, trackId);
+		const uploadMetadata = this.getUploadMetadata(track.metadata);
+		const audio = uploadMetadata.uploads?.audio;
+		if (!audio) throw new Error('No pending upload exists for this track');
+		return {
+			track: toTrackDTO(track),
+			uploadTargets: {
+				audio: await MediaUploadService.renewStoredTarget(audio),
+				cover: uploadMetadata.uploads?.cover
+					? await MediaUploadService.renewStoredTarget(uploadMetadata.uploads.cover)
+					: null
+			}
+		};
+	}
+
+	static async finalizeTrackUpload(artistId: string, trackId: string, input: FinalizeTrackInput) {
+		const track = await this.assertTrackOwned(artistId, trackId);
+		const uploadMetadata = this.getUploadMetadata(track.metadata);
+		const audio = uploadMetadata.uploads?.audio;
+		if (!audio) throw new Error('No audio upload metadata found');
+
+		await MediaUploadService.completeMultipart({ upload: audio, parts: input.audioParts });
+
+		const audioVerification = await MediaUploadService.verifyObject(audio);
+		if (!audioVerification.ok) {
+			await TrackService.updateTrack(trackId, {
+				status: 'failed',
+				metadata: this.mergeUploadMetadata(track.metadata, {
+					...uploadMetadata,
+					failedReason: audioVerification.reason
+				})
+			});
+			throw new Error(audioVerification.reason);
+		}
+
+		const cover = uploadMetadata.uploads?.cover;
+		if (cover && input.coverUploaded) {
+			const coverVerification = await MediaUploadService.verifyObject(cover);
+			if (!coverVerification.ok) {
+				await TrackService.updateTrack(trackId, {
+					status: 'failed',
+					metadata: this.mergeUploadMetadata(track.metadata, {
+						...uploadMetadata,
+						failedReason: coverVerification.reason
+					})
+				});
+				throw new Error(coverVerification.reason);
+			}
+		}
+
+		const finalized =
+			(await TrackService.updateTrack(trackId, {
+				status: 'uploaded',
+				metadata: this.mergeUploadMetadata(track.metadata, {
+					...uploadMetadata,
+					uploadedAt: new Date().toISOString(),
+					failedReason: undefined
+				})
+			})) ?? track;
+
+		await eventPublisher.publish({
+			type: 'track.uploaded',
+			trackId,
+			artistId,
+			occurredAt: new Date().toISOString()
+		});
+
+		return { track: toTrackDTO(finalized) };
 	}
 }
