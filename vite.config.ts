@@ -26,6 +26,8 @@ export default defineConfig({
 				'src/lib/server/media/validation.ts',
 				'src/lib/server/security/**'
 			],
+			// Barrel re-exports and type-only modules carry no testable logic.
+			exclude: ['**/index.ts', '**/types.ts'],
 			thresholds: { lines: 90, branches: 90, functions: 90, statements: 90 }
 		},
 		projects: [

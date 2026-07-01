@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toTrackDTO, toAlbumDTO } from './dto';
+import { toTrackDTO, toAlbumDTO, toTrackStatsDTO } from './dto';
 
 const baseTrack = {
 	id: 't1',
@@ -37,6 +37,36 @@ describe('toTrackDTO', () => {
 	});
 	it('defaults missing genres to an empty array', () => {
 		expect(toTrackDTO({ ...baseTrack, genre: null }).genres).toEqual([]);
+	});
+	it('maps null optionals and set albumId/trackNumber', () => {
+		const dto = toTrackDTO({
+			...baseTrack,
+			duration: null,
+			audioUrl: null,
+			imageUrl: null,
+			albumId: 'al1',
+			trackNumber: 5,
+			isPublished: false
+		});
+		expect(dto.duration).toBeNull();
+		expect(dto.audioKey).toBeNull();
+		expect(dto.imageKey).toBeNull();
+		expect(dto.albumId).toBe('al1');
+		expect(dto.trackNumber).toBe(5);
+		expect(dto.isPublished).toBe(false);
+	});
+});
+
+describe('toTrackStatsDTO', () => {
+	it('returns null for missing stats', () => {
+		expect(toTrackStatsDTO(null)).toBeNull();
+	});
+	it('defaults undefined counts to zero', () => {
+		expect(toTrackStatsDTO({ trackId: 't1' } as any)).toEqual({
+			playCount: 0,
+			likeCount: 0,
+			saveCount: 0
+		});
 	});
 });
 
