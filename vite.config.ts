@@ -24,6 +24,7 @@ export default defineConfig({
 				'src/lib/server/music/**',
 				'src/lib/server/events/**',
 				'src/lib/server/media/validation.ts',
+				'src/lib/server/media/uploadTargetHandler.ts',
 				'src/lib/server/security/**'
 			],
 			// Barrel re-exports and type-only modules carry no testable logic.
