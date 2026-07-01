@@ -2,7 +2,7 @@ import { AlbumService, TrackService, GenreService, AlbumTrackService } from '$li
 import type { Track, Album } from '$lib/db';
 import { deleteFileFromR2, R2_MULTIPART_PART_SIZE } from '$lib/db/services/R2Service';
 import { eventPublisher } from '$lib/server/events';
-import { MediaUploadService } from '$lib/server/media';
+import { MediaUploadService, type MediaUploadTarget } from '$lib/server/media';
 import { validateAudioUpload, validateImageUpload, assertPartCount } from '../media/validation';
 import {
 	toTrackDTO,
@@ -17,6 +17,7 @@ import {
 	type FinalizeTrackInput,
 	type TrackPatchInput,
 	type TrackUploadMetadata,
+	type UploadIntent,
 	type StudioMusicOverviewDTO,
 	type StudioStatsDTO
 } from './dto';
@@ -159,6 +160,26 @@ export class MusicApplicationService {
 		const ok = await AlbumService.deleteAlbum(albumId);
 		if (!ok) throw new Error('Failed to delete album');
 		return { ok: true };
+	}
+
+	static async createAlbumCover(artistId: string, albumId: string, intent: UploadIntent) {
+		const album = await this.assertAlbumOwned(artistId, albumId);
+		const check = validateImageUpload(intent);
+		if (!check.ok) throw new Error(check.reason);
+
+		if (album.coverImageUrl) {
+			await deleteFileFromR2({ uniqueKey: album.coverImageUrl, bucket: 'images' });
+		}
+		const uploadTarget: MediaUploadTarget = await MediaUploadService.createAlbumCoverUpload({
+			artistId,
+			albumId,
+			fileName: intent.fileName,
+			contentType: intent.contentType,
+			size: intent.size
+		});
+		const updated = await AlbumService.updateAlbum(albumId, { coverImageUrl: uploadTarget.key });
+		if (!updated) throw new MusicAccessError('Album not found');
+		return { album: toAlbumDTO(updated), uploadTarget };
 	}
 
 	private static getUploadMetadata(metadata: unknown): TrackUploadMetadata {
