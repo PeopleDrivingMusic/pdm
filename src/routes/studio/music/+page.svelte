@@ -1,7 +1,7 @@
 <script lang="ts">
-	import StudioMusicPage from './StudioMusicPage.svelte';
+	import MusicCatalogShell from './components/MusicCatalogShell.svelte';
 
 	let { data } = $props();
 </script>
 
-<StudioMusicPage {data} />
+<MusicCatalogShell {data} />

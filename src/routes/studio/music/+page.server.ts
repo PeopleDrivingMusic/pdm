@@ -4,7 +4,7 @@ import { getArtistByCookie } from '$lib/server/artist-session';
 import { MusicApplicationService, MusicAccessError } from '$lib/server/music';
 import { createRateLimiter } from '$lib/server/security/rateLimiter';
 import { isSameOrigin } from '$lib/server/security/origin';
-import type { StudioMusicOverviewDTO, Visibility } from '$lib/server/music';
+import type { Visibility } from '$lib/server/music';
 
 const createTrackLimiter = createRateLimiter({ limit: 30, windowMs: 60_000 });
 
@@ -31,32 +31,11 @@ function fromError(err: unknown) {
 	return fail(400, { error: message });
 }
 
-// TEMPORARY compat shim: maps the DTO overview back to the legacy shape the current
-// StudioMusicPage.svelte reads. Removed in Plan C (UI redesign) once the UI consumes
-// DTO keys (audioKey/imageKey/coverImageKey) directly. It reconstructs albumTracks in
-// memory from the overview — no DB access from the route.
-function toLegacyShape(overview: StudioMusicOverviewDTO) {
-	const albums = overview.albums.map((a) => ({ ...a, coverImageUrl: a.coverImageKey }));
-	const tracks = overview.tracks.map(({ track, stats }) => ({
-		track: { ...track, audioUrl: track.audioKey, imageUrl: track.imageKey, genre: track.genres },
-		stats
-	}));
-	const albumById = new Map(albums.map((a) => [a.id, a]));
-	const trackById = new Map(tracks.map((t) => [t.track.id, t.track]));
-	const albumTracks = overview.albumTracks.map((at) => ({
-		albumTrack: at,
-		album: albumById.get(at.albumId),
-		track: trackById.get(at.trackId)
-	}));
-	return { albums, tracks, albumTracks, genres: overview.genres, stats: overview.stats };
-}
-
 export const load: PageServerLoad = async ({ parent }) => {
 	const { artist } = await parent();
 	if (!artist) throw error(401, 'Unauthorized');
 	try {
-		const overview = await MusicApplicationService.getStudioOverview(artist.id);
-		return toLegacyShape(overview);
+		return await MusicApplicationService.getStudioOverview(artist.id);
 	} catch (err) {
 		console.error('Failed to load studio music data:', err);
 		throw error(500, 'Failed to load music data');
