@@ -40,3 +40,23 @@ Shared: `Sidebar`, `ThemeToggle`, `DesignSystemDemo`. Exported from
 **Rule:** content/feature UIs must reuse these primitives and theme tokens — no
 one-off colors/spacing/radii. Page files compose components and wire server
 data/actions rather than hardcoding the experience ([[studio-content]]).
+
+## UI component inventory (reusable molecules)
+
+Reusable, domain-agnostic molecules live in `src/lib/ui/`, take generic props +
+callbacks (no `$lib/server`/route-data imports), and ship with a
+`*.svelte.spec.ts` (vitest `client`/browser project: `page` from
+`@vitest/browser/context` + `render` from `vitest-browser-svelte`). Feature-coupled
+components stay in the route's `components/` dir.
+
+| Component | Path | Purpose | Key props | Tests |
+| --- | --- | --- | --- | --- |
+| `Badge` | `src/lib/ui/Badge.svelte` | status/gate label (icon+text, dark-correct tints) | `variant`, `label`, `icon?` | ✓ |
+| `ProgressBar` | `src/lib/ui/ProgressBar.svelte` | determinate/indeterminate progress (`role=progressbar`) | `value`, `label`, `state?`, `indeterminate?` | ✓ |
+| `SegmentedControl` | `src/lib/ui/SegmentedControl.svelte` | 2+ option segmented radio (arrow-key nav) | `value $bindable`, `options`, `ariaLabel`, `onChange?` | ✓ |
+| `VisibilityToggle` | `src/lib/ui/VisibilityToggle.svelte` | gate control `public\|subscribers_only` + inheritance cue (composes SegmentedControl) | `value $bindable`, `level`, `inheritedFrom?`, `onChange?` | ✓ |
+| `UploadDropzone` | `src/lib/ui/UploadDropzone.svelte` | real drag&drop + multi-file picker (keyboard-operable) | `onFiles`, `accept?`, `maxSizeMb?` | ✓ |
+
+New reusable molecules must be added here. Gate/upload/status tokens for these
+live in `src/styles/tokens.css` (`--gate-*`, `--upload-*`, `--status-*`). Ground
+visual work in the `ui-ux-pro-max` skill.
