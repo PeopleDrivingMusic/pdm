@@ -62,6 +62,7 @@
 	<form
 		method="POST"
 		action={album ? '?/updateAlbum' : '?/createAlbum'}
+		enctype="multipart/form-data"
 		use:enhance={() => {
 			submitting = true;
 			const file = coverFile;
