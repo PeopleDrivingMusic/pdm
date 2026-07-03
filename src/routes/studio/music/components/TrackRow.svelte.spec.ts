@@ -38,6 +38,6 @@ test('shows a progressbar while a job is uploading', async () => {
 		attempt: 1,
 		coverPreviewUrl: null
 	} as any;
-	render(TrackRow, { track, stats: null, job, ...cb });
+	render(TrackRow, { track, job, ...cb });
 	await expect.element(page.getByRole('progressbar')).toBeInTheDocument();
 });

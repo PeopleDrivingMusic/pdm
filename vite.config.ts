@@ -1,5 +1,5 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import net from 'node:net';
 import path from 'path';
 
@@ -24,70 +24,75 @@ async function findDevPort(host: string, start: number, tries = 25): Promise<num
 	return start;
 }
 
-export default defineConfig(async ({ command }) => {
-	// Only compute a dev port for real `vite dev` — never during tests/build.
-	const isDevServer = command === 'serve' && !process.env.VITEST;
-	const server = isDevServer
-		? { host: DEV_HOST, port: await findDevPort(DEV_HOST, DEV_PORT), strictPort: true }
-		: undefined;
-
+// Dev only: bind to 127.0.0.1 and auto-pick the first bindable port from 5173.
+// Kept in a plugin so the exported config stays a plain (sync) object.
+function devPortPlugin(): Plugin {
 	return {
-		plugins: [sveltekit()],
-		server,
-		resolve: {
-			alias: {
-				$styles: path.resolve('./src/styles')
-			}
-		},
-		css: {
-			preprocessorOptions: {
-				scss: {
-					additionalData: `@use '$styles/variables' as *;`
-				}
-			}
-		},
-		test: {
-			expect: { requireAssertions: true },
-			coverage: {
-				provider: 'v8',
-				include: [
-					'src/lib/server/music/**',
-					'src/lib/server/events/**',
-					'src/lib/server/media/validation.ts',
-					'src/lib/server/media/uploadTargetHandler.ts',
-					'src/lib/server/media/logging.ts',
-					'src/lib/server/security/**'
-				],
-				// Barrel re-exports and type-only modules carry no testable logic.
-				exclude: ['**/index.ts', '**/types.ts'],
-				thresholds: { lines: 90, branches: 90, functions: 90, statements: 90 }
-			},
-			projects: [
-				{
-					extends: './vite.config.ts',
-					test: {
-						name: 'client',
-						environment: 'browser',
-						browser: {
-							enabled: true,
-							provider: 'playwright',
-							instances: [{ browser: 'chromium' }]
-						},
-						include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
-						exclude: ['src/lib/server/**'],
-						setupFiles: ['./vitest-setup-client.ts']
-					}
-				},
-				{
-					extends: './vite.config.ts',
-					test: {
-						name: 'server',
-						environment: 'node',
-						include: ['src/**/*.{test,spec}.{js,ts}'],
-						exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
-					}
-				}
-			]
+		name: 'pdm-dev-port',
+		async config(_config, { command }) {
+			if (command !== 'serve' || process.env.VITEST) return;
+			return {
+				server: { host: DEV_HOST, port: await findDevPort(DEV_HOST, DEV_PORT), strictPort: true }
+			};
 		}
 	};
+}
+
+export default defineConfig({
+	plugins: [sveltekit(), devPortPlugin()],
+	resolve: {
+		alias: {
+			$styles: path.resolve('./src/styles')
+		}
+	},
+	css: {
+		preprocessorOptions: {
+			scss: {
+				additionalData: `@use '$styles/variables' as *;`
+			}
+		}
+	},
+	test: {
+		expect: { requireAssertions: true },
+		coverage: {
+			provider: 'v8',
+			include: [
+				'src/lib/server/music/**',
+				'src/lib/server/events/**',
+				'src/lib/server/media/validation.ts',
+				'src/lib/server/media/uploadTargetHandler.ts',
+				'src/lib/server/media/logging.ts',
+				'src/lib/server/security/**'
+			],
+			// Barrel re-exports and type-only modules carry no testable logic.
+			exclude: ['**/index.ts', '**/types.ts'],
+			thresholds: { lines: 90, branches: 90, functions: 90, statements: 90 }
+		},
+		projects: [
+			{
+				extends: './vite.config.ts',
+				test: {
+					name: 'client',
+					environment: 'browser',
+					browser: {
+						enabled: true,
+						provider: 'playwright',
+						instances: [{ browser: 'chromium' }]
+					},
+					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
+					exclude: ['src/lib/server/**'],
+					setupFiles: ['./vitest-setup-client.ts']
+				}
+			},
+			{
+				extends: './vite.config.ts',
+				test: {
+					name: 'server',
+					environment: 'node',
+					include: ['src/**/*.{test,spec}.{js,ts}'],
+					exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
+				}
+			}
+		]
+	}
 });

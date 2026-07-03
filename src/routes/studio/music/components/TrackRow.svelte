@@ -10,15 +10,15 @@
 		mdiEarth
 	} from '@mdi/js';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
-	import Badge from '$lib/ui/Badge.svelte';
 	import ProgressBar from '$lib/ui/ProgressBar.svelte';
 	import { resolveR2ImageUrl } from '$lib/utils/helpers';
-	import type { TrackDTO, TrackStatsDTO } from '$lib/server/music';
+	import { coverGradient } from './coverGradient';
+	import type { TrackDTO } from '$lib/server/music';
 	import type { TrackUploadJob } from '$lib/studio/music/types';
 
 	let {
 		track,
-		stats = null,
+		index = 0,
 		albumTitles = [],
 		inheritedFrom = null,
 		job = null,
@@ -29,7 +29,7 @@
 		onRetry
 	}: {
 		track: TrackDTO;
-		stats?: TrackStatsDTO | null;
+		index?: number;
 		albumTitles?: string[];
 		inheritedFrom?: 'album' | null;
 		job?: TrackUploadJob | null;
@@ -49,115 +49,106 @@
 	const coverSrc = $derived(
 		job?.coverPreviewUrl ?? (uploading ? null : resolveR2ImageUrl(track.imageKey))
 	);
+	const gated = $derived(track.visibility === 'subscribers_only');
 
 	function fmtDuration(sec: number | null) {
-		if (!sec) return '--:--';
+		if (!sec) return '—';
 		const m = Math.floor(sec / 60);
 		const s = sec % 60;
 		return `${m}:${s.toString().padStart(2, '0')}`;
 	}
-	const statusLabel = $derived(
+	const statusText = $derived(
 		job?.state === 'finalizing'
-			? 'Verifying'
+			? 'Verifying…'
 			: uploading
 				? `Uploading ${Math.round(job?.progress ?? 0)}%`
 				: failed
-					? 'Upload failed'
-					: track.isPublished
-						? 'Published'
-						: 'Draft'
-	);
-	const statusVariant = $derived(
-		uploading ? 'uploading' : failed ? 'failed' : track.isPublished ? 'published' : 'draft'
+					? (job?.error ?? 'Upload failed')
+					: null
 	);
 </script>
 
-<li class="track-row" class:busy={uploading} class:failed>
-	<div class="cover" class:dim={uploading || failed}>
+<li class="trow" class:busy={uploading} class:failed>
+	<span class="num">{uploading || failed ? '' : String(index).padStart(2, '0')}</span>
+
+	<span class="cov" class:dim={uploading || failed}>
 		{#if coverSrc}
-			<img src={coverSrc} alt={track.title} loading="lazy" />
+			<img src={coverSrc} alt="" loading="lazy" />
 		{:else}
-			<div class="cover-ph"><SvgIcon path={mdiMusicNote} size={18} /></div>
+			<span class="ph" style={uploading || failed ? '' : `background:${coverGradient(track.id)}`}>
+				{#if !uploading && !failed}<SvgIcon path={mdiMusicNote} size={16} />{/if}
+			</span>
 		{/if}
 		{#if uploading}
-			<span class="cover-overlay" aria-hidden="true"><SvgIcon path={mdiUpload} size={16} /></span>
+			<span class="ovl" aria-hidden="true"><SvgIcon path={mdiUpload} size={15} /></span>
 		{:else if failed}
 			<button
 				type="button"
-				class="cover-overlay retry"
+				class="ovl retry"
 				title="Retry upload"
-				aria-label={`Retry upload for ${track.title}`}
+				aria-label={`Retry ${track.title}`}
 				onclick={() => onRetry(track.id)}
 			>
-				<SvgIcon path={mdiRefresh} size={16} />
+				<SvgIcon path={mdiRefresh} size={15} />
 			</button>
 		{/if}
-	</div>
+	</span>
 
-	<div class="main">
-		<span class="title">{track.title}</span>
-		<span class="sub">
-			{#if albumTitles.length > 0}<span class="albums">{albumTitles.join(', ')}</span>{/if}
+	<span class="main">
+		<span class="nm">
+			{track.title}
+			{#if !track.isPublished && !uploading && !failed}<em class="draft">Draft</em>{/if}
 		</span>
+		{#if statusText}
+			<span class="status" role={failed ? 'alert' : 'status'}>{statusText}</span>
+		{:else if albumTitles.length > 0}
+			<span class="al">{albumTitles.join(', ')}</span>
+		{/if}
 		{#if uploading && job}
-			<span class="progress"
+			<span class="pbar"
 				><ProgressBar value={job.progress} label={`Uploading ${track.title}`} /></span
 			>
 		{/if}
-	</div>
+	</span>
 
-	<span class="dur">{fmtDuration(track.duration)}</span>
+	<span class="du">{fmtDuration(track.duration)}</span>
 
-	<span class="gate">
+	<button
+		type="button"
+		class="gpill"
+		class:on={gated}
+		aria-pressed={gated}
+		title={inheritedFrom
+			? 'Subscribers-only (inherited from album) — click to override'
+			: gated
+				? 'Subscribers-only — click to make public'
+				: 'Public — click to make subscribers-only'}
+		onclick={() => onVisibilityChange(track, gated ? 'public' : 'subscribers_only')}
+	>
+		{#if gated}
+			<SvgIcon path={mdiLock} size={13} /> {inheritedFrom ? 'Subscribers*' : 'Subscribers'}
+		{:else}
+			<SvgIcon path={mdiEarth} size={13} /> Public
+		{/if}
+	</button>
+
+	<span class="acts">
 		<button
 			type="button"
-			class="gate-toggle"
-			class:on={track.visibility === 'subscribers_only'}
-			title={inheritedFrom
-				? 'Subscribers-only (inherited from album) — click to override'
-				: track.visibility === 'subscribers_only'
-					? 'Subscribers-only — click to make public'
-					: 'Public — click to make subscribers-only'}
-			aria-pressed={track.visibility === 'subscribers_only'}
-			onclick={() =>
-				onVisibilityChange(
-					track,
-					track.visibility === 'subscribers_only' ? 'public' : 'subscribers_only'
-				)}
+			title="Link to album"
+			aria-label="Link to album"
+			onclick={() => onLink(track)}
 		>
-			{#if track.visibility === 'subscribers_only'}
-				<Badge
-					variant="gate"
-					label={inheritedFrom ? 'Subscribers*' : 'Subscribers'}
-					icon={mdiLock}
-				/>
-			{:else}
-				<span class="gate-public"><SvgIcon path={mdiEarth} size={14} /> Public</span>
-			{/if}
-		</button>
-	</span>
-
-	<span class="status">
-		<Badge variant={statusVariant} label={statusLabel} />
-	</span>
-
-	<span class="stats" aria-label="engagement">
-		<span title="Plays">{stats?.playCount ?? 0}</span>
-		<span title="Likes">{stats?.likeCount ?? 0}</span>
-		<span title="Saves">{stats?.saveCount ?? 0}</span>
-	</span>
-
-	<span class="actions">
-		<button type="button" class="icon-btn" title="Link to album" onclick={() => onLink(track)}>
 			<SvgIcon path={mdiLink} size={16} />
 		</button>
-		<button type="button" class="icon-btn" title="Edit track" onclick={() => onEdit(track)}>
+		<button type="button" title="Edit track" aria-label="Edit track" onclick={() => onEdit(track)}>
 			<SvgIcon path={mdiPencil} size={16} />
 		</button>
 		<button
 			type="button"
-			class="icon-btn danger"
+			class="danger"
 			title="Delete track"
+			aria-label="Delete track"
 			onclick={() => onDelete(track)}
 		>
 			<SvgIcon path={mdiDelete} size={16} />
@@ -166,56 +157,54 @@
 </li>
 
 <style lang="scss">
-	.track-row {
+	.trow {
 		display: grid;
-		grid-template-columns: 48px minmax(0, 2fr) 56px auto auto auto auto;
+		grid-template-columns: 34px 44px minmax(0, 1fr) 56px 150px 108px;
 		align-items: center;
-		gap: var(--space-3);
-		padding: var(--space-3) var(--space-4);
-		background: var(--bg-surface);
-		border: 1px solid var(--border-primary);
-		border-radius: var(--radius-md);
-		transition:
-			background var(--duration-fast),
-			border-color var(--duration-fast);
-
-		&:hover {
-			background: var(--bg-secondary);
-			border-color: var(--border-secondary, var(--border-focus));
-		}
-		&:focus-within {
-			border-color: var(--border-focus);
-		}
+		gap: 18px;
+		padding: 13px 26px;
+		border-top: 1px solid var(--border-primary);
+	}
+	.trow:hover {
+		background: var(--bg-secondary);
+	}
+	.trow:focus-within {
+		background: var(--bg-secondary);
 	}
 
-	.cover {
-		position: relative;
-		width: 48px;
-		height: 48px;
-		border-radius: var(--radius-sm);
-		overflow: hidden;
-		background: var(--bg-tertiary);
-		flex-shrink: 0;
+	.num {
+		color: var(--text-tertiary);
+		font-size: 14px;
+		font-variant-numeric: tabular-nums;
+		text-align: center;
+	}
 
-		img {
+	.cov {
+		position: relative;
+		width: 44px;
+		height: 44px;
+		border-radius: 8px;
+		overflow: hidden;
+		img,
+		.ph {
+			position: absolute;
+			inset: 0;
 			width: 100%;
 			height: 100%;
 			object-fit: cover;
-			display: block;
-		}
-		.cover-ph {
-			width: 100%;
-			height: 100%;
 			display: flex;
 			align-items: center;
 			justify-content: center;
-			color: var(--text-tertiary);
+			color: rgba(255, 255, 255, 0.8);
 		}
 		&.dim img,
-		&.dim .cover-ph {
-			filter: brightness(0.55);
+		&.dim .ph {
+			filter: brightness(0.5);
 		}
-		.cover-overlay {
+		.ph {
+			background: var(--bg-tertiary);
+		}
+		.ovl {
 			position: absolute;
 			inset: 0;
 			display: flex;
@@ -226,7 +215,7 @@
 			border: 0;
 			cursor: default;
 		}
-		.cover-overlay.retry {
+		.ovl.retry {
 			cursor: pointer;
 			&:focus-visible {
 				outline: 2px solid var(--border-focus);
@@ -238,135 +227,147 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
-
-		.title {
-			font-size: var(--font-size-base);
-			font-weight: var(--font-weight-medium);
+		gap: 3px;
+		.nm {
+			font-size: 15px;
+			font-weight: 600;
 			color: var(--text-primary);
 			overflow: hidden;
 			text-overflow: ellipsis;
 			white-space: nowrap;
+			display: flex;
+			align-items: center;
+			gap: 8px;
 		}
-		.sub {
-			font-size: var(--font-size-xs);
+		.draft {
+			font-style: normal;
+			font-size: 10px;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+			color: var(--text-tertiary);
+			background: var(--bg-tertiary);
+			padding: 2px 6px;
+			border-radius: 5px;
+		}
+		.al {
+			font-size: 12px;
 			color: var(--text-tertiary);
 			overflow: hidden;
 			text-overflow: ellipsis;
 			white-space: nowrap;
 		}
-		.progress {
-			margin-top: var(--space-1);
-			display: block;
-			max-width: 220px;
+		.status {
+			font-size: 12px;
+			color: var(--gate-tint-text);
+		}
+		.pbar {
+			max-width: 240px;
 		}
 	}
+	.trow.failed .status {
+		color: var(--status-failed-text);
+	}
 
-	.dur {
-		font-size: var(--font-size-sm);
-		color: var(--text-secondary);
-		font-variant-numeric: tabular-nums;
+	.du {
 		text-align: right;
-	}
-
-	.gate-toggle {
-		border: 0;
-		background: transparent;
-		padding: 0;
-		cursor: pointer;
-		display: inline-flex;
-		border-radius: var(--radius-sm);
-
-		&:focus-visible {
-			outline: 2px solid var(--border-focus);
-			outline-offset: 2px;
-		}
-		.gate-public {
-			display: inline-flex;
-			align-items: center;
-			gap: var(--space-1);
-			font-size: var(--font-size-xs);
-			color: var(--text-tertiary);
-			padding: var(--space-1) var(--space-2);
-			border-radius: var(--radius-sm);
-		}
-		&:hover .gate-public {
-			color: var(--text-secondary);
-			background: var(--bg-tertiary);
-		}
-	}
-
-	.stats {
-		display: flex;
-		gap: var(--space-3);
-		font-size: var(--font-size-sm);
+		font-size: 14px;
 		color: var(--text-secondary);
 		font-variant-numeric: tabular-nums;
 	}
 
-	.actions {
-		display: inline-flex;
-		gap: var(--space-1);
-	}
-
-	.icon-btn {
+	.gpill {
+		justify-self: start;
 		display: inline-flex;
 		align-items: center;
-		justify-content: center;
-		width: 32px;
-		height: 32px;
+		gap: 6px;
 		border: 1px solid var(--border-primary);
-		border-radius: var(--radius-sm);
-		background: transparent;
+		background: var(--bg-tertiary);
+		padding: 6px 12px;
+		border-radius: 999px;
+		font-size: 12px;
 		color: var(--text-secondary);
 		cursor: pointer;
+		white-space: nowrap;
 		transition:
 			background var(--duration-fast),
 			color var(--duration-fast);
 
-		&:hover {
-			background: var(--bg-tertiary);
-			color: var(--text-primary);
+		&.on {
+			background: var(--gate-tint-bg);
+			color: var(--gate-tint-text);
+			border-color: transparent;
 		}
 		&:focus-visible {
 			outline: 2px solid var(--border-focus);
-			outline-offset: 1px;
-		}
-		&.danger:hover {
-			color: var(--color-error-500);
+			outline-offset: 2px;
 		}
 	}
 
-	/* Mobile: collapse the grid into a card */
-	@media (max-width: 900px) {
-		.track-row {
-			grid-template-columns: 48px 1fr auto;
-			grid-template-areas:
-				'cover main actions'
-				'gate gate gate'
-				'stats status dur';
-			row-gap: var(--space-2);
+	.acts {
+		display: inline-flex;
+		gap: 4px;
+		justify-self: end;
+		opacity: 0;
+		transition: opacity var(--duration-fast);
+
+		button {
+			width: 32px;
+			height: 32px;
+			border: 0;
+			border-radius: 8px;
+			background: transparent;
+			color: var(--text-secondary);
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			&:hover {
+				background: var(--bg-tertiary);
+				color: var(--text-primary);
+			}
+			&.danger:hover {
+				color: var(--color-error-300);
+			}
+			&:focus-visible {
+				outline: 2px solid var(--border-focus);
+				opacity: 1;
+			}
 		}
-		.cover {
-			grid-area: cover;
+	}
+	.trow:hover .acts,
+	.trow:focus-within .acts {
+		opacity: 1;
+	}
+
+	@media (max-width: 760px) {
+		.trow {
+			grid-template-columns: 44px minmax(0, 1fr) auto;
+			grid-template-areas:
+				'cov main acts'
+				'cov gate du';
+			gap: 6px 14px;
+			padding: 12px 16px;
+		}
+		.num {
+			display: none;
+		}
+		.cov {
+			grid-area: cov;
 		}
 		.main {
 			grid-area: main;
 		}
-		.actions {
-			grid-area: actions;
+		.acts {
+			grid-area: acts;
+			opacity: 1;
 		}
-		.gate {
+		.gpill {
 			grid-area: gate;
 		}
-		.status {
-			grid-area: status;
-		}
-		.stats {
-			grid-area: stats;
-		}
-		.dur {
-			grid-area: dur;
+		.du {
+			grid-area: du;
+			text-align: right;
+			align-self: center;
 		}
 	}
 </style>

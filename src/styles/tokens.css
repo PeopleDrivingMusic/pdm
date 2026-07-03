@@ -514,3 +514,7 @@
 	--selection-bg: rgba(255, 178, 0, 0.1);
 	--toolbar-bg: var(--bg-primary);
 }
+
+:root {
+	--font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+}

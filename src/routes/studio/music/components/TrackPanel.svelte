@@ -38,37 +38,33 @@
 			.map((at) => albumTitles[at.albumId])
 			.filter(Boolean) as string[];
 	}
-	// A track is "inherited" when it belongs to a subscribers-only album.
 	function inheritedFrom(trackId: string): 'album' | null {
-		const gated = albumTracks.some(
+		return albumTracks.some(
 			(at) => at.trackId === trackId && albumVisibility[at.albumId] === 'subscribers_only'
-		);
-		return gated ? 'album' : null;
+		)
+			? 'album'
+			: null;
 	}
 </script>
 
-{#if tracks.length === 0}
-	<div class="empty">
-		<SvgIcon path={mdiMusicNote} size={44} />
-		<p>No tracks yet</p>
-		<Button onClick={onUpload}>Upload your first track</Button>
-	</div>
-{:else}
-	<div class="table-scroll">
-		<div class="thead" aria-hidden="true">
-			<span></span>
-			<span>Title</span>
-			<span class="r">Time</span>
-			<span>Visibility</span>
-			<span>Status</span>
-			<span>Plays · Likes · Saves</span>
-			<span></span>
+<section class="panel">
+	<header class="ph">
+		<h2>Tracks</h2>
+		<span class="count">{tracks.length} total</span>
+	</header>
+
+	{#if tracks.length === 0}
+		<div class="empty">
+			<SvgIcon path={mdiMusicNote} size={40} />
+			<p>No tracks yet</p>
+			<Button onClick={onUpload}>Upload your first track</Button>
 		</div>
-		<ul class="track-list">
-			{#each tracks as { track, stats } (track.id)}
+	{:else}
+		<ul class="rows">
+			{#each tracks as { track }, i (track.id)}
 				<TrackRow
 					{track}
-					{stats}
+					index={i + 1}
 					albumTitles={albumsFor(track.id)}
 					inheritedFrom={inheritedFrom(track.id)}
 					job={jobsById[track.id] ?? null}
@@ -80,55 +76,46 @@
 				/>
 			{/each}
 		</ul>
-	</div>
-{/if}
+	{/if}
+</section>
 
 <style lang="scss">
-	.table-scroll {
-		overflow-x: auto;
+	.panel {
+		background: var(--bg-surface);
+		border: 1px solid var(--border-primary);
+		border-radius: 20px;
+		overflow: hidden;
 	}
-
-	.thead {
-		display: grid;
-		grid-template-columns: 48px minmax(0, 2fr) 56px auto auto auto auto;
-		align-items: center;
-		gap: var(--space-3);
-		padding: 0 var(--space-4) var(--space-2);
-		font-size: var(--font-size-xs);
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: var(--text-tertiary);
-
-		.r {
-			text-align: right;
+	.ph {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		padding: 22px 26px 14px;
+		h2 {
+			margin: 0;
+			font-family: var(--font-serif);
+			font-size: 26px;
+			font-weight: 700;
+			color: var(--text-primary);
 		}
-
-		@media (max-width: 900px) {
-			display: none;
+		.count {
+			color: var(--text-tertiary);
+			font-size: 13px;
 		}
 	}
-
-	.track-list {
+	.rows {
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
 	}
-
 	.empty {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: var(--space-4);
 		padding: var(--space-12) var(--space-8);
-		border: 2px dashed var(--border-primary);
-		border-radius: var(--radius-lg);
-		background: var(--bg-secondary);
 		color: var(--text-tertiary);
 		text-align: center;
-
 		p {
 			margin: 0;
 			color: var(--text-secondary);

@@ -5,15 +5,13 @@
 	import { mdiPlus, mdiUpload } from '@mdi/js';
 	import Button from '$lib/ui/Button.svelte';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
-	import UploadDropzone from '$lib/ui/UploadDropzone.svelte';
 	import { notificationStore } from '$lib/stores/notification.svelte';
 	import { extractTrackMetadata, type ClientMediaUploadTarget } from '$lib/utils/helpers';
 	import { createUploadController } from '$lib/studio/music/uploadController.svelte';
 	import type { TrackUploadJob } from '$lib/studio/music/types';
 	import type { StudioMusicOverviewDTO, TrackDTO, AlbumDTO } from '$lib/server/music';
-	import MusicStatsBar from './MusicStatsBar.svelte';
-	import AlbumGrid from './AlbumGrid.svelte';
-	import TrackList from './TrackList.svelte';
+	import AlbumBento from './AlbumBento.svelte';
+	import TrackPanel from './TrackPanel.svelte';
 	import UploadDock from './UploadDock.svelte';
 	import AlbumFormModal from './AlbumFormModal.svelte';
 	import TrackFormModal from './TrackFormModal.svelte';
@@ -27,9 +25,6 @@
 	const albums = $derived(data.albums);
 	const tracks = $derived(data.tracks);
 	const albumTracks = $derived(data.albumTracks);
-	const trackTitles = $derived(
-		Object.fromEntries(tracks.map(({ track }) => [track.id, track.title]))
-	);
 	const albumTitles = $derived(Object.fromEntries(albums.map((a) => [a.id, a.title])));
 	const albumVisibility = $derived(Object.fromEntries(albums.map((a) => [a.id, a.visibility])));
 	const jobsById = $derived(
@@ -38,9 +33,7 @@
 			TrackUploadJob
 		>
 	);
-
-	type Tab = 'all' | 'albums' | 'tracks';
-	let tab = $state<Tab>('all');
+	const fmt = (n: number) => n.toLocaleString();
 
 	// modal state
 	let albumModalOpen = $state(false);
@@ -50,13 +43,14 @@
 	let linkModalOpen = $state(false);
 	let linkingTrackId = $state('');
 
+	let fileInput: HTMLInputElement;
+
 	async function submitAction(action: string, formData: FormData) {
 		const res = await fetch(action, { method: 'POST', body: formData });
 		const result = deserialize(await res.text());
 		if (result.type === 'success') return (result.data ?? {}) as Record<string, unknown>;
 		if (result.type === 'failure') {
-			const err = (result.data as { error?: string } | undefined)?.error;
-			throw new Error(err || 'Request failed');
+			throw new Error((result.data as { error?: string } | undefined)?.error || 'Request failed');
 		}
 		throw new Error('Request failed');
 	}
@@ -139,18 +133,6 @@
 		}
 	}
 
-	async function unlinkTrack(albumId: string, trackId: string) {
-		try {
-			const fd = new FormData();
-			fd.set('albumId', albumId);
-			fd.set('trackId', trackId);
-			await submitAction('?/unlinkTrackFromAlbum', fd);
-			await invalidateAll();
-		} catch (e) {
-			notificationStore.error(e instanceof Error ? e.message : 'Could not unlink track');
-		}
-	}
-
 	function openCreateAlbum() {
 		editingAlbum = null;
 		albumModalOpen = true;
@@ -167,27 +149,28 @@
 		linkingTrackId = track.id;
 		linkModalOpen = true;
 	}
-
-	let fileInput: HTMLInputElement;
-	function pickFiles() {
-		fileInput?.click();
-	}
 </script>
 
 <svelte:head><title>Music · Studio · PDM</title></svelte:head>
 
 <section class="page">
-	<header class="page-head">
-		<div>
+	<!-- MASTHEAD -->
+	<header class="masthead">
+		<div class="lead">
+			<div class="kicker">People Driving Music — Studio</div>
 			<h1>Music</h1>
-			<p class="sub">Manage your albums and tracks, and control who can listen.</p>
+			<div class="sub">
+				<b>{fmt(data.stats.totalTracks)}</b> tracks · <b>{fmt(data.stats.totalAlbums)}</b> albums ·
+				<b>{fmt(data.stats.subscribersOnly)}</b>
+				subscriber-only · <b>{fmt(data.stats.totalPlays)}</b> plays
+			</div>
 		</div>
-		<div class="head-actions">
-			<Button variant="secondary" onClick={pickFiles}>
-				<SvgIcon path={mdiUpload} size={18} /> Upload tracks
-			</Button>
-			<Button onClick={openCreateAlbum}>
+		<div class="acts">
+			<Button variant="secondary" onClick={openCreateAlbum}>
 				<SvgIcon path={mdiPlus} size={18} /> New album
+			</Button>
+			<Button onClick={() => fileInput.click()}>
+				<SvgIcon path={mdiUpload} size={18} /> Upload
 			</Button>
 			<input
 				bind:this={fileInput}
@@ -204,59 +187,30 @@
 		</div>
 	</header>
 
-	<MusicStatsBar stats={data.stats} />
+	<div class="eyebrow">Albums · {albums.length}</div>
+	<AlbumBento
+		{albums}
+		{albumTracks}
+		stats={data.stats}
+		onEdit={openEditAlbum}
+		onDelete={deleteAlbum}
+		onCreate={openCreateAlbum}
+		{onFiles}
+	/>
 
-	<div class="dropzone-wrap">
-		<UploadDropzone accept="audio/*" maxSizeMb={100} {onFiles} />
-	</div>
-
-	<nav class="tabs" aria-label="Catalog view">
-		{#each [['all', 'All'], ['albums', 'Albums'], ['tracks', 'Tracks']] as [id, label] (id)}
-			<button
-				type="button"
-				role="tab"
-				aria-selected={tab === id}
-				class:active={tab === id}
-				onclick={() => (tab = id as Tab)}
-			>
-				{label}
-			</button>
-		{/each}
-	</nav>
-
-	{#if tab === 'all' || tab === 'albums'}
-		<div class="section">
-			<h2>Albums <span class="muted">({albums.length})</span></h2>
-			<AlbumGrid
-				{albums}
-				{albumTracks}
-				{trackTitles}
-				onEdit={openEditAlbum}
-				onDelete={deleteAlbum}
-				onUnlinkTrack={unlinkTrack}
-				onCreate={openCreateAlbum}
-			/>
-		</div>
-	{/if}
-
-	{#if tab === 'all' || tab === 'tracks'}
-		<div class="section">
-			<h2>Tracks <span class="muted">({tracks.length})</span></h2>
-			<TrackList
-				{tracks}
-				{albumTracks}
-				{albumTitles}
-				{albumVisibility}
-				{jobsById}
-				onEdit={openEditTrack}
-				onDelete={deleteTrack}
-				onLink={openLink}
-				onVisibilityChange={changeTrackVisibility}
-				onRetry={(id) => controller.retryTrackUpload(id)}
-				onUpload={pickFiles}
-			/>
-		</div>
-	{/if}
+	<TrackPanel
+		{tracks}
+		{albumTracks}
+		{albumTitles}
+		{albumVisibility}
+		{jobsById}
+		onEdit={openEditTrack}
+		onDelete={deleteTrack}
+		onLink={openLink}
+		onVisibilityChange={changeTrackVisibility}
+		onRetry={(id) => controller.retryTrackUpload(id)}
+		onUpload={() => fileInput.click()}
+	/>
 </section>
 
 <UploadDock
@@ -271,101 +225,76 @@
 
 <style lang="scss">
 	.page {
-		padding: var(--space-8);
-		max-width: 1400px;
+		max-width: 1180px;
 		margin: 0 auto;
+		padding: 40px 48px 90px;
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-6);
+		gap: 34px;
 
 		@media (max-width: 768px) {
-			padding: var(--space-4);
-			gap: var(--space-4);
+			padding: 24px 18px 80px;
+			gap: 24px;
 		}
 	}
 
-	.page-head {
+	.masthead {
 		display: flex;
+		align-items: flex-end;
 		justify-content: space-between;
-		align-items: flex-start;
 		gap: var(--space-4);
+		border-bottom: 1px solid var(--border-primary);
+		padding-bottom: 22px;
 
+		.kicker {
+			font-size: 12px;
+			letter-spacing: 0.2em;
+			text-transform: uppercase;
+			color: var(--gate-tint-text);
+			margin-bottom: 12px;
+		}
 		h1 {
 			margin: 0;
-			font-size: var(--font-size-3xl);
-			font-weight: var(--font-weight-bold);
+			font-family: var(--font-serif);
+			font-size: 58px;
+			line-height: 0.95;
+			font-weight: 700;
+			letter-spacing: -0.01em;
 			color: var(--text-primary);
 		}
 		.sub {
-			margin: var(--space-1) 0 0;
-			color: var(--text-secondary);
-			font-size: var(--font-size-sm);
+			margin-top: 12px;
+			color: var(--text-tertiary);
+			font-size: 14px;
+			font-variant-numeric: tabular-nums;
+			b {
+				color: var(--text-secondary);
+				font-weight: 600;
+			}
 		}
-		.head-actions {
+		.acts {
 			display: flex;
-			gap: var(--space-3);
+			gap: 12px;
 			flex-shrink: 0;
 		}
 
 		@media (max-width: 768px) {
 			flex-direction: column;
-			.head-actions {
-				width: 100%;
+			align-items: stretch;
+			h1 {
+				font-size: 44px;
+			}
+			.acts {
+				margin-top: 8px;
 			}
 		}
 	}
 
-	.dropzone-wrap {
-		max-width: 640px;
-	}
-
-	.tabs {
-		display: flex;
-		gap: var(--space-1);
-		border-bottom: 1px solid var(--border-primary);
-
-		button {
-			border: 0;
-			background: transparent;
-			padding: var(--space-3) var(--space-4);
-			color: var(--text-secondary);
-			font-size: var(--font-size-sm);
-			font-weight: var(--font-weight-medium);
-			cursor: pointer;
-			border-bottom: 2px solid transparent;
-			margin-bottom: -1px;
-			transition:
-				color var(--duration-fast),
-				border-color var(--duration-fast);
-
-			&:hover {
-				color: var(--text-primary);
-			}
-			&.active {
-				color: var(--color-brand-400);
-				border-bottom-color: var(--color-brand-400);
-			}
-			&:focus-visible {
-				outline: 2px solid var(--border-focus);
-				outline-offset: -2px;
-			}
-		}
-	}
-
-	.section {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
-
-		h2 {
-			margin: 0;
-			font-size: var(--font-size-xl);
-			font-weight: var(--font-weight-semibold);
-			color: var(--text-primary);
-			.muted {
-				color: var(--text-tertiary);
-				font-weight: var(--font-weight-normal);
-			}
-		}
+	.eyebrow {
+		font-size: 12px;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--text-tertiary);
+		margin: 0 2px -16px;
 	}
 </style>
