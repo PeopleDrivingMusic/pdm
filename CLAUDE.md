@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**PDM (People Driving Music)** is first and foremost a **music-social platform** — everything is built around music and musical content. Anyone can listen for free; a fan who wants more subscribes to a specific artist for **$1/mo** to unlock exclusive content and platform perks (the artist's shared fan chat, offline caching of that artist, no ads on that artist, ticket presale access, etc.).
+**PDM (People Driven Music)** is first and foremost a **music-social platform** — everything is built around music and musical content. Anyone can listen for free; a fan who wants more subscribes to a specific artist for **$1/mo** to unlock exclusive content and platform perks (the artist's shared fan chat, offline caching of that artist, no ads on that artist, ticket presale access, etc.).
 
 The core mechanics the product is built around:
 - **Listening** — music playback with all its features.

@@ -1,6 +1,6 @@
 # PDM Database Setup
 
-This document describes the database setup for the People Driving Music (PDM) project using PostgreSQL and Drizzle ORM.
+This document describes the database setup for the People Driven Music (PDM) project using PostgreSQL and Drizzle ORM.
 
 ## Prerequisites
 
