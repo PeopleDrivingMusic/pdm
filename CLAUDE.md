@@ -24,7 +24,7 @@ The **`.claude/` directory is the project's AI knowledge base — the user's "se
 - For questions about product/business/architecture, **consult the wiki first** (start at `.claude/wiki/home.md`).
 - When you learn something durable about the project, **file it into the wiki** per `.claude/wiki/WIKI.md` (project knowledge, distinct from memory below).
 
-**Memory (hard rule)** — Claude Code memory **lives in the project at `.claude/memory/`, NOT only on the local machine.** It is part of the `pdm-claude` repo. The harness's machine-local memory path is merely a working location; **`.claude/memory/` is memory's canonical, version-controlled home.** After **any** memory change, mirror it into `.claude/memory/` and commit/push `pdm-claude` so nothing ever lives only locally.
+**Memory (hard rule)** — Claude Code memory **lives in the project at `.claude/memory/`, NOT only on the local machine.** The harness's machine-local memory path is a **directory symlink → `.claude/memory/`** (part of the `pdm-claude` repo), so every memory write lands directly in the repo folder — no manual mirroring. After **any** memory change, just **commit/push `pdm-claude`** so nothing ever lives only locally. (If the symlink is ever missing, recreate it with `cmd /c mklink /D` — not PowerShell 5.1's `New-Item`.)
 
 ## Commands
 
