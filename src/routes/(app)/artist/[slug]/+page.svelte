@@ -419,6 +419,7 @@
 
 	.hero {
 		overflow: hidden;
+		position: relative;
 		border-radius: var(--radius-xl, 24px);
 		background:
 			radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 34%),
@@ -433,20 +434,25 @@
 			linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.34)),
 			linear-gradient(135deg, var(--bg-tertiary), var(--bg-primary));
 		background-size: cover;
-		background-position: center;
+		background-position: top;
 		position: relative;
 
 		&::after {
 			content: '';
 			position: absolute;
-			inset: 18% 0 0;
-			background: linear-gradient(180deg, transparent 8%, color-mix(in srgb, var(--bg-primary) 92%, transparent));
+			inset: 0;
+			pointer-events: none;
+			background: linear-gradient(
+				180deg,
+				transparent 55%,
+				color-mix(in srgb, var(--bg-primary) 88%, transparent)
+			);
 		}
 	}
 
 	.hero-content {
-		margin-top: -64px;
-		position: relative;
+		position: absolute;
+		bottom: 0;
 		z-index: 1;
 		display: flex;
 		justify-content: space-between;
