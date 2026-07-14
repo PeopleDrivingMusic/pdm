@@ -15,12 +15,16 @@ A later phase adds **fintech** (royalty crowdfunding / micro-investment in track
 
 Two distinct audiences share one app: **listeners** (the public app) and **artists** (the Studio dashboard).
 
-## Project Wiki
+## Project Knowledge Base & Memory (`.claude/`)
 
-Product, business, architecture, and domain knowledge live in an LLM-maintained wiki at **`.claude/wiki/`**. It is the single source of truth for the "why" behind PDM (strategy, economic model, system design, decisions). Read `.claude/wiki/WIKI.md` for how it is organized and maintained, and `.claude/wiki/index.md` to locate pages.
+The **`.claude/` directory is the project's AI knowledge base — the user's "second brain" for this project** (LLM-maintained wiki, business docs, and Claude Code memory, plus any future agents/skills). It is **gitignored in this repo** and version-controlled **separately** in the private repo **`PeopleDrivingMusic/pdm-claude`** — a nested git repo living inside `.claude/`. Commit/push anything under `.claude/` from **inside** that folder (`git -C .claude …`), never through the main repo (which ignores it, including `.claude/.git`).
+
+**Wiki** — product, business, architecture, and domain knowledge live at **`.claude/wiki/`**, the single source of truth for the "why" behind PDM (strategy, economic model, system design, decisions). Read `.claude/wiki/WIKI.md` for how it is organized, `.claude/wiki/index.md` to locate pages.
 
 - For questions about product/business/architecture, **consult the wiki first** (start at `.claude/wiki/home.md`).
-- When you learn something durable about the project, **file it into the wiki** per `.claude/wiki/WIKI.md` (this is project knowledge, distinct from Claude Code `memory/`, which is about the user and working context).
+- When you learn something durable about the project, **file it into the wiki** per `.claude/wiki/WIKI.md` (project knowledge, distinct from memory below).
+
+**Memory (hard rule)** — Claude Code memory **lives in the project at `.claude/memory/`, NOT only on the local machine.** It is part of the `pdm-claude` repo. The harness's machine-local memory path is merely a working location; **`.claude/memory/` is memory's canonical, version-controlled home.** After **any** memory change, mirror it into `.claude/memory/` and commit/push `pdm-claude` so nothing ever lives only locally.
 
 ## Commands
 
