@@ -183,6 +183,73 @@ export const cacheMisses = getMetric(
 		})
 );
 
+// Media upload pipeline metrics
+export const mediaUploadStartedTotal = getMetric(
+	'media_upload_started_total',
+	() =>
+		new Counter({
+			name: 'media_upload_started_total',
+			help: 'Media uploads started',
+			labelNames: ['kind'],
+			registers: [register]
+		})
+);
+
+export const mediaUploadFinalizedTotal = getMetric(
+	'media_upload_finalized_total',
+	() =>
+		new Counter({
+			name: 'media_upload_finalized_total',
+			help: 'Media uploads finalized',
+			labelNames: ['kind', 'result'],
+			registers: [register]
+		})
+);
+
+export const mediaUploadFailedTotal = getMetric(
+	'media_upload_failed_total',
+	() =>
+		new Counter({
+			name: 'media_upload_failed_total',
+			help: 'Media uploads failed',
+			labelNames: ['kind', 'reason'],
+			registers: [register]
+		})
+);
+
+export const mediaUploadDuration = getMetric(
+	'media_upload_duration_seconds',
+	() =>
+		new Histogram({
+			name: 'media_upload_duration_seconds',
+			help: 'Upload create-to-finalize duration',
+			labelNames: ['kind'],
+			buckets: [1, 5, 15, 30, 60, 120, 300, 600],
+			registers: [register]
+		})
+);
+
+export const mediaPendingUploads = getMetric(
+	'media_pending_uploads',
+	() =>
+		new Gauge({
+			name: 'media_pending_uploads',
+			help: 'Tracks awaiting upload completion',
+			registers: [register]
+		})
+);
+
+export const r2ErrorsTotal = getMetric(
+	'r2_errors_total',
+	() =>
+		new Counter({
+			name: 'r2_errors_total',
+			help: 'R2 operation errors',
+			labelNames: ['op'],
+			registers: [register]
+		})
+);
+
 // Error metrics
 export const errorsTotal = getMetric(
 	'errors_total',
@@ -251,6 +318,30 @@ export class MetricsCollector {
 
 	static recordError(errorType: string, component: string) {
 		errorsTotal.inc({ error_type: errorType, component });
+	}
+
+	static recordUploadStarted(kind: string) {
+		mediaUploadStartedTotal.inc({ kind });
+	}
+
+	static recordUploadFinalized(kind: string, result: 'success' | 'failure') {
+		mediaUploadFinalizedTotal.inc({ kind, result });
+	}
+
+	static recordUploadFailed(kind: string, reason: string) {
+		mediaUploadFailedTotal.inc({ kind, reason });
+	}
+
+	static observeUploadDuration(kind: string, seconds: number) {
+		mediaUploadDuration.observe({ kind }, seconds);
+	}
+
+	static setPendingUploads(n: number) {
+		mediaPendingUploads.set(n);
+	}
+
+	static recordR2Error(op: string) {
+		r2ErrorsTotal.inc({ op });
 	}
 
 	static updateMemoryUsage() {

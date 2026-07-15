@@ -1,6 +1,6 @@
-# People Driving Music (PDM)
+# People Driven Music (PDM)
 
-Welcome to **People Driving Music (PDM)**, a revolutionary platform designed to unite people through music and WEB3 technology.
+Welcome to **People Driven Music (PDM)**, a revolutionary platform designed to unite people through music and WEB3 technology.
 
 ## About the Project
 

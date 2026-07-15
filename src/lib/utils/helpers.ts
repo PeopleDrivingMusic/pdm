@@ -25,7 +25,7 @@ export interface ClientMultipartUploadTarget {
 }
 
 export interface ClientMediaUploadTarget {
-	kind: 'track-audio' | 'track-cover' | 'content-photo';
+	kind: 'track-audio' | 'track-cover' | 'album-cover' | 'content-photo';
 	bucket: 'music' | 'images';
 	key: string;
 	contentType: string;
@@ -162,7 +162,9 @@ export async function uploadR2Target(input: {
 		});
 
 		if (!response.etag) {
-			throw new Error('R2 did not expose ETag for multipart upload. Check bucket CORS exposeHeaders.');
+			throw new Error(
+				'R2 did not expose ETag for multipart upload. Check bucket CORS exposeHeaders.'
+			);
 		}
 
 		uploadedBytes += blob.size;
