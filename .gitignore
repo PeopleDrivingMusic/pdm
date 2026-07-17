@@ -1,6 +1,10 @@
 test-results
 node_modules
 
+# yarn.lock is the source of truth; an npm lockfile drifts and double-reports
+# every Dependabot alert.
+package-lock.json
+
 # Output
 .output
 .vercel
