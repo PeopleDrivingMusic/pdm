@@ -10,14 +10,16 @@
 	}
 
 	let { data }: Props = $props();
-	const { user } = $derived(data);
+	const { profileUser, user: currentUser } = $derived(data);
 
 	const viewsMap: { [key: string]: any } = {
 		overview: Overview,
 		affiliate: Affiliate
 	};
 
-	const tabs = [
+	type ProfileTab = { id: string; label: string };
+
+	const tabs: ProfileTab[] = [
 		{ id: 'overview', label: 'Overview' },
 		{ id: 'playlists', label: 'Playlists' },
 		{ id: 'subscriptions', label: 'Subscriptions' },
@@ -27,15 +29,15 @@
 	let activeTab = $state(tabs[0]);
 	const activeTabId = $derived(activeTab?.id);
 	let ViewComponent = $derived(viewsMap[activeTabId]);
-	$inspect(user);
-	function handleTabChange(tab) {
+	$inspect(profileUser);
+	function handleTabChange(tab: ProfileTab) {
 		activeTab = tab;
 	}
 </script>
 
 <div class="profile-page">
 	<!-- Header Section -->
-	<ProfileHeader {user} />
+	<ProfileHeader user={profileUser} {currentUser} />
 
 	<!-- Tabs Section -->
 	<section class="profile-tabs-wrapper">

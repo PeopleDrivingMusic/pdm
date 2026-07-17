@@ -1,234 +1,326 @@
-import { pgTable, serial, text, varchar, timestamp, boolean, integer, jsonb, uuid, numeric, decimal } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
-
-// Users table
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  email: varchar('email', { length: 255 }).notNull().unique(),
-  username: varchar('username', { length: 50 }).unique(),
-  displayName: varchar('display_name', { length: 100 }),
-  avatarUrl: text('avatar_url'),
-  bio: text('bio'),
-  walletAddress: varchar('wallet_address', { length: 100 }),
-  isVerified: boolean('is_verified').default(false),
-  // OAuth fields
-  googleId: varchar('google_id', { length: 255 }),
-  // Password-based auth (optional)
-  hashedPassword: text('hashed_password'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  trust_score: decimal('trust_score', { precision: 3, scale: 2 }).default('0.00').notNull(),
-});
-
-// Sessions table for Lucia auth
-export const sessions = pgTable('sessions', {
-  id: text('id').primaryKey(),
-  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-// Artists table
-export const artists = pgTable('artists', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id),
-  name: varchar('name', { length: 100 }).notNull(),
-  slug: varchar('slug', { length: 100 }).notNull().unique(),
-  coverImg: text('cover_img'),
-  avatar: text('avatar'),
-  genre: varchar('genre', { length: 50 }),
-  description: text('description'),
-  socialLinks: jsonb('social_links'), // JSON object for social media links
-  isActive: boolean('is_active').default(true),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-
-// Albums table
-export const albums = pgTable('albums', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  artistId: uuid('artist_id').notNull().references(() => artists.id),
-  title: varchar('title', { length: 200 }).notNull(),
-  description: text('description'),
-  coverImageUrl: text('cover_image_url'),
-  releaseDate: timestamp('release_date'),
-  price: integer('price'), // Price in cents or smallest currency unit
-  isPublished: boolean('is_published').default(false),
-  metadata: jsonb('metadata'), // Additional metadata (blockchain info, etc.)
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-
-// Tracks table
-export const tracks = pgTable('tracks', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  albumId: uuid('album_id').references(() => albums.id),
-  artistId: uuid('artist_id').notNull().references(() => artists.id),
-  title: varchar('title', { length: 200 }).notNull(),
-  duration: integer('duration'), // Duration in seconds
-  audioUrl: text('audio_url'),
-  lyrics: text('lyrics'),
-  clipUrl: text('clip_url'),
-  imageUrl: text('image_url'), // Track cover image URL,
-  trackNumber: integer('track_number'),
-  genre: jsonb('genres').$type<string[]>(),
-  isPublished: boolean('is_published').default(false),
-  metadata: jsonb('metadata'), // Blockchain info, IPFS hash, etc.
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-
-// Track analytics/stats table
-export const trackStats = pgTable('track_stats', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  trackId: uuid('track_id').notNull().unique().references(() => tracks.id, { onDelete: 'cascade' }),
-  likeCount: integer('like_count').default(0).notNull(),
-  playCount: integer('play_count').default(0).notNull(),
-  saveCount: integer('save_count').default(0).notNull(), // Number of times users saved the track to favorites or playlists
-  commentCount: integer('comment_count').default(0).notNull(),
-  lastUpdated: timestamp('last_updated').defaultNow().notNull(),
-});
-
-// Playlists table
-export const playlists = pgTable('playlists', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id),
-  name: varchar('name', { length: 100 }).notNull(),
-  description: text('description'),
-  coverImageUrl: text('cover_image_url'),
-  isPublic: boolean('is_public').default(true),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
-
-// Playlist tracks junction table
-export const playlistTracks = pgTable('playlist_tracks', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  playlistId: uuid('playlist_id').notNull().references(() => playlists.id),
-  trackId: uuid('track_id').notNull().references(() => tracks.id),
-  position: integer('position').notNull(),
-  addedAt: timestamp('added_at').defaultNow().notNull(),
-});
-
-// User favorites
-export const userFavorites = pgTable('user_favorites', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id),
-  trackId: uuid('track_id').notNull().references(() => tracks.id),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-// Purchase history
-export const purchases = pgTable('purchases', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id),
-  trackId: uuid('track_id').references(() => tracks.id),
-  albumId: uuid('album_id').references(() => albums.id),
-  price: integer('price').notNull(),
-  currency: varchar('currency', { length: 10 }).default('USD'),
-  transactionHash: varchar('transaction_hash', { length: 100 }), // Blockchain transaction hash
-  status: varchar('status', { length: 20 }).default('pending'), // pending, completed, failed
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export { users, sessions } from './schemas/users';
+export {
+	artists,
+	artistOnboardingRequests,
+	artistAccounts,
+	artistSessions
+} from './schemas/artist';
+export {
+	posts,
+	contentMedia,
+	postMedia,
+	postMusicAttachments,
+	postPolls,
+	postPollOptions,
+	postPollVotes,
+	photoAlbums,
+	photos,
+	videos,
+	videoCollections,
+	videoCollectionItems,
+	artistFeedItems
+} from './schemas/content';
+export { genres, albums, tracks, albumTracks } from './schemas/catalog';
+export { trackStats } from './schemas/engagement';
+export { playlists, playlistTracks, userFavorites } from './schemas/user-library';
+export { purchases } from './schemas/finance';
+import { users, sessions } from './schemas/users';
+import {
+	artists,
+	artistOnboardingRequests,
+	artistAccounts,
+	artistSessions
+} from './schemas/artist';
+import {
+	posts,
+	contentMedia,
+	postMedia,
+	postMusicAttachments,
+	postPolls,
+	postPollOptions,
+	postPollVotes,
+	photoAlbums,
+	photos,
+	videos,
+	videoCollections,
+	videoCollectionItems,
+	artistFeedItems
+} from './schemas/content';
+import { genres, albums, tracks, albumTracks } from './schemas/catalog';
+import { trackStats } from './schemas/engagement';
+import { playlists, playlistTracks, userFavorites } from './schemas/user-library';
+import { purchases } from './schemas/finance';
 
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
-  artist: one(artists),
-  playlists: many(playlists),
-  favorites: many(userFavorites),
-  purchases: many(purchases),
+	artist: one(artists),
+	artistOnboardingRequests: many(artistOnboardingRequests),
+	playlists: many(playlists),
+	favorites: many(userFavorites),
+	purchases: many(purchases)
 }));
 
-export const artistsRelations = relations(artists, ({ one, many }) => ({
-  user: one(users, {
-    fields: [artists.userId],
-    references: [users.id],
-  }),
-  albums: many(albums),
-  tracks: many(tracks),
+export const artistOnboardingRequestsRelations = relations(artistOnboardingRequests, ({ one }) => ({
+	user: one(users, {
+		fields: [artistOnboardingRequests.userId],
+		references: [users.id]
+	})
+}));
+
+export const artistAccountsRelations = relations(artistAccounts, ({ one, many }) => ({
+	artist: one(artists, {
+		fields: [artistAccounts.artistId],
+		references: [artists.id]
+	}),
+	sessions: many(artistSessions)
+}));
+
+export const artistSessionsRelations = relations(artistSessions, ({ one }) => ({
+	artistAccount: one(artistAccounts, {
+		fields: [artistSessions.artistAccountId],
+		references: [artistAccounts.id]
+	})
 }));
 
 export const albumsRelations = relations(albums, ({ one, many }) => ({
-  artist: one(artists, {
-    fields: [albums.artistId],
-    references: [artists.id],
-  }),
-  tracks: many(tracks),
-  purchases: many(purchases),
+	artist: one(artists, {
+		fields: [albums.artistId],
+		references: [artists.id]
+	}),
+	albumTracks: many(albumTracks),
+	purchases: many(purchases)
 }));
 
 export const tracksRelations = relations(tracks, ({ one, many }) => ({
-  artist: one(artists, {
-    fields: [tracks.artistId],
-    references: [artists.id],
-  }),
-  album: one(albums, {
-    fields: [tracks.albumId],
-    references: [albums.id],
-  }),
-  playlistTracks: many(playlistTracks),
-  favorites: many(userFavorites),
-  purchases: many(purchases),
+	artist: one(artists, {
+		fields: [tracks.artistId],
+		references: [artists.id]
+	}),
+	album: one(albums, {
+		fields: [tracks.albumId],
+		references: [albums.id]
+	}),
+	albumTracks: many(albumTracks),
+	playlistTracks: many(playlistTracks),
+	favorites: many(userFavorites),
+	purchases: many(purchases),
+	stats: one(trackStats)
 }));
 
 export const playlistsRelations = relations(playlists, ({ one, many }) => ({
-  user: one(users, {
-    fields: [playlists.userId],
-    references: [users.id],
-  }),
-  tracks: many(playlistTracks),
+	user: one(users, {
+		fields: [playlists.userId],
+		references: [users.id]
+	}),
+	tracks: many(playlistTracks)
 }));
 
 export const playlistTracksRelations = relations(playlistTracks, ({ one }) => ({
-  playlist: one(playlists, {
-    fields: [playlistTracks.playlistId],
-    references: [playlists.id],
-  }),
-  track: one(tracks, {
-    fields: [playlistTracks.trackId],
-    references: [tracks.id],
-  }),
+	playlist: one(playlists, {
+		fields: [playlistTracks.playlistId],
+		references: [playlists.id]
+	}),
+	track: one(tracks, {
+		fields: [playlistTracks.trackId],
+		references: [tracks.id]
+	})
+}));
+
+export const albumTracksRelations = relations(albumTracks, ({ one }) => ({
+	album: one(albums, {
+		fields: [albumTracks.albumId],
+		references: [albums.id]
+	}),
+	track: one(tracks, {
+		fields: [albumTracks.trackId],
+		references: [tracks.id]
+	})
 }));
 
 export const userFavoritesRelations = relations(userFavorites, ({ one }) => ({
-  user: one(users, {
-    fields: [userFavorites.userId],
-    references: [users.id],
-  }),
-  track: one(tracks, {
-    fields: [userFavorites.trackId],
-    references: [tracks.id],
-  }),
+	user: one(users, {
+		fields: [userFavorites.userId],
+		references: [users.id]
+	}),
+	track: one(tracks, {
+		fields: [userFavorites.trackId],
+		references: [tracks.id]
+	})
 }));
 
 export const purchasesRelations = relations(purchases, ({ one }) => ({
-  user: one(users, {
-    fields: [purchases.userId],
-    references: [users.id],
-  }),
-  track: one(tracks, {
-    fields: [purchases.trackId],
-    references: [tracks.id],
-  }),
-  album: one(albums, {
-    fields: [purchases.albumId],
-    references: [albums.id],
-  }),
+	user: one(users, {
+		fields: [purchases.userId],
+		references: [users.id]
+	}),
+	track: one(tracks, {
+		fields: [purchases.trackId],
+		references: [tracks.id]
+	}),
+	album: one(albums, {
+		fields: [purchases.albumId],
+		references: [albums.id]
+	})
 }));
 
 // Session relations
 export const sessionsRelations = relations(sessions, ({ one }) => ({
-  user: one(users, {
-    fields: [sessions.userId],
-    references: [users.id],
-  }),
+	user: one(users, {
+		fields: [sessions.userId],
+		references: [users.id]
+	})
 }));
 
 export const trackStatsRelations = relations(trackStats, ({ one }) => ({
-  track: one(tracks, {
-    fields: [trackStats.trackId],
-    references: [tracks.id],
-  }),
+	track: one(tracks, {
+		fields: [trackStats.trackId],
+		references: [tracks.id]
+	})
+}));
+
+export const artistsRelations = relations(artists, ({ one, many }) => ({
+	user: one(users, {
+		fields: [artists.userId],
+		references: [users.id]
+	}),
+	tracks: many(tracks),
+	albums: many(albums),
+	artistAccounts: many(artistAccounts),
+	posts: many(posts),
+	contentMedia: many(contentMedia),
+	photoAlbums: many(photoAlbums),
+	videos: many(videos),
+	videoCollections: many(videoCollections),
+	artistFeedItems: many(artistFeedItems)
+}));
+export const postsRelations = relations(posts, ({ one, many }) => ({
+	artist: one(artists, {
+		fields: [posts.artistId],
+		references: [artists.id]
+	}),
+	media: many(postMedia),
+	musicAttachments: many(postMusicAttachments),
+	polls: many(postPolls)
+}));
+
+export const contentMediaRelations = relations(contentMedia, ({ one, many }) => ({
+	artist: one(artists, {
+		fields: [contentMedia.artistId],
+		references: [artists.id]
+	}),
+	postMedia: many(postMedia),
+	photos: many(photos)
+}));
+
+export const postMediaRelations = relations(postMedia, ({ one }) => ({
+	post: one(posts, {
+		fields: [postMedia.postId],
+		references: [posts.id]
+	}),
+	media: one(contentMedia, {
+		fields: [postMedia.mediaId],
+		references: [contentMedia.id]
+	})
+}));
+
+export const postMusicAttachmentsRelations = relations(postMusicAttachments, ({ one }) => ({
+	post: one(posts, {
+		fields: [postMusicAttachments.postId],
+		references: [posts.id]
+	}),
+	track: one(tracks, {
+		fields: [postMusicAttachments.trackId],
+		references: [tracks.id]
+	}),
+	album: one(albums, {
+		fields: [postMusicAttachments.albumId],
+		references: [albums.id]
+	})
+}));
+
+export const postPollsRelations = relations(postPolls, ({ one, many }) => ({
+	post: one(posts, {
+		fields: [postPolls.postId],
+		references: [posts.id]
+	}),
+	options: many(postPollOptions),
+	votes: many(postPollVotes)
+}));
+
+export const postPollOptionsRelations = relations(postPollOptions, ({ one, many }) => ({
+	poll: one(postPolls, {
+		fields: [postPollOptions.pollId],
+		references: [postPolls.id]
+	}),
+	votes: many(postPollVotes)
+}));
+
+export const postPollVotesRelations = relations(postPollVotes, ({ one }) => ({
+	poll: one(postPolls, {
+		fields: [postPollVotes.pollId],
+		references: [postPolls.id]
+	}),
+	option: one(postPollOptions, {
+		fields: [postPollVotes.optionId],
+		references: [postPollOptions.id]
+	}),
+	user: one(users, {
+		fields: [postPollVotes.userId],
+		references: [users.id]
+	})
+}));
+
+export const photoAlbumsRelations = relations(photoAlbums, ({ one, many }) => ({
+	artist: one(artists, {
+		fields: [photoAlbums.artistId],
+		references: [artists.id]
+	}),
+	photos: many(photos)
+}));
+
+export const photosRelations = relations(photos, ({ one }) => ({
+	album: one(photoAlbums, {
+		fields: [photos.albumId],
+		references: [photoAlbums.id]
+	}),
+	media: one(contentMedia, {
+		fields: [photos.mediaId],
+		references: [contentMedia.id]
+	})
+}));
+
+export const videosRelations = relations(videos, ({ one }) => ({
+	artist: one(artists, {
+		fields: [videos.artistId],
+		references: [artists.id]
+	})
+}));
+
+export const videoCollectionsRelations = relations(videoCollections, ({ one, many }) => ({
+	artist: one(artists, {
+		fields: [videoCollections.artistId],
+		references: [artists.id]
+	}),
+	items: many(videoCollectionItems)
+}));
+
+export const videoCollectionItemsRelations = relations(videoCollectionItems, ({ one }) => ({
+	collection: one(videoCollections, {
+		fields: [videoCollectionItems.collectionId],
+		references: [videoCollections.id]
+	}),
+	video: one(videos, {
+		fields: [videoCollectionItems.videoId],
+		references: [videos.id]
+	})
+}));
+
+export const artistFeedItemsRelations = relations(artistFeedItems, ({ one }) => ({
+	artist: one(artists, {
+		fields: [artistFeedItems.artistId],
+		references: [artists.id]
+	})
 }));
 
 // User type exports for TypeScript
@@ -236,18 +328,79 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
-export type Playlist = typeof playlists.$inferInsert
-export type PlaylistTrack = typeof playlistTracks.$inferInsert
+export type Artist = typeof artists.$inferSelect;
+export type NewArtist = typeof artists.$inferInsert;
+export type ArtistOnboardingRequest = typeof artistOnboardingRequests.$inferSelect;
+export type NewArtistOnboardingRequest = typeof artistOnboardingRequests.$inferInsert;
+export type ArtistAccount = typeof artistAccounts.$inferSelect;
+export type NewArtistAccount = typeof artistAccounts.$inferInsert;
+export type ArtistSession = typeof artistSessions.$inferSelect;
+export type Album = typeof albums.$inferSelect;
+export type NewAlbum = typeof albums.$inferInsert;
+export type Track = typeof tracks.$inferSelect;
+export type NewTrack = typeof tracks.$inferInsert;
+export type TrackStats = typeof trackStats.$inferSelect;
+export type Genre = typeof genres.$inferSelect;
+export type NewGenre = typeof genres.$inferInsert;
+export type AlbumTrack = typeof albumTracks.$inferSelect;
+export type NewAlbumTrack = typeof albumTracks.$inferInsert;
+export type Playlist = typeof playlists.$inferInsert;
+export type PlaylistTrack = typeof playlistTracks.$inferInsert;
+export type Post = typeof posts.$inferSelect;
+export type NewPost = typeof posts.$inferInsert;
+export type ContentMedia = typeof contentMedia.$inferSelect;
+export type NewContentMedia = typeof contentMedia.$inferInsert;
+export type PostMedia = typeof postMedia.$inferSelect;
+export type NewPostMedia = typeof postMedia.$inferInsert;
+export type PostMusicAttachment = typeof postMusicAttachments.$inferSelect;
+export type NewPostMusicAttachment = typeof postMusicAttachments.$inferInsert;
+export type PostPoll = typeof postPolls.$inferSelect;
+export type NewPostPoll = typeof postPolls.$inferInsert;
+export type PostPollOption = typeof postPollOptions.$inferSelect;
+export type NewPostPollOption = typeof postPollOptions.$inferInsert;
+export type PostPollVote = typeof postPollVotes.$inferSelect;
+export type NewPostPollVote = typeof postPollVotes.$inferInsert;
+export type PhotoAlbum = typeof photoAlbums.$inferSelect;
+export type NewPhotoAlbum = typeof photoAlbums.$inferInsert;
+export type Photo = typeof photos.$inferSelect;
+export type NewPhoto = typeof photos.$inferInsert;
+export type Video = typeof videos.$inferSelect;
+export type NewVideo = typeof videos.$inferInsert;
+export type VideoCollection = typeof videoCollections.$inferSelect;
+export type NewVideoCollection = typeof videoCollections.$inferInsert;
+export type VideoCollectionItem = typeof videoCollectionItems.$inferSelect;
+export type NewVideoCollectionItem = typeof videoCollectionItems.$inferInsert;
+export type ArtistFeedItem = typeof artistFeedItems.$inferSelect;
+export type NewArtistFeedItem = typeof artistFeedItems.$inferInsert;
 
 // Export all tables for migrations
 export const schema = {
-  users,
-  sessions,
-  artists,
-  albums,
-  tracks,
-  playlists,
-  playlistTracks,
-  userFavorites,
-  purchases,
+	users,
+	sessions,
+	artists,
+	artistOnboardingRequests,
+	artistAccounts,
+	artistSessions,
+	posts,
+	contentMedia,
+	postMedia,
+	postMusicAttachments,
+	postPolls,
+	postPollOptions,
+	postPollVotes,
+	photoAlbums,
+	photos,
+	videos,
+	videoCollections,
+	videoCollectionItems,
+	artistFeedItems,
+	genres,
+	albums,
+	tracks,
+	trackStats,
+	albumTracks,
+	playlists,
+	playlistTracks,
+	userFavorites,
+	purchases
 };

@@ -7,6 +7,8 @@
 		href?: string;
 		onClick?: () => void;
 		children?: () => any;
+		full?: boolean;
+		fullWidth?: boolean;
 	}
 
 	let {
@@ -15,18 +17,22 @@
 		disabled = false,
 		href = '',
 		size = 'md',
+		full = false,
+		fullWidth = false,
 		onClick,
 		children
 	}: Props = $props();
+
+	full = full || fullWidth;
 </script>
 
 {#if href}
-	<a {href} class="btn btn--{variant} {size}">
+	<a {href} class="btn btn--{variant} {size}" class:full>
 		{@render children?.()}
 	</a>
 {:else}
 	<!-- else content here -->
-	<button class="btn btn--{variant} {size}" {type} {disabled} onclick={onClick}>
+	<button class="btn btn--{variant} {size}" class:full {type} {disabled} onclick={onClick}>
 		{@render children?.()}
 	</button>
 {/if}
@@ -45,11 +51,14 @@
 		align-items: center;
 		justify-content: center;
 		gap: var(--space-2);
-		width: 100%;
+		width: fit-content;
 		box-shadow: var(--shadow-xs);
 		position: relative;
 		overflow: hidden;
 
+		&.full {
+			width: 100%;
+		}
 		&:disabled {
 			opacity: 0.6;
 			cursor: not-allowed;
@@ -108,13 +117,13 @@
 			}
 		}
 
-    &.md {
-      padding: var(--space-2) var(--space-4);
-      font-size: var(--font-size-xs);
-    }
-    &.sm {
-      padding: var(--space-1) var(--space-2);
-      font-size: var(--font-size-xs);
-    }
+		&.md {
+			padding: var(--space-2) var(--space-4);
+			font-size: var(--font-size-xs);
+		}
+		&.sm {
+			padding: var(--space-1) var(--space-2);
+			font-size: var(--font-size-xs);
+		}
 	}
 </style>

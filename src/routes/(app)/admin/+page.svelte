@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	 import { PUBLIC_PGADMIN_URL } from '$env/static/public';
-    
-	
+	import { PUBLIC_PGADMIN_URL } from '$env/static/public';
+
 	let { data } = $props();
 	let refreshing = $state(false);
 	let dbHealth = $state(data.dbHealth);
-	
+
 	async function refreshHealth() {
 		refreshing = true;
 		try {
@@ -18,7 +17,7 @@
 			refreshing = false;
 		}
 	}
-	
+
 	// Auto-refresh every 30 seconds
 	onMount(() => {
 		const interval = setInterval(refreshHealth, 30000);
@@ -33,11 +32,7 @@
 <div class="admin-container">
 	<header class="admin-header">
 		<h1>PDM Database Administration</h1>
-		<button 
-			class="refresh-btn" 
-			onclick={refreshHealth} 
-			disabled={refreshing}
-		>
+		<button class="refresh-btn" onclick={refreshHealth} disabled={refreshing}>
 			{refreshing ? 'Refreshing...' : 'Refresh Status'}
 		</button>
 	</header>
@@ -88,13 +83,14 @@
 		<div class="actions-card">
 			<h2>Database Actions</h2>
 			<div class="actions-grid">
-				<a href={PUBLIC_PGADMIN_URL} target="_blank" class="action-btn">
-					Open pgAdmin
-				</a>
+				<a href={PUBLIC_PGADMIN_URL} target="_blank" class="action-btn"> Open pgAdmin </a>
 				<button class="action-btn" onclick={() => window.open('/api/db/health', '_blank')}>
 					View Raw Health Check
 				</button>
-				<button class="action-btn secondary" onclick={() => alert('Drizzle Studio: npm run db:studio')}>
+				<button
+					class="action-btn secondary"
+					onclick={() => alert('Drizzle Studio: npm run db:studio')}
+				>
 					Open Drizzle Studio
 				</button>
 			</div>
@@ -104,7 +100,9 @@
 		<div class="schema-card">
 			<h2>Schema Information</h2>
 			<div class="schema-info">
-				<p><strong>Tables:</strong> users, artists, albums, tracks, playlists, playlist_tracks, user_favorites, purchases</p>
+				<p>
+					<strong>Schemas:</strong> users, artist, catalog, content, engagement, finance
+				</p>
 				<p><strong>ORM:</strong> Drizzle ORM</p>
 				<p><strong>Database:</strong> PostgreSQL 15</p>
 				<p><strong>Migrations:</strong> Generated and ready to apply</p>
@@ -126,45 +124,48 @@
 
 <style lang="scss">
 	@use '../../../styles/variables' as mixins;
-	
+
 	.admin-container {
 		@include mixins.container();
 		padding: var(--space-8);
 		min-height: 100vh;
 	}
-	
+
 	.admin-header {
 		@include mixins.flex-between();
 		margin-bottom: var(--space-8);
 		padding-bottom: var(--space-4);
 		border-bottom: 1px solid var(--border-primary);
-		
+
 		h1 {
 			@include mixins.text-display-md();
 			@include mixins.font-bold();
 			color: var(--text-primary);
 		}
 	}
-	
+
 	.refresh-btn {
 		@include mixins.button-secondary();
-		
+
 		&:disabled {
 			opacity: 0.5;
 			cursor: not-allowed;
 		}
 	}
-	
+
 	.status-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 		gap: var(--space-6);
 		margin-bottom: var(--space-8);
 	}
-	
-	.status-card, .stats-card, .actions-card, .schema-card {
+
+	.status-card,
+	.stats-card,
+	.actions-card,
+	.schema-card {
 		@include mixins.card();
-		
+
 		h2 {
 			@include mixins.text-xl();
 			@include mixins.font-semibold();
@@ -172,106 +173,106 @@
 			margin-bottom: var(--space-4);
 		}
 	}
-	
+
 	.status-card {
 		&.connected {
 			border-left: 4px solid var(--success);
 		}
-		
+
 		&.disconnected {
 			border-left: 4px solid var(--error);
 		}
 	}
-	
+
 	.status-header {
 		@include mixins.flex-between();
 		margin-bottom: var(--space-3);
 	}
-	
+
 	.status-indicator {
 		font-size: 1.5rem;
-		
+
 		&.success {
 			color: var(--success);
 		}
-		
+
 		&.error {
 			color: var(--error);
 		}
 	}
-	
+
 	.status-message {
 		@include mixins.text-md();
 		color: var(--text-secondary);
 		margin-bottom: var(--space-2);
 	}
-	
+
 	.timestamp {
 		@include mixins.text-sm();
 		color: var(--text-tertiary);
 	}
-	
+
 	.stats-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 		gap: var(--space-4);
 	}
-	
+
 	.stat-item {
 		text-align: center;
 		padding: var(--space-3);
 		background: var(--bg-secondary);
 		border-radius: var(--radius-md);
-		
+
 		.stat-value {
 			@include mixins.text-xl();
 			@include mixins.font-bold();
 			color: var(--primary);
 			display: block;
 		}
-		
+
 		.stat-label {
 			@include mixins.text-sm();
 			color: var(--text-tertiary);
 		}
 	}
-	
+
 	.actions-grid {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
 	}
-	
+
 	.action-btn {
 		@include mixins.button-primary();
 		text-decoration: none;
 		text-align: center;
-		
+
 		&.secondary {
 			@include mixins.button-secondary();
 		}
 	}
-	
+
 	.schema-info {
 		@include mixins.text-sm();
 		color: var(--text-secondary);
 		line-height: 1.6;
-		
+
 		p {
 			margin-bottom: var(--space-2);
 		}
-		
+
 		strong {
 			color: var(--text-primary);
 		}
 	}
-	
+
 	.help-section {
 		margin-top: var(--space-8);
 		padding: var(--space-6);
 		background: var(--bg-secondary);
 		border-radius: var(--radius-lg);
-		
+
 		h2 {
 			@include mixins.text-lg();
 			@include mixins.font-semibold();
@@ -279,12 +280,12 @@
 			margin-bottom: var(--space-4);
 		}
 	}
-	
+
 	.commands {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-		
+
 		code {
 			@include mixins.text-sm();
 			font-family: var(--font-family-mono);
@@ -295,18 +296,18 @@
 			border: 1px solid var(--border-primary);
 		}
 	}
-	
+
 	@include mixins.mobile-only {
 		.admin-header {
 			flex-direction: column;
 			gap: var(--space-4);
 			text-align: center;
 		}
-		
+
 		.status-grid {
 			grid-template-columns: 1fr;
 		}
-		
+
 		.stats-grid {
 			grid-template-columns: repeat(2, 1fr);
 		}

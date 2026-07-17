@@ -2,56 +2,50 @@
 	import { page } from '$app/state';
 	import Avatar from '$lib/ui/Avatar.svelte';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
-	import {
-		mdiAccountMusic,
-		mdiCog,
-		mdiHandCoin,
-		mdiHome,
-		mdiMagnify,
-		mdiMusicNoteEighth,
-		mdiPlaylistMusic,
-		mdiTicketConfirmation
-	} from '@mdi/js/mdi.js';
-	import type { PageData } from '../../routes/$types';
+	import { mdiMagnify } from '@mdi/js/mdi.js';
 	import Input from '$lib/ui/Input.svelte';
 
-	let { expand = $bindable() } = $props();
+	type SidebarItem = {
+		label?: string;
+		icon?: string;
+		href?: string;
+		section?: boolean;
+		space?: boolean;
+	};
+
+	type SidebarAccount = {
+		name: string;
+		avatarUrl?: string | null;
+		profileHref?: string;
+	};
+
+	let { expand = $bindable(), items = [], showSearch = true, account } = $props<{
+		expand?: boolean;
+		items?: SidebarItem[];
+		showSearch?: boolean;
+		account?: SidebarAccount | null;
+	}>();
 
 	const pathname = $derived(page.url.pathname);
-	const user = $derived(page.data.user) as PageData['user'];
-
-	const sidebarItems = [
-		{ label: 'Home', icon: mdiHome, href: '/' },
-		{ label: 'Music', icon: mdiMusicNoteEighth, href: '/listen' },
-		{ label: 'Artists', icon: mdiAccountMusic, href: '/artists' },
-		{ label: 'My Playlists', icon: mdiPlaylistMusic, href: '/playlists' },
-
-		{ section: true },
-
-		{ label: 'Tickets', icon: mdiTicketConfirmation, href: '/tickets' },
-		{ label: 'Crowdfunding', icon: mdiHandCoin, href: '/crowdfunding' },
-		{ space: true },
-
-		{ label: 'Settings', icon: mdiCog, href: '/settings' },
-		{ section: true }
-	];
 </script>
 
 <div class="sidebar-wrapper" class:expand>
 	<button class="logo" onclick={() => (expand = !expand)}>
 		<h2>{expand ? 'PDM' : 'P'}</h2>
 	</button>
-	<div class="sidebar-item search">
-		{#if expand}
-			<Input placeholder="Search" />
-		{:else}
-			<button onclick={() => expand = true}>
-				<SvgIcon path={	mdiMagnify} size={24} />
-			</button>
-		{/if}
-	</div>
+	{#if showSearch}
+		<div class="sidebar-item search">
+			{#if expand}
+				<Input placeholder="Search" />
+			{:else}
+				<button onclick={() => (expand = true)}>
+					<SvgIcon path={mdiMagnify} size={24} />
+				</button>
+			{/if}
+		</div>
+	{/if}
 	<div class="nav-wrapper">
-		{#each sidebarItems as item}
+		{#each items as item}
 			{#if item.section}
 				<div class="divider">
 					<div class="line"></div>
@@ -77,14 +71,16 @@
 			{/if}
 		{/each}
 	</div>
-	<a class="avatar-wrapper" href="/profile/{user?.username}">
-		<div class="avatar">
-			<Avatar name={user?.displayName || ''} src={user?.avatarUrl || ''} size="s" />
-		</div>
-		{#if expand}
-			<div class="name">{user?.displayName}</div>
-		{/if}
-	</a>
+	{#if account}
+		<a class="avatar-wrapper" href={account.profileHref || '#'}>
+			<div class="avatar">
+				<Avatar name={account.name} src={account.avatarUrl || ''} size="s" />
+			</div>
+			{#if expand}
+				<div class="name">{account.name}</div>
+			{/if}
+		</a>
+	{/if}
 </div>
 
 <style lang="scss">

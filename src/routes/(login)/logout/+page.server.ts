@@ -1,4 +1,4 @@
-import { fail, redirect } from "@sveltejs/kit";
+import { fail, isRedirect, redirect } from "@sveltejs/kit";
 import { invalidateSession, deleteSessionTokenCookie } from "$lib/server/session";
 import { logger } from "$lib/utils/logger";
 import type { RequestEvent } from "@sveltejs/kit";
@@ -30,8 +30,7 @@ export const actions = {
 
 			throw redirect(302, "/login");
 		} catch (error) {
-			if (error instanceof Response && error.status === 302) {
-				// Re-throw redirect responses
+			if (isRedirect(error)) {
 				throw error;
 			}
 

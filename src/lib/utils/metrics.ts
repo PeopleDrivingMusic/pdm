@@ -1,124 +1,266 @@
 import { register, collectDefaultMetrics, Counter, Histogram, Gauge } from 'prom-client';
 
-// Initialize default metrics collector
-collectDefaultMetrics({ register });
+declare global {
+	var __pdmMetricsMemoryInterval: NodeJS.Timeout | undefined;
+}
+
+function getMetric<T>(name: string, create: () => T): T {
+	const existing = register.getSingleMetric(name);
+	return (existing as T | undefined) ?? create();
+}
+
+// Initialize default metrics collector once. Vite SSR can re-evaluate this module during HMR.
+if (!register.getSingleMetric('process_cpu_user_seconds_total')) {
+	collectDefaultMetrics({ register });
+}
 
 // HTTP metrics
-export const httpRequestsTotal = new Counter({
-	name: 'http_requests_total',
-	help: 'Total number of HTTP requests',
-	labelNames: ['method', 'route', 'status_code'],
-	registers: [register]
-});
+export const httpRequestsTotal = getMetric(
+	'http_requests_total',
+	() =>
+		new Counter({
+			name: 'http_requests_total',
+			help: 'Total number of HTTP requests',
+			labelNames: ['method', 'route', 'status_code'],
+			registers: [register]
+		})
+);
 
-export const httpRequestDuration = new Histogram({
-	name: 'http_request_duration_seconds',
-	help: 'Duration of HTTP requests in seconds',
-	labelNames: ['method', 'route', 'status_code'],
-	buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
-	registers: [register]
-});
+export const httpRequestDuration = getMetric(
+	'http_request_duration_seconds',
+	() =>
+		new Histogram({
+			name: 'http_request_duration_seconds',
+			help: 'Duration of HTTP requests in seconds',
+			labelNames: ['method', 'route', 'status_code'],
+			buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+			registers: [register]
+		})
+);
 
 // Database metrics
-export const dbConnectionsActive = new Gauge({
-	name: 'db_connections_active',
-	help: 'Number of active database connections',
-	registers: [register]
-});
+export const dbConnectionsActive = getMetric(
+	'db_connections_active',
+	() =>
+		new Gauge({
+			name: 'db_connections_active',
+			help: 'Number of active database connections',
+			registers: [register]
+		})
+);
 
-export const dbQueryDuration = new Histogram({
-	name: 'db_query_duration_seconds',
-	help: 'Duration of database queries in seconds',
-	labelNames: ['operation', 'table'],
-	buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
-	registers: [register]
-});
+export const dbQueryDuration = getMetric(
+	'db_query_duration_seconds',
+	() =>
+		new Histogram({
+			name: 'db_query_duration_seconds',
+			help: 'Duration of database queries in seconds',
+			labelNames: ['operation', 'table'],
+			buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+			registers: [register]
+		})
+);
 
-export const dbQueriesTotal = new Counter({
-	name: 'db_queries_total',
-	help: 'Total number of database queries',
-	labelNames: ['operation', 'table', 'status'],
-	registers: [register]
-});
+export const dbQueriesTotal = getMetric(
+	'db_queries_total',
+	() =>
+		new Counter({
+			name: 'db_queries_total',
+			help: 'Total number of database queries',
+			labelNames: ['operation', 'table', 'status'],
+			registers: [register]
+		})
+);
 
 // User metrics
-export const activeUsers = new Gauge({
-	name: 'active_users',
-	help: 'Number of currently active users',
-	registers: [register]
-});
+export const activeUsers = getMetric(
+	'active_users',
+	() =>
+		new Gauge({
+			name: 'active_users',
+			help: 'Number of currently active users',
+			registers: [register]
+		})
+);
 
-export const userSessions = new Gauge({
-	name: 'user_sessions_total',
-	help: 'Total number of user sessions',
-	registers: [register]
-});
+export const userSessions = getMetric(
+	'user_sessions_total',
+	() =>
+		new Gauge({
+			name: 'user_sessions_total',
+			help: 'Total number of user sessions',
+			registers: [register]
+		})
+);
 
-export const userActions = new Counter({
-	name: 'user_actions_total',
-	help: 'Total number of user actions',
-	labelNames: ['action', 'user_type'],
-	registers: [register]
-});
+export const userActions = getMetric(
+	'user_actions_total',
+	() =>
+		new Counter({
+			name: 'user_actions_total',
+			help: 'Total number of user actions',
+			labelNames: ['action', 'user_type'],
+			registers: [register]
+		})
+);
 
 // Business metrics for PDM
-export const songsPlayedTotal = new Counter({
-	name: 'songs_played_total',
-	help: 'Total number of songs played',
-	labelNames: ['genre', 'source'],
-	registers: [register]
-});
+export const songsPlayedTotal = getMetric(
+	'songs_played_total',
+	() =>
+		new Counter({
+			name: 'songs_played_total',
+			help: 'Total number of songs played',
+			labelNames: ['genre', 'source'],
+			registers: [register]
+		})
+);
 
-export const playlistsCreated = new Counter({
-	name: 'playlists_created_total',
-	help: 'Total number of playlists created',
-	labelNames: ['user_type'],
-	registers: [register]
-});
+export const playlistsCreated = getMetric(
+	'playlists_created_total',
+	() =>
+		new Counter({
+			name: 'playlists_created_total',
+			help: 'Total number of playlists created',
+			labelNames: ['user_type'],
+			registers: [register]
+		})
+);
 
-export const musicUploads = new Counter({
-	name: 'music_uploads_total',
-	help: 'Total number of music uploads',
-	labelNames: ['format', 'status'],
-	registers: [register]
-});
+export const musicUploads = getMetric(
+	'music_uploads_total',
+	() =>
+		new Counter({
+			name: 'music_uploads_total',
+			help: 'Total number of music uploads',
+			labelNames: ['format', 'status'],
+			registers: [register]
+		})
+);
 
-export const streamingDuration = new Histogram({
-	name: 'streaming_duration_seconds',
-	help: 'Duration of music streaming sessions',
-	labelNames: ['quality', 'device_type'],
-	buckets: [10, 30, 60, 300, 600, 1800, 3600, 7200, 14400], // 10s to 4h
-	registers: [register]
-});
+export const streamingDuration = getMetric(
+	'streaming_duration_seconds',
+	() =>
+		new Histogram({
+			name: 'streaming_duration_seconds',
+			help: 'Duration of music streaming sessions',
+			labelNames: ['quality', 'device_type'],
+			buckets: [10, 30, 60, 300, 600, 1800, 3600, 7200, 14400], // 10s to 4h
+			registers: [register]
+		})
+);
 
 // System metrics
-export const memoryUsage = new Gauge({
-	name: 'app_memory_usage_bytes',
-	help: 'Application memory usage in bytes',
-	registers: [register]
-});
+export const memoryUsage = getMetric(
+	'app_memory_usage_bytes',
+	() =>
+		new Gauge({
+			name: 'app_memory_usage_bytes',
+			help: 'Application memory usage in bytes',
+			registers: [register]
+		})
+);
 
-export const cacheHits = new Counter({
-	name: 'cache_hits_total',
-	help: 'Total number of cache hits',
-	labelNames: ['cache_type'],
-	registers: [register]
-});
+export const cacheHits = getMetric(
+	'cache_hits_total',
+	() =>
+		new Counter({
+			name: 'cache_hits_total',
+			help: 'Total number of cache hits',
+			labelNames: ['cache_type'],
+			registers: [register]
+		})
+);
 
-export const cacheMisses = new Counter({
-	name: 'cache_misses_total',
-	help: 'Total number of cache misses',
-	labelNames: ['cache_type'],
-	registers: [register]
-});
+export const cacheMisses = getMetric(
+	'cache_misses_total',
+	() =>
+		new Counter({
+			name: 'cache_misses_total',
+			help: 'Total number of cache misses',
+			labelNames: ['cache_type'],
+			registers: [register]
+		})
+);
+
+// Media upload pipeline metrics
+export const mediaUploadStartedTotal = getMetric(
+	'media_upload_started_total',
+	() =>
+		new Counter({
+			name: 'media_upload_started_total',
+			help: 'Media uploads started',
+			labelNames: ['kind'],
+			registers: [register]
+		})
+);
+
+export const mediaUploadFinalizedTotal = getMetric(
+	'media_upload_finalized_total',
+	() =>
+		new Counter({
+			name: 'media_upload_finalized_total',
+			help: 'Media uploads finalized',
+			labelNames: ['kind', 'result'],
+			registers: [register]
+		})
+);
+
+export const mediaUploadFailedTotal = getMetric(
+	'media_upload_failed_total',
+	() =>
+		new Counter({
+			name: 'media_upload_failed_total',
+			help: 'Media uploads failed',
+			labelNames: ['kind', 'reason'],
+			registers: [register]
+		})
+);
+
+export const mediaUploadDuration = getMetric(
+	'media_upload_duration_seconds',
+	() =>
+		new Histogram({
+			name: 'media_upload_duration_seconds',
+			help: 'Upload create-to-finalize duration',
+			labelNames: ['kind'],
+			buckets: [1, 5, 15, 30, 60, 120, 300, 600],
+			registers: [register]
+		})
+);
+
+export const mediaPendingUploads = getMetric(
+	'media_pending_uploads',
+	() =>
+		new Gauge({
+			name: 'media_pending_uploads',
+			help: 'Tracks awaiting upload completion',
+			registers: [register]
+		})
+);
+
+export const r2ErrorsTotal = getMetric(
+	'r2_errors_total',
+	() =>
+		new Counter({
+			name: 'r2_errors_total',
+			help: 'R2 operation errors',
+			labelNames: ['op'],
+			registers: [register]
+		})
+);
 
 // Error metrics
-export const errorsTotal = new Counter({
-	name: 'errors_total',
-	help: 'Total number of errors',
-	labelNames: ['error_type', 'component'],
-	registers: [register]
-});
+export const errorsTotal = getMetric(
+	'errors_total',
+	() =>
+		new Counter({
+			name: 'errors_total',
+			help: 'Total number of errors',
+			labelNames: ['error_type', 'component'],
+			registers: [register]
+		})
+);
 
 // Functions for updating metrics
 export class MetricsCollector {
@@ -158,7 +300,11 @@ export class MetricsCollector {
 		musicUploads.inc({ format, status: success ? 'success' : 'failure' });
 	}
 
-	static recordStreamingSession(duration: number, quality: string = 'standard', deviceType: string = 'web') {
+	static recordStreamingSession(
+		duration: number,
+		quality: string = 'standard',
+		deviceType: string = 'web'
+	) {
 		streamingDuration.observe({ quality, device_type: deviceType }, duration);
 	}
 
@@ -174,6 +320,30 @@ export class MetricsCollector {
 		errorsTotal.inc({ error_type: errorType, component });
 	}
 
+	static recordUploadStarted(kind: string) {
+		mediaUploadStartedTotal.inc({ kind });
+	}
+
+	static recordUploadFinalized(kind: string, result: 'success' | 'failure') {
+		mediaUploadFinalizedTotal.inc({ kind, result });
+	}
+
+	static recordUploadFailed(kind: string, reason: string) {
+		mediaUploadFailedTotal.inc({ kind, reason });
+	}
+
+	static observeUploadDuration(kind: string, seconds: number) {
+		mediaUploadDuration.observe({ kind }, seconds);
+	}
+
+	static setPendingUploads(n: number) {
+		mediaPendingUploads.set(n);
+	}
+
+	static recordR2Error(op: string) {
+		r2ErrorsTotal.inc({ op });
+	}
+
 	static updateMemoryUsage() {
 		const usage = process.memoryUsage();
 		memoryUsage.set(usage.rss);
@@ -181,7 +351,7 @@ export class MetricsCollector {
 }
 
 // Periodic system metrics updates
-setInterval(() => {
+globalThis.__pdmMetricsMemoryInterval ??= setInterval(() => {
 	MetricsCollector.updateMemoryUsage();
 }, 10000); // Every 10 seconds
 

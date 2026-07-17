@@ -5,7 +5,7 @@
 	let isSyncingTime = $state(false);
 	let lastTrackId: string | null = $state(null);
 
-	const { isPlaying, currentTime, currentTrack, que, currentTrackIndex, volume } = $derived(playerStore);
+	const { isPlaying, currentTrack, que, currentTrackIndex, volume } = $derived(playerStore);
 
 	$effect(() => {
 		if (!audio) return;
@@ -15,9 +15,8 @@
 	$effect(() => {
 		if (!audio) return;
 		const trackId = currentTrack?.track?.id ?? null;
-		const trackUrl = currentTrack?.track?.audioUrl ?? '';
 
-		if (!trackUrl) {
+		if (!trackId) {
 			audio.pause();
 			audio.removeAttribute('src');
 			audio.load();
@@ -27,17 +26,32 @@
 
 		if (trackId !== lastTrackId) {
 			lastTrackId = trackId;
-			audio.src = trackUrl;
-			audio.currentTime = playerStore.currentTime || 0;
-			if (playerStore.isPlaying) {
-				audio.play().catch((err) => console.error('Play error:', err));
-			}
+			fetch(`/api/music/${trackId}`)
+				.then((res) => {
+					if (!res.ok) throw new Error('Failed to get stream URL');
+					return res.json();
+				})
+				.then((data) => {
+					if (!data.src || typeof data.src !== 'string') {
+						throw new Error('Stream URL response is invalid');
+					}
+					audio.src = data.src;
+					audio.currentTime = playerStore.currentTime || 0;
+					audio.load();
+				})
+				.catch((err) => {
+					console.error('Error loading track URL:', err);
+					audio.removeAttribute('src');
+					audio.load();
+				});
 		}
 	});
 
 	$effect(() => {
 		if (!audio) return;
 		if (!currentTrack?.track?.audioUrl) return;
+		if (!audio.src) return;
+
 		if (isPlaying) {
 			if (audio.paused) {
 				audio.play().catch((err) => console.error('Play error:', err));
@@ -50,6 +64,7 @@
 	$effect(() => {
 		if (!audio) return;
 		if (!currentTrack?.track?.audioUrl) return;
+		if (!audio.src) return;
 		if (isSyncingTime) return;
 		const desired = playerStore.currentTime || 0;
 		if (Math.abs(audio.currentTime - desired) > 0.25) {
@@ -65,8 +80,13 @@
 		});
 	}
 
+	function playWhenReady() {
+		if (!isPlaying) return;
+		audio.play().catch((err) => console.error('Play error inside event:', err));
+	}
+
 	function handleLoadedMetadata() {
-		playerStore.duration = isNaN(audio.duration) ? 0 : audio.duration;
+		playerStore.duration = Number.isNaN(audio.duration) ? 0 : audio.duration;
 	}
 
 	function handleEnded() {
@@ -85,9 +105,9 @@
 
 <audio
 	bind:this={audio}
+	oncanplay={playWhenReady}
 	ontimeupdate={handleTimeUpdate}
 	onloadedmetadata={handleLoadedMetadata}
 	onended={handleEnded}
 	crossorigin="anonymous"
->
-</audio>
+></audio>

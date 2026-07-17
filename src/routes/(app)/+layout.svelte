@@ -1,24 +1,62 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import {
+		mdiAccountMusic,
+		mdiCog,
+		mdiHandCoin,
+		mdiHome,
+		mdiMusicNoteEighth,
+		mdiPlaylistMusic,
+		mdiTicketConfirmation
+	} from '@mdi/js/mdi.js';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import MusicPlayer from '$lib/ui/components/MusicPlayer/MusicPlayer.svelte';
 	import '../../app.scss';
 	import type { Snapshot } from '../$types';
 
-	let { children } = $props();
+	let { children, data } = $props();
 	export const snapshot: Snapshot<boolean> = {
 		capture: () => sidebarExpand,
 		restore: (value) => (sidebarExpand = value)
 	};
 	let sidebarExpand = $state(true)
+
+	const sidebarItems = [
+		{ label: 'Home', icon: mdiHome, href: '/' },
+		{ label: 'Music', icon: mdiMusicNoteEighth, href: '/listen' },
+		{ label: 'Artists', icon: mdiAccountMusic, href: '/artists' },
+		{ label: 'My Playlists', icon: mdiPlaylistMusic, href: '/playlists' },
+
+		{ section: true },
+
+		{ label: 'Tickets', icon: mdiTicketConfirmation, href: '/tickets' },
+		{ label: 'Crowdfunding', icon: mdiHandCoin, href: '/crowdfunding' },
+		{ space: true },
+
+		{ label: 'Settings', icon: mdiCog, href: '/settings' },
+		{ section: true }
+	];
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
 <div class="app-wrapper" class:fullHeight={playerStore.currentTrackIndex < 0}>
-	<Sidebar bind:expand={sidebarExpand} />
+	<Sidebar
+		bind:expand={sidebarExpand}
+		items={sidebarItems}
+		showSearch={true}
+		account={
+			data.user
+				? {
+						name: data.user.displayName || data.user.username || 'User',
+						avatarUrl: data.user.avatarUrl,
+						profileHref: data.user.username ? `/profile/${data.user.username}` : '/profile'
+					}
+				: null
+		}
+	/>
 	<div class="page">
 		{@render children?.()}
 	</div>

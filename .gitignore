@@ -29,5 +29,7 @@ docker/postgres/data/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+coverage/
+
 # Claude Code (local config + AI-maintained wiki)
 .claude/

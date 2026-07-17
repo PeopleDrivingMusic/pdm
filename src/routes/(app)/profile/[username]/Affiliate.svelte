@@ -10,6 +10,8 @@
 	let copyFeedback = $state('');
 	let showQR = $state(false);
 
+	type ReferralStatus = 'active' | 'pending';
+
 	const referralData = $state({
 		referralLink: 'https://pdm.music/ref/johndoe2024',
 		qrCode:
@@ -25,28 +27,28 @@
 				name: 'Alex Johnson',
 				joinDate: '2024-01-15',
 				earnings: 450.25,
-				status: 'active'
+				status: 'active' as ReferralStatus
 			},
 			{
 				id: 2,
 				name: 'Sarah Wilson',
 				joinDate: '2024-02-20',
 				earnings: 380.5,
-				status: 'active'
+				status: 'active' as ReferralStatus
 			},
 			{
 				id: 3,
 				name: 'Mike Chen',
 				joinDate: '2024-03-10',
 				earnings: 275.0,
-				status: 'active'
+				status: 'active' as ReferralStatus
 			},
 			{
 				id: 4,
 				name: 'Emma Davis',
 				joinDate: '2024-04-05',
 				earnings: 0,
-				status: 'pending'
+				status: 'pending' as ReferralStatus
 			}
 		],
 		earningsHistory: [
@@ -169,7 +171,6 @@
 	<section class="affiliate-section">
 		<div class="balance-info">
 			<div class="balance-info__header">
-				
 				<h3>Your Platform Balance</h3>
 			</div>
 			<div class="balance-info__content">
@@ -185,21 +186,21 @@
 						<span>Purchase premium subscriptions for artists</span>
 					</li>
 					<li>
-                        <div class="icon">
-                            <SvgIcon path={mdiCheckCircle} size={18} />
-                        </div>
+						<div class="icon">
+							<SvgIcon path={mdiCheckCircle} size={18} />
+						</div>
 						<span>Buy individual tracks and albums</span>
 					</li>
 					<li>
-                        <div class="icon">
-                            <SvgIcon path={mdiCheckCircle} size={18} />
-                        </div>
+						<div class="icon">
+							<SvgIcon path={mdiCheckCircle} size={18} />
+						</div>
 						<span>Unlock premium features and tools</span>
 					</li>
 					<li>
-                        <div class="icon">
-                            <SvgIcon path={mdiCheckCircle} size={18} />
-                        </div>
+						<div class="icon">
+							<SvgIcon path={mdiCheckCircle} size={18} />
+						</div>
 						<span>Support your favorite artists directly</span>
 					</li>
 				</ul>

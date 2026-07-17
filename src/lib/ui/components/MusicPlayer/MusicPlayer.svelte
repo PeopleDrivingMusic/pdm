@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import {
 		mdiHeart,
 		mdiArrowCollapse,
@@ -18,13 +18,15 @@
 	import Tabs from '$lib/ui/Tabs.svelte';
 	import CoverPreview from './CoverPreview.svelte';
 	import Aurora from '$lib/ui/backgrounds/Aurora.svelte';
-	import ColorThief from 'colorthief';
 	import { TrackClient } from '$lib/client/tracks';
-	import SaveTrackModal from "$lib/ui/components/Modal/SaveTrackModal.svelte"
-
-	const { track, artist, album, isLiked } = $derived(
-		playerStore.que[playerStore.currentTrackIndex]
-	);
+	import SaveTrackModal from '$lib/ui/components/Modal/SaveTrackModal.svelte';
+	import { resolveR2ImageUrl } from '$lib/utils/helpers';
+	const currentTrack = $derived(playerStore.currentTrack);
+	const track = $derived(currentTrack?.track);
+	const artist = $derived(currentTrack?.artist);
+	const album = $derived(currentTrack?.album);
+	const coverUrl = $derived(resolveR2ImageUrl(track?.imageUrl || album?.coverImageUrl || artist?.avatar));
+	const isLiked = $derived(currentTrack?.isLiked ?? false);
 	const socialTabs = [
 		{ id: 'lyrics', label: 'Lyrics' },
 		{ id: 'comments', label: 'Comments' },
@@ -46,164 +48,157 @@
 		{ id: 'similar', label: 'Similar' },
 		{ id: 'covers', label: 'Cover versions' }
 	];
-	let auroraColors = $state([]);
+	let auroraColors = $state<string[]>([]);
 	let isExpanded = $state(false);
 	let showSaveModal = $state(false);
-	let saveTrackId = $state("")
+	let saveTrackId = $state('');
 	$effect(() => {
-		extractColors(track.imageUrl || album?.coverImageUrl || artist?.avatar);
+		extractColors(coverUrl);
 	});
 
-	async function extractColors(imageUrl) {
+	async function extractColors(imageUrl?: string | null) {
 		if (!imageUrl) {
 			auroraColors = ['#444444', '#222222', '#000000', '#111111'];
 			return;
 		}
-		const img = new Image();
-		img.crossOrigin = 'anonymous';
-		img.src = imageUrl;
-
-		img.onload = () => {
-			const colorThief = new ColorThief();
-			const palette = colorThief.getPalette(img, 4);
-			auroraColors = palette.map(color => {
-				const hex = '#' + color.map(c => c.toString(16).padStart(2, '0')).join('');
-				return hex;
-			});
-		};
+		auroraColors = ['#7b61ff', '#2dd4bf', '#111827', '#f59e0b'];
 	}
-	
 </script>
 
-<div class="player-wrapper" class:expanded={isExpanded} in:fly={{ y: 100 }}>
-	<div class="left-column">
-		{#if isExpanded}
-			<div class="tracks-next">
-				<div class="tabs-wrapper">
-					<Tabs
-						type="underline"
-						tabs={musicModeTabs}
-						showTrack={true}
-						activeTab={musicModeTabs[0]}
-						onTabChange={(tab) => console.log('Tab changed to:', tab)}
-					/>
-				</div>
-				<div class="tracks-que">
-					{#each playerStore.que as { track, artist }, index}
-						<div class="track">
-							<Avatar
-								size="s"
-								square={true}
-								src={track.imageUrl || album?.coverImageUrl || artist?.avatar}
-							/>
-							<div class="track-info">
-								<h3 class="track-title">{track.title}</h3>
-								<a class="track-artist" href="/artist/{artist?.slug}">{artist?.name}</a>
-							</div>
-							<div class="actions">
-								<div class="button">
-									<SvgIcon path={mdiHeart} size={20} />
+{#if track}
+	<div class="player-wrapper" class:expanded={isExpanded} in:fly={{ y: 100 }}>
+		<div class="left-column">
+			{#if isExpanded}
+				<div class="tracks-next">
+					<div class="tabs-wrapper">
+						<Tabs
+							type="underline"
+							tabs={musicModeTabs}
+							showTrack={true}
+							activeTab={musicModeTabs[0]}
+							onTabChange={(tab) => console.log('Tab changed to:', tab)}
+						/>
+					</div>
+					<div class="tracks-que">
+						{#each playerStore.que as { track, artist }, index}
+							<div class="track">
+								<Avatar
+									size="s"
+									square={true}
+									src={resolveR2ImageUrl(track.imageUrl || album?.coverImageUrl || artist?.avatar)}
+								/>
+								<div class="track-info">
+									<h3 class="track-title">{track.title}</h3>
+									<a class="track-artist" href="/artist/{artist?.slug}">{artist?.name}</a>
 								</div>
-								<div class="button">
-									<SvgIcon path={mdiClose} size={20} />
+								<div class="actions">
+									<div class="button">
+										<SvgIcon path={mdiHeart} size={20} />
+									</div>
+									<div class="button">
+										<SvgIcon path={mdiClose} size={20} />
+									</div>
 								</div>
 							</div>
-						</div>
-						<!-- content here -->
-					{/each}
+							<!-- content here -->
+						{/each}
+					</div>
 				</div>
-			</div>
-		{:else}
-			<div class="track-info">
-				<div class="artist-info">
-					<div class="track-title">{track.title}</div>
-					<a class="track-artist" href="/artist/{artist?.slug}">{artist?.name}</a>
+			{:else}
+				<div class="track-info">
+					<div class="artist-info">
+						<div class="track-title">{track.title}</div>
+						<a class="track-artist" href="/artist/{artist?.slug}">{artist?.name}</a>
+					</div>
+					<div class="button-wrapper">
+						<Button variant="primary" size="md">Subscribe</Button>
+					</div>
 				</div>
-				<div class="button-wrapper">
-					<Button variant="primary" size="md">Subscribe</Button>
+			{/if}
+		</div>
+		<div class="center-column">
+			{#if isExpanded}
+				<div class="aurora-bg" in:fade>
+					<Aurora colorStops={auroraColors} />
 				</div>
-			</div>
-		{/if}
-	</div>
-	<div class="center-column">
-		{#if isExpanded}
-			<div class="aurora-bg" in:fade>
-				<Aurora colorStops={auroraColors}/>
-			</div>
-			<button class="collapse-button icon-button" onclick={() => (isExpanded = false)}>
-				<SvgIcon path={mdiArrowCollapse} size={20} />
-			</button>
-			<div class="preview-wrapper" in:fade>
-				<div class="buttons-wrapper">
-					<Tabs
-						type="pill"
-						tabs={playerModeTabs}
-						activeTab={playerModeTabs[0]}
-						onTabChange={(tab) => console.log('Tab changed to:', tab)}
-					/>
-				</div>
-				<CoverPreview {track} {artist} {album} />
-			</div>
-		{/if}
-		{#if !isExpanded}
-			<Player />
-		{/if}
-	</div>
-	{#if !isExpanded}
-		<div class="right-column">
-			<div class="actions">
-				{#if !isExpanded}
-					<button
-						class="action-button icon-button"
-						class:active={isLiked}
-						onclick={async () => {
-							const res = await TrackClient.toggleLike(track.id);
-							if (res) {
-								playerStore.que[playerStore.currentTrackIndex].isLiked = !isLiked;
-							}
-						}}
-					>
-						{#if isLiked}
-							<SvgIcon path={mdiHeart} size={20} />
-						{:else}
-							<SvgIcon path={mdiHeartOutline} size={20} />
-						{/if}
-					</button>
-					<button class="action-button icon-button">
-						<SvgIcon path={mdiChatOutline} size={20} />
-					</button><button class="action-button icon-button">
-						<SvgIcon path={mdiRocketLaunchOutline} size={20} />
-					</button>
-					<button class="action-button icon-button" onclick={() => {
-						saveTrackId = track.id;
-						showSaveModal = true;
-					}}>
-						<SvgIcon path={mdiBookmarkOutline} size={20} />
-					</button>
-					<button class="action-button icon-button">
-						<SvgIcon path={mdiCloudDownloadOutline} size={20} />
-					</button>
-				{:else}
-					<Tabs
-						type="underline"
-						showTrack={true}
-						tabs={socialTabs}
-						activeTab={socialTabs[0]}
-						onTabChange={(tab) => console.log('Tab changed to:', tab)}
-					/>
-				{/if}
-				<button
-					class="action-button expand-button icon-button"
-					onclick={() => (isExpanded = !isExpanded)}
-				>
+				<button class="collapse-button icon-button" onclick={() => (isExpanded = false)}>
 					<SvgIcon path={mdiArrowCollapse} size={20} />
 				</button>
-			</div>
+				<div class="preview-wrapper" in:fade>
+					<div class="buttons-wrapper">
+						<Tabs
+							type="pill"
+							tabs={playerModeTabs}
+							activeTab={playerModeTabs[0]}
+							onTabChange={(tab) => console.log('Tab changed to:', tab)}
+						/>
+					</div>
+					<CoverPreview />
+				</div>
+			{/if}
+			{#if !isExpanded}
+				<Player />
+			{/if}
 		</div>
-	{/if}
-</div>
+		{#if !isExpanded}
+			<div class="right-column">
+				<div class="actions">
+					{#if !isExpanded}
+						<button
+							class="action-button icon-button"
+							class:active={isLiked}
+							onclick={async () => {
+								const res = await TrackClient.toggleLike(track.id);
+								if (res) {
+									playerStore.que[playerStore.currentTrackIndex].isLiked = !isLiked;
+								}
+							}}
+						>
+							{#if isLiked}
+								<SvgIcon path={mdiHeart} size={20} />
+							{:else}
+								<SvgIcon path={mdiHeartOutline} size={20} />
+							{/if}
+						</button>
+						<button class="action-button icon-button">
+							<SvgIcon path={mdiChatOutline} size={20} />
+						</button><button class="action-button icon-button">
+							<SvgIcon path={mdiRocketLaunchOutline} size={20} />
+						</button>
+						<button
+							class="action-button icon-button"
+							onclick={() => {
+								saveTrackId = track.id;
+								showSaveModal = true;
+							}}
+						>
+							<SvgIcon path={mdiBookmarkOutline} size={20} />
+						</button>
+						<button class="action-button icon-button">
+							<SvgIcon path={mdiCloudDownloadOutline} size={20} />
+						</button>
+					{:else}
+						<Tabs
+							type="underline"
+							showTrack={true}
+							tabs={socialTabs}
+							activeTab={socialTabs[0]}
+							onTabChange={(tab) => console.log('Tab changed to:', tab)}
+						/>
+					{/if}
+					<button
+						class="action-button expand-button icon-button"
+						onclick={() => (isExpanded = !isExpanded)}
+					>
+						<SvgIcon path={mdiArrowCollapse} size={20} />
+					</button>
+				</div>
+			</div>
+		{/if}
+	</div>
 
-<SaveTrackModal trackId={saveTrackId} bind:show={showSaveModal}></SaveTrackModal>
+	<SaveTrackModal trackId={saveTrackId} bind:show={showSaveModal}></SaveTrackModal>
+{/if}
 
 <style lang="scss">
 	.player-wrapper {

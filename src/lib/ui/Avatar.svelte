@@ -20,7 +20,8 @@
     ...rest
   }: Props = $props();
 
-  let showImage = $state(!!src);
+  let imageError = $state(false);
+  let showImage = $derived(!!src && !imageError);
 
   function getInitials(input = '') {
     const s = (input || '').trim();
@@ -29,9 +30,14 @@
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
+  $effect(() => {
+    if (src) {
+      imageError = false;
+    }
+  });
 
   function handleImgError() {
-    showImage = false;
+    imageError = true;
   }
 
   const initials = $derived(getInitials(name || alt || ''));

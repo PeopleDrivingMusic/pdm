@@ -1,1 +1,0 @@
-ALTER TABLE "tracks" DROP COLUMN "play_count";

@@ -1,6 +1,6 @@
 # PDM Monitoring & Logging System
 
-Comprehensive monitoring and logging system for the PDM (People Driving Music) project, including Prometheus, Loki, Grafana and modern tools for collecting metrics and logs.
+Comprehensive monitoring and logging system for the PDM (People Driven Music) project, including Prometheus, Loki, Grafana and modern tools for collecting metrics and logs.
 
 ## 🏗️ Architecture
 

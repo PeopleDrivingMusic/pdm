@@ -11,5 +11,5 @@ export const load: PageServerLoad = async ({params}) => {
 			message: 'Not found'
 		});
 	}
-    return { user };
+	return { profileUser: user };
 };

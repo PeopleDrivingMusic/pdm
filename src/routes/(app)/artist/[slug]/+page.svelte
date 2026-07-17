@@ -1,688 +1,927 @@
 <script lang="ts">
-	import SvgIcon from '$lib/ui/SvgIcon.svelte';
-	import { page } from '$app/state';
 	import type { PageData } from './$types';
-	import Button from '$lib/ui/Button.svelte';
-	import Avatar from '$lib/ui/Avatar.svelte';
-	import MusicTrack from '$lib/ui/components/MusicTrack.svelte';
+	import { page } from '$app/state';
 	import {
-		mdiChat,
-		mdiFormatListBulleted,
-		mdiListBox,
-		mdiMap,
-		mdiMapMarkerRadiusOutline,
-		mdiHeart
+		mdiChatOutline,
+		mdiHeartOutline,
+		mdiImageMultipleOutline,
+		mdiLockOutline,
+		mdiPlayCircleOutline,
+		mdiPostOutline,
+		mdiVideoOutline
 	} from '@mdi/js';
+	import { Avatar, Button, SvgIcon, Tabs } from '$lib/ui';
 	import MusicAlbum from '$lib/ui/components/MusicAlbum.svelte';
-	import Progress from '$lib/ui/Progress.svelte';
-	import Tabs from '$lib/ui/Tabs.svelte';
-	import { derived } from 'svelte/store';
-	$inspect(page.data);
-	const { artist, tracks, albums } = $derived(page.data as PageData);
-	const albumMap = $derived(new Map(albums.map((album) => ([album.id, album]))))
+	import MusicTrack from '$lib/ui/components/MusicTrack.svelte';
+	import PostMusicAttachment from '$lib/ui/components/PostMusicAttachment.svelte';
+	import PostPoll from '$lib/ui/components/PostPoll.svelte';
+
+	const { artist, tracks, albums, content } = $derived(page.data as PageData);
+	const albumMap = $derived(new Map(albums.map((album) => [album.id, album])));
+	const trackMap = $derived(new Map(tracks.map((track) => [track.track.id, track])));
+
 	const tabs = [
-		{label: 'Feed', id: "feed"},
-		{label: 'Music', id: "music"},
-		{label: 'Photos', id: "photos"},
-		{label: 'Posts', id: "posts"},
-		{label: 'Lives', id: "lives"},
-		{label: 'Shop', id: "shop"}
+		{ label: 'Feed', id: 'feed' },
+		{ label: 'Music', id: 'music' },
+		{ label: 'Posts', id: 'posts' },
+		{ label: 'Photos', id: 'photos' },
+		{ label: 'Videos', id: 'videos' },
+		{ label: 'Shop', id: 'shop' }
 	];
-	let tab = $state('Feed');
-	const concerts = [
-		{
-			id: 1,
-			date: '2025-03-15',
-			time: '20:00',
-			city: 'Los Angeles',
-			country: 'USA',
-			venue: 'Crypto.com Arena'
-		},
-		{
-			id: 2,
-			date: '2025-03-22',
-			time: '19:30',
-			city: 'New York',
-			country: 'USA',
-			venue: 'Madison Square Garden'
-		},
-		{
-			id: 3,
-			date: '2025-04-05',
-			time: '21:00',
-			city: 'London',
-			country: 'UK',
-			venue: 'The O2 Arena'
-		},
-		{
-			id: 4,
-			date: '2025-04-18',
-			time: '20:30',
-			city: 'Paris',
-			country: 'France',
-			venue: 'Accor Arena'
-		},
-		{
-			id: 5,
-			date: '2025-05-10',
-			time: '19:00',
-			city: 'Tokyo',
-			country: 'Japan',
-			venue: 'Tokyo Dome'
-		},
-		{
-			id: 6,
-			date: '2025-05-25',
-			time: '20:00',
-			city: 'Sydney',
-			country: 'Australia',
-			venue: 'Qudos Bank Arena'
-		}
-	];
-	function formatDate(dateStr: string) {
-		const date = new Date(dateStr);
-		return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+	let activeTab = $state(tabs[0]);
+
+	const latestPhotos = $derived(content.photoAlbums.flatMap((album) => album.photos).slice(0, 6));
+	const videoItems = $derived([...content.videoCollections, ...content.videos]);
+
+	function formatDate(value: Date | string | null) {
+		if (!value) return '';
+		const date = new Date(value);
+		if (Number.isNaN(date.getTime())) return '';
+		return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(date);
+	}
+
+	function contentIcon(type: string) {
+		if (type === 'photo_album') return mdiImageMultipleOutline;
+		if (type === 'video' || type === 'video_collection') return mdiVideoOutline;
+		return mdiPostOutline;
+	}
+
+	function contentLabel(type: string) {
+		if (type === 'photo_album') return 'Gallery';
+		if (type === 'video_collection') return 'Video playlist';
+		if (type === 'video') return 'Video';
+		return 'Post';
 	}
 </script>
 
 <div class="artist-page">
-	<div class="main-content">
-		<div class="header">
-			<div class="cover" style=" background-image: url('{artist?.coverImg}')"></div>
-			<div class="header-content">
-				<div class="info">
-					<h1 class="name">{artist?.name || 'Unknown Artist'}</h1>
-					<div class="community">
-						<div class="followers">
-							<strong>{artist.followersCount || '1.5m'}</strong> Followers
-						</div>
-						<div class="subscribers">
-							<strong>{artist.likesCount || '100k'}</strong> Subscribers
+	<main class="main-content">
+		<header class="hero">
+			<div class="cover" style:background-image={artist?.coverImg ? `url('${artist.coverImg}')` : undefined}>
+			</div>
+			<div class="hero-content">
+				<div class="identity">
+					<Avatar size="lg" src={artist.avatar} name={artist.name} />
+					<div>
+						<p class="eyebrow">Artist</p>
+						<h1>{artist?.name || 'Unknown Artist'}</h1>
+						<div class="community">
+							<span><strong>1.5m</strong> followers</span>
+							<span><strong>100k</strong> subscribers</span>
 						</div>
 					</div>
-					<!-- <p class="genre">{data.tracks ? data.tracks.genre : ''}</p> -->
 				</div>
 				<div class="actions">
 					<Button variant="secondary">Follow</Button>
 					<Button>Subscribe</Button>
 				</div>
 			</div>
-		</div>
-		<div class="section">
-			<div class="tabs-wrapper">
-				<Tabs tabs={tabs} activeTab={tabs[0]} type="pill" />
-				
-			</div>
-			{#if tab === 'Feed'}
-				<div class="feed-content">
-					<h3>Top Music</h3>
+		</header>
+
+		<section class="content-surface">
+			<Tabs {tabs} bind:activeTab type="pill" />
+
+			{#if activeTab.id === 'feed'}
+				<section class="section-block">
+					<div class="section-heading">
+						<div>
+							<p class="eyebrow">Latest</p>
+							<h2>Artist feed</h2>
+						</div>
+					</div>
+
+					{#if content.feed.length}
+						<div class="feed-list">
+							{#each content.feed as item}
+								<article class="feed-card" class:is-locked={item.isLocked}>
+									<div class="feed-icon">
+										<SvgIcon path={contentIcon(item.type)} size={22} />
+									</div>
+									<div class="feed-body">
+										<div class="meta-row">
+											<span>{contentLabel(item.type)}</span>
+											{#if item.visibility !== 'public'}
+												<span class="visibility">
+													<SvgIcon path={mdiLockOutline} size={13} />
+													{item.visibility}
+												</span>
+											{/if}
+											<span>{formatDate(item.publishedAt)}</span>
+										</div>
+										<h3>{item.title}</h3>
+										<p>{item.type === 'post' ? item.excerpt : item.description}</p>
+									</div>
+									{#if item.isLocked}
+										<div class="lock-overlay">
+											<SvgIcon path={mdiLockOutline} size={20} />
+											<span>{item.lockReason}</span>
+										</div>
+									{/if}
+								</article>
+							{/each}
+						</div>
+					{:else}
+						<div class="empty-state">No artist updates yet.</div>
+					{/if}
+				</section>
+
+				<section class="section-block">
+					<div class="section-heading">
+						<div>
+							<p class="eyebrow">Music</p>
+							<h2>Top tracks</h2>
+						</div>
+					</div>
 					<div class="track-wrapper">
 						{#each tracks as track}
-							<MusicTrack track={track.track} isLiked={track.isLiked}  {artist} album={albumMap.get(track.albumId || "")}/>
+							<MusicTrack
+								track={track.track}
+								isLiked={track.isLiked}
+								{artist}
+								album={albumMap.get(track.track.albumId || '')}
+							/>
 						{/each}
 					</div>
-				</div>
-				<div class="posts-feed">
-					<h3>Recent Posts</h3>
-
-					<!-- HTML (to paste into the posts-feed area) -->
-					<div class="posts-list">
-						<!-- Post 1 -->
-						<article class="post">
-							<div class="post-header">
-								<Avatar size="md" src={artist.avatar} name={artist.name} />
-								<div class="meta-row">
-									<div class="author">{artist.name} <span class="time">• 2h</span></div>
-									<div class="post-text">
-										Just finished a new remix — dropped it in the studio today. Thoughts?
-									</div>
-								</div>
-							</div>
-							<div class="post-actions">
-								<div class="action-button">
-									<SvgIcon path={mdiHeart} size={24} />
-								</div>
-								<div class="action-button">
-									<SvgIcon path={mdiChat} size={24} />
-								</div>
-							</div>
-						</article>
-
-						<!-- Post 2 -->
-						<article class="post">
-							<div class="post-header">
-								<Avatar size="md" src={artist.avatar} name={artist.name} />
-								<div class="meta-row">
-									<div class="author">{artist.name}<span class="time">• Yesterday</span></div>
-									<div class="post-text">Live session highlights — cutting a sick verse. 🎤</div>
-								</div>
-							</div>
-							<div class="media">
-								<div class="media-placeholder">LIVE SESSION CLIP</div>
-							</div>
-							<div class="post-actions">
-								<div class="action-button">
-									<SvgIcon path={mdiHeart} size={24} />
-								</div>
-								<div class="action-button">
-									<SvgIcon path={mdiChat} size={24} />
-								</div>
-							</div>
-						</article>
-
-						<!-- Poll -->
-						<article class="post poll">
-							<div class="post-header">
-								<Avatar size="md" src={artist.avatar} name={artist.name} />
-								<div class="meta-row">
-									<div class="author">Which track should be next?</div>
-									<div class="time">• Poll · 1d</div>
-								</div>
-							</div>
-
-							<form class="poll-form" on:submit|preventDefault>
-								<label class="option">
-									<input type="radio" name="poll" value="A" />
-									<span class="option-label">Track A — Upbeat</span>
-									<Progress progress={62} />
-								</label>
-
-								<label class="option">
-									<input type="radio" name="poll" value="B" />
-									<span class="option-label">Track B — Chill</span>
-									<Progress progress={28} />
-								</label>
-
-								<label class="option">
-									<input type="radio" name="poll" value="C" />
-									<span class="option-label">Track C — Experimental</span>
-									<Progress progress={10} />
-								</label>
-
-							</form>
-						</article>
+				</section>
+			{:else if activeTab.id === 'music'}
+				<section class="section-block">
+					<div class="section-heading">
+						<div>
+							<p class="eyebrow">Catalog</p>
+							<h2>Tracks</h2>
+						</div>
 					</div>
-				</div>
+					<div class="track-wrapper">
+						{#each tracks as track}
+							<MusicTrack
+								track={track.track}
+								isLiked={track.isLiked}
+								{artist}
+								album={albumMap.get(track.track.albumId || '')}
+							/>
+						{/each}
+					</div>
+				</section>
 
-				<div class="albums">
-					<h3>Albums</h3>
+				<section class="section-block">
+					<div class="section-heading">
+						<div>
+							<p class="eyebrow">Releases</p>
+							<h2>Albums</h2>
+						</div>
+					</div>
 					<div class="album-wrapper">
 						{#each albums as album}
 							<MusicAlbum {album} {artist} />
 						{/each}
 					</div>
-				</div>
-			{/if}
-		</div>
-	</div>
-	<div class="side-content">
-		<div class="section">
-			<div class="section-bg"></div>
-			<div class="community-info">
-				<h2>Community</h2>
-				<div class="online">
-					<div class="red-dot"></div>
-					<strong>1.2k</strong> Online
-				</div>
-			</div>
-			<div class="chat-wrapp">
-				{#each Array(10) as item, index}
-					<div class="message-wrapp">
-						<Avatar size="s" name={`User ${index}`} />
-						<div class="text">Message {index}</div>
+				</section>
+			{:else if activeTab.id === 'posts'}
+				<section class="section-block">
+					<div class="section-heading">
+						<div>
+							<p class="eyebrow">Updates</p>
+							<h2>Posts</h2>
+						</div>
 					</div>
-				{/each}
-			</div>
-		</div>
+					{#if content.posts.length}
+						<div class="posts-list">
+							{#each content.posts as post}
+								<article class="post-card" class:is-locked={post.isLocked}>
+									<header class="post-header">
+										<Avatar size="md" src={artist.avatar} name={artist.name} />
+										<div>
+											<div class="author">{artist.name}</div>
+											<div class="meta-row">
+												<span>{formatDate(post.publishedAt)}</span>
+												{#if post.visibility !== 'public'}
+													<span class="visibility">
+														<SvgIcon path={mdiLockOutline} size={13} />
+														{post.visibility}
+													</span>
+												{/if}
+											</div>
+										</div>
+									</header>
+									<div class="post-content">
+										<h3>{post.title}</h3>
+										{#if post.isLocked}
+											<p>{post.excerpt}</p>
+											<div class="locked-panel">
+												<SvgIcon path={mdiLockOutline} size={22} />
+												<span>{post.lockReason}</span>
+											</div>
+										{:else}
+											{#if post.bodyHtml}
+												<div class="rich-text">{@html post.bodyHtml}</div>
+											{:else}
+												<p>{post.excerpt}</p>
+											{/if}
 
-		<div class="section">
-			<div class="section-bg"></div>
-			<div class="upcoming-header">
-				<h2>Upcoming Concerts</h2>
-				<div class="buttons">
-					<button>
-						<SvgIcon path={mdiFormatListBulleted} />
-					</button>
-					<button>
-						<SvgIcon path={mdiMapMarkerRadiusOutline} />
-					</button>
+											{#if post.media.length}
+												<div class="post-media-grid">
+													{#each post.media as media}
+														<img src={media.thumbnailUrl || media.fileUrl} alt={media.alt || media.caption || post.title} loading="lazy" />
+													{/each}
+												</div>
+											{/if}
+
+											{#if post.musicAttachments.length}
+												<div class="music-attachments">
+													{#each post.musicAttachments as item}
+														{@const trackEntry = item.type === 'track' ? trackMap.get(item.id) : undefined}
+														<PostMusicAttachment
+															attachment={item}
+															{trackEntry}
+															artist={artist ?? null}
+															album={trackEntry?.track.albumId ? albumMap.get(trackEntry.track.albumId) : null}
+														/>
+													{/each}
+												</div>
+											{/if}
+
+											{#if post.poll}
+												<PostPoll poll={post.poll} />
+											{/if}
+										{/if}
+									</div>
+									<footer class="post-actions">
+										<button aria-label="Like post"><SvgIcon path={mdiHeartOutline} size={20} /></button>
+										<button aria-label="Comment on post"><SvgIcon path={mdiChatOutline} size={20} /></button>
+									</footer>
+								</article>
+							{/each}
+						</div>
+					{:else}
+						<div class="empty-state">No posts yet.</div>
+					{/if}
+				</section>
+			{:else if activeTab.id === 'photos'}
+				<section class="section-block">
+					<div class="section-heading">
+						<div>
+							<p class="eyebrow">Gallery</p>
+							<h2>Photo albums</h2>
+						</div>
+					</div>
+					{#if content.photoAlbums.length}
+						<div class="gallery-grid">
+							{#each content.photoAlbums as album}
+								<article class="gallery-card" class:is-locked={album.isLocked}>
+									<div class="gallery-preview">
+										{#if album.photos[0]}
+											<img src={album.photos[0].thumbnailUrl || album.photos[0].fileUrl} alt={album.photos[0].alt || album.title} loading="lazy" />
+										{:else}
+											<SvgIcon path={album.isLocked ? mdiLockOutline : mdiImageMultipleOutline} size={34} />
+										{/if}
+										{#if album.isLocked}
+											<div class="lock-overlay">
+												<SvgIcon path={mdiLockOutline} size={20} />
+												<span>{album.lockReason}</span>
+											</div>
+										{/if}
+									</div>
+									<div class="card-copy">
+										<div class="meta-row">
+											<span>{album.photos.length} photos</span>
+											{#if album.visibility !== 'public'}
+												<span class="visibility">
+													<SvgIcon path={mdiLockOutline} size={13} />
+													{album.visibility}
+												</span>
+											{/if}
+										</div>
+										<h3>{album.title}</h3>
+										<p>{album.description}</p>
+									</div>
+								</article>
+							{/each}
+						</div>
+					{:else}
+						<div class="empty-state">No photo albums yet.</div>
+					{/if}
+				</section>
+			{:else if activeTab.id === 'videos'}
+				<section class="section-block">
+					<div class="section-heading">
+						<div>
+							<p class="eyebrow">Watch</p>
+							<h2>Videos and playlists</h2>
+						</div>
+					</div>
+					{#if videoItems.length}
+						<div class="video-grid">
+							{#each videoItems as item}
+								<article class="video-card" class:is-locked={item.isLocked}>
+									<div class="video-preview">
+										{#if item.type === 'video' && item.thumbnailUrl}
+											<img src={item.thumbnailUrl} alt={item.title} loading="lazy" />
+										{:else}
+											<SvgIcon path={item.isLocked ? mdiLockOutline : mdiVideoOutline} size={36} />
+										{/if}
+										<div class="play-badge">
+											<SvgIcon path={item.isLocked ? mdiLockOutline : mdiPlayCircleOutline} size={28} />
+										</div>
+									</div>
+									<div class="card-copy">
+										<div class="meta-row">
+											<span>{contentLabel(item.type)}</span>
+											{#if item.visibility !== 'public'}
+												<span class="visibility">
+													<SvgIcon path={mdiLockOutline} size={13} />
+													{item.visibility}
+												</span>
+											{/if}
+										</div>
+										<h3>{item.title}</h3>
+										<p>{item.description}</p>
+										{#if item.isLocked}
+											<div class="locked-inline">
+												<SvgIcon path={mdiLockOutline} size={16} />
+												<span>{item.lockReason}</span>
+											</div>
+										{/if}
+									</div>
+								</article>
+							{/each}
+						</div>
+					{:else}
+						<div class="empty-state">No videos yet.</div>
+					{/if}
+				</section>
+			{:else}
+				<div class="empty-state">Shop is coming soon.</div>
+			{/if}
+		</section>
+	</main>
+
+	<aside class="side-content">
+		<section class="sidebar-card">
+			<div class="section-heading compact">
+				<div>
+					<p class="eyebrow">Community</p>
+					<h2>Fan room</h2>
 				</div>
+				<span class="online-dot"></span>
 			</div>
-			<div class="concert-list">
-				{#each concerts as concert}
-					<div class="concert-item">
-						<div class="concert-date">
-							<div class="day">{formatDate(concert.date)}</div>
-							<div class="time">{concert.time}</div>
-						</div>
-						<div class="concert-info">
-							<div class="venue">{concert.venue}</div>
-							<div class="location">
-								<SvgIcon path={mdiMapMarkerRadiusOutline} size={16} />
-								<span>{concert.city}, {concert.country}</span>
-							</div>
-						</div>
-						<div class="button">
-							<Button size="md">Get Tickets</Button>
-						</div>
-						<!-- <button class="get-tickets">Get Tickets</button> -->
+			<div class="chat-preview">
+				{#each Array(6) as _, index}
+					<div class="message-row">
+						<Avatar size="s" name={`User ${index + 1}`} />
+						<span>Fan message {index + 1}</span>
 					</div>
 				{/each}
 			</div>
-		</div>
-	</div>
+		</section>
+
+		<section class="sidebar-card">
+			<div class="section-heading compact">
+				<div>
+					<p class="eyebrow">Photos</p>
+					<h2>Latest shots</h2>
+				</div>
+			</div>
+			{#if latestPhotos.length}
+				<div class="mini-photo-grid">
+					{#each latestPhotos as photo}
+						<img src={photo.thumbnailUrl || photo.fileUrl} alt={photo.alt || photo.caption || 'Artist photo'} loading="lazy" />
+					{/each}
+				</div>
+			{:else}
+				<div class="empty-state compact">No public photos yet.</div>
+			{/if}
+		</section>
+	</aside>
 </div>
 
 <style lang="scss">
 	.artist-page {
 		width: 100%;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+		gap: var(--space-7, 2rem);
+		align-items: start;
+	}
+
+	.main-content,
+	.side-content {
+		min-width: 0;
+	}
+
+	.side-content {
+		position: sticky;
+		top: var(--space-5);
 		display: flex;
-		height: max-content;
+		flex-direction: column;
+		gap: var(--space-5);
+	}
 
-		gap: var(--space-6);
-		.main-content {
-			width: 60%;
-			.header {
-				position: relative;
-				width: 100%;
-				display: flex;
-				flex-direction: column;
-				justify-content: end;
+	.hero {
+		overflow: hidden;
+		position: relative;
+		border-radius: var(--radius-xl, 24px);
+		background:
+			radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 34%),
+			linear-gradient(135deg, color-mix(in srgb, var(--bg-tertiary) 92%, var(--primary)), var(--bg-primary));
+		box-shadow: 0 18px 56px rgba(0, 0, 0, 0.24);
+	}
 
-				.cover {
-					width: 100%;
-					height: 100%;
-					background: var(--bg-secondary);
-					background-size: cover;
-					background-position: top;
-					z-index: 1;
-					height: 350px;
+	.cover {
+		height: clamp(190px, 24vw, 240px);
+		background:
+			linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 42%),
+			linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.34)),
+			linear-gradient(135deg, var(--bg-tertiary), var(--bg-primary));
+		background-size: cover;
+		background-position: top;
+		position: relative;
 
-					-webkit-mask-image: linear-gradient(
-						to bottom,
-						rgba(0, 0, 0, 1) 0%,
-						rgba(0, 0, 0, 1) 22%,
-						rgba(0, 0, 0, 0) 100%
-					);
-					mask-image: linear-gradient(
-						to bottom,
-						rgba(0, 0, 0, 1) 0%,
-						rgba(0, 0, 0, 1) 22%,
-						rgba(0, 0, 0, 0) 100%
-					);
-					-webkit-mask-size: 100% 100%;
-					mask-size: 100% 100%;
-					mask-repeat: no-repeat;
-
-					&::after {
-						content: '';
-						position: absolute;
-						left: 0;
-						right: 0;
-						bottom: 0;
-						height: 40%;
-						background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
-						pointer-events: none;
-						z-index: 1;
-					}
-				}
-				.header-content {
-					margin-top: -15%;
-					z-index: 2;
-					padding: var(--space-6);
-					color: var(--text-primary);
-					display: flex;
-					justify-content: space-between;
-					align-items: start;
-
-					.info {
-						display: flex;
-						flex-direction: column;
-						.name {
-							font-size: 2.5rem;
-							margin: 0;
-						}
-						.community {
-							display: flex;
-							color: var(--text-secondary);
-							gap: var(--space-2);
-						}
-					}
-					.actions {
-						flex-shrink: 0;
-						display: flex;
-						gap: var(--space-4);
-					}
-				}
-			}
-		}
-
-		.section {
-			position: relative;
-			border-radius: 12px;
-			display: flex;
-			display: flex;
-			flex-direction: column;
-			padding: var(--space-4);
-			gap: var(--space-4);
-			h3 {
-				@include text-display-xs();
-			}
-		}
-
-		.side-content {
-			position: sticky;
-			top: 0;
-			height: max-content;
-			flex-grow: 1;
-			padding: var(--space-4);
-			display: flex;
-			flex-direction: column;
-			gap: var(--space-5);
-			.section {
-				.community-info {
-					z-index: 1;
-					display: flex;
-					width: 100%;
-					align-items: center;
-					justify-content: space-between;
-					.online {
-						display: flex;
-						color: var(--text-secondary);
-						align-items: center;
-						gap: var(--space-2);
-						.red-dot {
-							width: 10px;
-							height: 10px;
-							background-color: var(--color-error-700);
-							border-radius: 50%;
-						}
-					}
-				}
-				.section-bg {
-					position: absolute;
-					left: 0;
-					right: 0;
-					top: 0;
-					bottom: 0;
-					background-color: var(--bg-surface);
-					opacity: 0.8;
-					z-index: 0;
-					border-radius: 12px;
-				}
-
-				h2 {
-					z-index: 1;
-					@include text-display-xs();
-				}
-
-				.chat-wrapp {
-					flex-grow: 1;
-					background: var(--bg-secondary);
-					border-radius: 16px;
-					z-index: 1;
-					width: 100%;
-					height: 300px;
-					max-height: 300px;
-					overflow-y: auto;
-					.message-wrapp {
-						padding: var(--space-2);
-						display: flex;
-						gap: var(--space-2);
-						align-items: end;
-						.text {
-							@include text-xs();
-							color: var(--text-primary);
-							padding: var(--space-1);
-							background: var(--color-brand-800);
-							border-radius: var(--radius-2xl);
-						}
-					}
-				}
-
-				.upcoming-header {
-					display: flex;
-					width: 100%;
-					justify-content: space-between;
-					align-items: center;
-					.buttons {
-						display: flex;
-						gap: var(--space-2);
-
-						button:hover {
-							color: var(--primary);
-						}
-					}
-				}
-			}
-		}
-
-		.tabs-wrapper {
-			display: flex;
-			gap: var(--space-4);
-		}
-
-		.feed-content {
-			display: flex;
-			flex-direction: column;
-			gap: var(--space-4);
-
-			.track-wrapper {
-				background: var(--bg-secondary);
-				padding: var(--space-3);
-				border-radius: 12px;
-				display: grid;
-				grid-auto-flow: column;
-				overflow-x: scroll;
-				overflow-y: hidden;
-				grid-auto-columns: minmax(300px, 1fr);
-				grid-template-rows: repeat(3, auto);
-				gap: var(--space-5);
-			}
-		}
-		.album-wrapper {
-			background: var(--bg-secondary);
-			padding: var(--space-3);
-			padding-block: var(--space-4);
-			border-radius: 12px;
-			display: grid;
-			grid-auto-flow: column;
-			overflow-x: scroll;
-			overflow-y: hidden;
-			grid-auto-columns: minmax(200px, 1fr);
-			grid-template-rows: repeat(1, auto);
-			gap: var(--space-5);
+		&::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+			pointer-events: none;
+			background: linear-gradient(
+				180deg,
+				transparent 55%,
+				color-mix(in srgb, var(--bg-primary) 88%, transparent)
+			);
 		}
 	}
 
+	.hero-content {
+		position: absolute;
+		bottom: 0;
+		z-index: 1;
+		display: flex;
+		justify-content: space-between;
+		gap: var(--space-4);
+		padding: 0 var(--space-6, 1.5rem) var(--space-6, 1.5rem);
+	}
+
+	.identity {
+		display: flex;
+		align-items: flex-end;
+		gap: var(--space-4);
+
+		h1 {
+			margin: 0;
+			font-size: clamp(2rem, 3.4vw, 3.25rem);
+			line-height: 1;
+			color: var(--text-primary);
+		}
+	}
+
+	.eyebrow {
+		margin: 0 0 var(--space-1);
+		color: var(--primary);
+		font-size: var(--font-size-xs);
+		font-weight: 700;
+		letter-spacing: 0;
+		text-transform: uppercase;
+	}
+
+	.community,
+	.meta-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--space-2);
+		color: var(--text-secondary);
+		font-size: var(--font-size-xs);
+	}
+
+	.community strong {
+		color: var(--text-primary);
+	}
+
+	.actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		flex-shrink: 0;
+		padding-top: var(--space-5);
+	}
+
+	.content-surface,
+	.sidebar-card,
+	.section-block {
+		border-radius: var(--radius-lg);
+	}
+
+	.content-surface {
+		margin-top: var(--space-5);
+		padding: 0 var(--space-5) var(--space-6);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-6, 1.5rem);
+		background: transparent;
+	}
+
+	.section-block {
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+		background: transparent;
+	}
+
+	.section-heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+
+		h2 {
+			margin: 0;
+			color: var(--text-primary);
+			font-size: var(--font-size-2xl);
+			line-height: 1.2;
+		}
+
+		&.compact h2 {
+			font-size: var(--font-size-lg);
+		}
+	}
+
+	.track-wrapper,
+	.album-wrapper {
+		display: grid;
+		grid-auto-flow: column;
+		gap: var(--space-4);
+		overflow-x: auto;
+		margin-inline: calc(var(--space-2) * -1);
+		padding: var(--space-1) var(--space-2) var(--space-3);
+		border-radius: 0;
+		background: transparent;
+	}
+
+	.track-wrapper {
+		grid-auto-columns: minmax(280px, 1fr);
+		grid-template-rows: repeat(3, auto);
+	}
+
+	.album-wrapper {
+		grid-auto-columns: minmax(180px, 220px);
+	}
+
+	.feed-list,
 	.posts-list {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
+	}
 
-		.post {
-			background: var(--bg-secondary);
-			border-radius: 12px;
-			padding: var(--space-3);
-			display: flex;
-			flex-direction: column;
-			gap: var(--space-3);
+	.feed-card,
+	.post-card,
+	.gallery-card,
+	.video-card {
+		position: relative;
+		overflow: hidden;
+		border: 1px solid color-mix(in srgb, var(--border-primary) 62%, transparent);
+		border-radius: var(--radius-lg);
+		background:
+			linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 40%),
+			color-mix(in srgb, var(--bg-surface) 74%, var(--bg-primary));
+		box-shadow: 0 14px 40px rgba(0, 0, 0, 0.16);
+		transition:
+			transform var(--duration-normal) var(--easing-ease-out),
+			border-color var(--duration-normal) var(--easing-ease-out),
+			background-color var(--duration-normal) var(--easing-ease-out);
 
-			.post-header {
-				display: flex;
-				gap: var(--space-3);
-				align-items: flex-start;
+		&:hover {
+			transform: translateY(-2px);
+			border-color: color-mix(in srgb, var(--primary) 45%, var(--border-primary));
+		}
+	}
 
-				.meta-row {
-					display: flex;
-					flex-direction: column;
-					gap: 6px;
+	.feed-card {
+		display: grid;
+		grid-template-columns: 48px minmax(0, 1fr);
+		gap: var(--space-3);
+		padding: var(--space-4);
+	}
 
-					.author {
-						@include text-sm();
-						color: var(--text-primary);
-						font-weight: 600;
+	.feed-icon {
+		width: 48px;
+		height: 48px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: var(--radius-md);
+		background: color-mix(in srgb, var(--primary) 16%, var(--bg-tertiary));
+		color: var(--primary);
+	}
 
-						.time {
-							color: var(--text-secondary);
-							font-weight: 400;
-							margin-left: 6px;
-						}
-					}
+	.feed-body,
+	.card-copy,
+	.post-content {
+		min-width: 0;
 
-					.post-text {
-						@include text-xs();
-						color: var(--text-primary);
-					}
-				}
-			}
-
-			.media {
-				.media-placeholder {
-					height: 140px;
-					border-radius: 10px;
-					background: linear-gradient(90deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.08));
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					color: var(--text-secondary);
-					font-weight: 600;
-				}
-			}
-
-			.post-actions {
-				display: flex;
-				justify-content: flex-end;
-				gap: var(--space-2);
-				.action-button {
-					cursor: pointer;
-					color: var(--text-tertiary);
-					&:hover {
-						color: var(--primary);
-					}
-				}
-			}
+		h3 {
+			margin: var(--space-1) 0;
+			color: var(--text-primary);
+			font-size: var(--font-size-lg);
+			line-height: 1.25;
 		}
 
-		/* Poll specific */
-		.poll {
-			.poll-form {
-				display: flex;
-				flex-direction: column;
-				gap: var(--space-3);
+		p {
+			margin: 0;
+			color: var(--text-secondary);
+			font-size: var(--font-size-sm);
+			line-height: 1.5;
+		}
+	}
 
-				.option {
-					display: flex;
-					flex-direction: column;
-					gap: 8px;
-					padding: var(--space-2);
-					border-radius: 10px;
-					background: rgba(0, 0, 0, 0.03);
-					cursor: pointer;
+	.visibility {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		color: var(--primary);
+		text-transform: capitalize;
+	}
 
-					input[type='radio'] {
-						display: none;
-					}
+	.post-card {
+		padding: var(--space-5);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+	}
 
-					.option-label {
-						@include text-sm();
-						color: var(--text-primary);
-						font-weight: 600;
-					}
+	.post-header,
+	.post-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
 
+	.author {
+		color: var(--text-primary);
+		font-size: var(--font-size-sm);
+		font-weight: 700;
+	}
 
-					&:has(input:checked) {
-						box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06);
-					}
-				}
+	.rich-text {
+		color: var(--text-primary);
+		font-size: var(--font-size-sm);
+		line-height: 1.6;
+	}
 
-				.poll-actions {
-					display: flex;
-					gap: var(--space-2);
-					justify-content: flex-end;
-				}
+	.post-media-grid,
+	.gallery-grid,
+	.video-grid {
+		display: grid;
+		gap: var(--space-3);
+	}
+
+	.post-media-grid {
+		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+		margin-top: var(--space-3);
+
+		img {
+			width: 100%;
+			aspect-ratio: 16 / 10;
+			object-fit: cover;
+			border-radius: var(--radius-md);
+		}
+	}
+
+	.music-attachments {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-3);
+		margin-top: var(--space-3);
+	}
+
+	.post-actions {
+		justify-content: flex-end;
+
+		button {
+			width: 44px;
+			height: 44px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: var(--radius-md);
+			color: var(--text-secondary);
+
+			&:hover {
+				background: var(--bg-tertiary);
+				color: var(--text-primary);
 			}
 		}
 	}
 
-	.concert-list {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-        z-index: 1;
-        max-height: 400px;
-        overflow-y: auto;
+	.gallery-grid,
+	.video-grid {
+		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	}
 
-        .concert-item {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-            padding: var(--space-3);
-            background: rgba(255, 255, 255, 0.02);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: all 200ms ease;
+	.gallery-preview,
+	.video-preview {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+		aspect-ratio: 16 / 10;
+		background:
+			linear-gradient(135deg, color-mix(in srgb, var(--primary) 22%, transparent), transparent 54%),
+			var(--bg-tertiary);
+		color: var(--text-secondary);
 
-            &:hover {
-                background: rgba(255, 255, 255, 0.04);
-                border-color: rgba(255, 255, 255, 0.1);
-            }
+		img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+		}
+	}
 
-            .concert-date {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-				width: 80px;
-				aspect-ratio: 1/1;
-				flex-shrink: 0;
-                padding: var(--space-2);
-                background: linear-gradient(
-                    135deg,
-                    var(--color-brand-600),
-                    var(--color-brand-800)
-                );
-                border-radius: 10px;
+	.card-copy {
+		padding: var(--space-3);
+	}
 
-                .day {
-                    @include text-sm();
-                    font-weight: 700;
-                    color: var(--text-primary);
-                }
+	.play-badge {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--text-primary);
+		background: rgba(0, 0, 0, 0.18);
+	}
 
-                .time {
-                    @include text-xs();
-                    color: var(--text-secondary);
-                    margin-top: 2px;
-                }
-            }
+	.lock-overlay,
+	.locked-panel,
+	.locked-inline {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		color: var(--text-primary);
+	}
 
-            .concert-info {
-                flex-grow: 1;
-                display: flex;
-                flex-direction: column;
-                gap: var(--space-1);
+	.lock-overlay {
+		position: absolute;
+		inset: 0;
+		justify-content: center;
+		padding: var(--space-4);
+		background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
+		backdrop-filter: blur(16px);
+		text-align: center;
+		font-size: var(--font-size-sm);
+		font-weight: 700;
+	}
 
-                .venue {
-                    @include text-sm();
-                    font-weight: 600;
-                    color: var(--text-primary);
-                }
+	.locked-panel {
+		justify-content: center;
+		min-height: 140px;
+		margin-top: var(--space-3);
+		border: 1px dashed color-mix(in srgb, var(--primary) 45%, var(--border-primary));
+		border-radius: var(--radius-lg);
+		background:
+			linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), transparent),
+			color-mix(in srgb, var(--bg-surface) 70%, var(--bg-primary));
+	}
 
-                .location {
-                    display: flex;
-                    align-items: center;
-                    gap: var(--space-1);
-                    @include text-xs();
-                    color: var(--text-secondary);
-                }
-            }
+	.locked-inline {
+		margin-top: var(--space-3);
+		color: var(--primary);
+		font-size: var(--font-size-sm);
+		font-weight: 700;
+	}
 
-			.button {
-				flex-shrink: 0;
-				// width: 155px;
+	.is-locked {
+		border-color: color-mix(in srgb, var(--primary) 42%, transparent);
+	}
+
+	.sidebar-card {
+		padding: var(--space-5);
+		background:
+			linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 48%),
+			color-mix(in srgb, var(--bg-surface) 72%, var(--bg-primary));
+		box-shadow: 0 14px 44px rgba(0, 0, 0, 0.18);
+	}
+
+	.online-dot {
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		background: var(--success);
+		box-shadow: 0 0 0 5px color-mix(in srgb, var(--success) 18%, transparent);
+	}
+
+	.chat-preview {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		margin-top: var(--space-3);
+	}
+
+	.message-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		padding: var(--space-2) 0;
+		border-radius: var(--radius-md);
+		background: transparent;
+		color: var(--text-secondary);
+		font-size: var(--font-size-sm);
+	}
+
+	.mini-photo-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: var(--space-2);
+		margin-top: var(--space-3);
+
+		img {
+			width: 100%;
+			aspect-ratio: 1;
+			object-fit: cover;
+			border-radius: var(--radius-sm);
+		}
+	}
+
+	.empty-state {
+		padding: var(--space-6);
+		border: 1px dashed color-mix(in srgb, var(--border-primary) 58%, transparent);
+		border-radius: var(--radius-lg);
+		background: color-mix(in srgb, var(--bg-surface) 46%, transparent);
+		color: var(--text-secondary);
+		font-size: var(--font-size-sm);
+		text-align: center;
+
+		&.compact {
+			padding: var(--space-4);
+		}
+	}
+
+	@media (max-width: 1100px) {
+		.artist-page {
+			grid-template-columns: 1fr;
+		}
+
+		.side-content {
+			position: static;
+		}
+	}
+
+	@media (max-width: 720px) {
+		.cover {
+			height: 180px;
+		}
+
+		.hero-content {
+			flex-direction: column;
+			margin-top: -48px;
+			padding: 0 var(--space-4) var(--space-4);
+		}
+
+		.identity {
+			align-items: flex-end;
+		}
+
+		.actions {
+			width: 100%;
+			padding-top: 0;
+
+			:global(.btn) {
+				flex: 1;
 			}
-        }
-    }
-	/* your styles go here */
+		}
+
+		.content-surface,
+		.section-block,
+		.sidebar-card {
+			border-radius: var(--radius-md);
+		}
+
+		.content-surface {
+			padding-inline: var(--space-3);
+			padding-bottom: var(--space-5);
+		}
+	}
+
+	:global(.artist-page .tabs-wrapper.pill) {
+		padding: 0 var(--space-1);
+		gap: var(--space-2);
+		background: transparent;
+	}
+
+	:global(.artist-page .tabs-wrapper.pill .tab) {
+		flex-grow: 0;
+		min-width: 96px;
+		min-height: 44px;
+		border-radius: 999px;
+		color: var(--text-secondary);
+	}
+
+	:global(.artist-page .tabs-wrapper.pill .tab.active) {
+		color: var(--text-on-primary);
+	}
+
+	:global(.artist-page .tabs-wrapper.pill .tab-border) {
+		box-shadow: 0 10px 28px color-mix(in srgb, var(--primary) 32%, transparent);
+	}
 </style>

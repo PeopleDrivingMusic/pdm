@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { albums, artists } from '$lib/db/schema';
 	import type { InferSelectModel } from 'drizzle-orm';
+	import { resolveR2ImageUrl } from '$lib/utils/helpers';
 
 	const {
 		album,
@@ -10,12 +11,12 @@
 		artist?: InferSelectModel<typeof artists> | null;
 	} = $props();
 
-	// your script goes here
+	const coverUrl = $derived(resolveR2ImageUrl(album?.coverImageUrl));
 </script>
 
 <button class="music-album">
 	<div class="image-wrapper">
-		<div class="album-cover" style="background-image: url('{album?.coverImageUrl}');"></div>
+		<div class="album-cover" style:background-image={coverUrl ? `url('${coverUrl}')` : undefined}></div>
 	</div>
 	<div class="album-info">
 		<h3 class="album-title">{album?.title}</h3>

@@ -4,6 +4,7 @@
 	import SvgIcon from '../SvgIcon.svelte';
 	import { mdiPlay } from '@mdi/js';
 	import type { Album, Artist, Track } from '$lib/db';
+	import { resolveR2ImageUrl } from '$lib/utils/helpers';
 
 	const {
 		track,
@@ -17,10 +18,11 @@
 		isLiked?: boolean;
 	} = $props();
 
-	$inspect(playerStore)
+	let coverSrc = $state<string | null>(null);
+	$inspect(playerStore);
 
 	function trackClick() {
-		const isInQue = playerStore.que.findIndex(queItem => queItem.track.id === track.id);
+		const isInQue = playerStore.que.findIndex((queItem) => queItem.track.id === track.id);
 		if (isInQue >= 0) {
 			const currentIndex = playerStore.currentTrackIndex;
 			const desiredIndex = currentIndex + 1;
@@ -65,15 +67,22 @@
 		playerStore.isPlaying = true;
 	}
 
+	$effect(() => {
+		if (track.imageUrl) {
+			coverSrc = null;
+			getSignedCoverUrlForTrack(track);
+		}
+	});
+
+	async function getSignedCoverUrlForTrack(track: Track) {
+		if (!track.imageUrl) return null;
+		coverSrc = resolveR2ImageUrl(track.imageUrl);
+	}
 </script>
 
 <button class="music-track" onclick={trackClick}>
 	<div class="image-wrapper">
-		<Avatar
-			size="lg"
-			src={track.imageUrl || album?.coverImageUrl || artist?.avatar}
-			square={true}
-		/>
+		<Avatar size="lg" src={coverSrc} square={true} />
 		<div class="bg"></div>
 		<div class="play-icon">
 			<SvgIcon path={mdiPlay} size={48} />
