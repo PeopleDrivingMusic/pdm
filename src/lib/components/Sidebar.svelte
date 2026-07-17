@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import Avatar from '$lib/ui/Avatar.svelte';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
-	import { mdiMagnify } from '@mdi/js/mdi.js';
+	import { mdiLoginVariant, mdiMagnify } from '@mdi/js/mdi.js';
 	import Input from '$lib/ui/Input.svelte';
 
 	type SidebarItem = {
@@ -19,11 +19,18 @@
 		profileHref?: string;
 	};
 
-	let { expand = $bindable(), items = [], showSearch = true, account } = $props<{
+	let {
+		expand = $bindable(),
+		items = [],
+		showSearch = true,
+		account,
+		showLogin = false
+	} = $props<{
 		expand?: boolean;
 		items?: SidebarItem[];
 		showSearch?: boolean;
 		account?: SidebarAccount | null;
+		showLogin?: boolean;
 	}>();
 
 	const pathname = $derived(page.url.pathname);
@@ -55,7 +62,8 @@
 			{:else}
 				<a
 					class="sidebar-item"
-					class:active={item.href !== "/" && pathname.startsWith(item.href || "") || item.href === pathname}
+					class:active={(item.href !== '/' && pathname.startsWith(item.href || '')) ||
+						item.href === pathname}
 					href={item.href}
 					title={item.label}
 				>
@@ -78,6 +86,15 @@
 			</div>
 			{#if expand}
 				<div class="name">{account.name}</div>
+			{/if}
+		</a>
+	{:else if showLogin}
+		<a class="avatar-wrapper" href="/login" title="Log in">
+			<div class="avatar login-icon">
+				<SvgIcon path={mdiLoginVariant} size={24} />
+			</div>
+			{#if expand}
+				<div class="name">Log in</div>
 			{/if}
 		</a>
 	{/if}
@@ -186,6 +203,19 @@
 			gap: var(--space-2);
 			.avatar {
 				flex-shrink: 0;
+
+				&.login-icon {
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					width: 32px;
+					height: 32px;
+					color: var(--text-tertiary);
+				}
+			}
+
+			&:hover .avatar.login-icon {
+				color: var(--primary);
 			}
 
 			.name {

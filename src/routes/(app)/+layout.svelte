@@ -30,6 +30,7 @@
 		bind:expand={sidebarExpand}
 		items={sidebarItems}
 		showSearch={true}
+		showLogin={true}
 		account={data.user
 			? {
 					name: data.user.displayName || data.user.username || 'User',
