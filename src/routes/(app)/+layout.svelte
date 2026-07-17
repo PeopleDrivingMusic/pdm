@@ -1,15 +1,7 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	import {
-		mdiAccountMusic,
-		mdiCog,
-		mdiHandCoin,
-		mdiHome,
-		mdiMusicNoteEighth,
-		mdiPlaylistMusic,
-		mdiTicketConfirmation
-	} from '@mdi/js/mdi.js';
+	import { mdiHome, mdiMusicNoteEighth } from '@mdi/js/mdi.js';
 	import { playerStore } from '$lib/stores/player.svelte';
 	import MusicPlayer from '$lib/ui/components/MusicPlayer/MusicPlayer.svelte';
 	import '../../app.scss';
@@ -20,21 +12,12 @@
 		capture: () => sidebarExpand,
 		restore: (value) => (sidebarExpand = value)
 	};
-	let sidebarExpand = $state(true)
+	let sidebarExpand = $state(true);
 
 	const sidebarItems = [
 		{ label: 'Home', icon: mdiHome, href: '/' },
 		{ label: 'Music', icon: mdiMusicNoteEighth, href: '/listen' },
-		{ label: 'Artists', icon: mdiAccountMusic, href: '/artists' },
-		{ label: 'My Playlists', icon: mdiPlaylistMusic, href: '/playlists' },
-
-		{ section: true },
-
-		{ label: 'Tickets', icon: mdiTicketConfirmation, href: '/tickets' },
-		{ label: 'Crowdfunding', icon: mdiHandCoin, href: '/crowdfunding' },
 		{ space: true },
-
-		{ label: 'Settings', icon: mdiCog, href: '/settings' },
 		{ section: true }
 	];
 </script>
@@ -47,22 +30,20 @@
 		bind:expand={sidebarExpand}
 		items={sidebarItems}
 		showSearch={true}
-		account={
-			data.user
-				? {
-						name: data.user.displayName || data.user.username || 'User',
-						avatarUrl: data.user.avatarUrl,
-						profileHref: data.user.username ? `/profile/${data.user.username}` : '/profile'
-					}
-				: null
-		}
+		account={data.user
+			? {
+					name: data.user.displayName || data.user.username || 'User',
+					avatarUrl: data.user.avatarUrl,
+					profileHref: data.user.username ? `/profile/${data.user.username}` : '/profile'
+				}
+			: null}
 	/>
 	<div class="page">
 		{@render children?.()}
 	</div>
 </div>
 {#if playerStore.currentTrackIndex > -1}
-	 <MusicPlayer />
+	<MusicPlayer />
 {/if}
 
 <style lang="scss">
@@ -75,12 +56,14 @@
 		background: var(--bg-secondary);
 		color: var(--text-primary);
 		padding-top: 20px;
-		transition: max-height 300ms ease, height 300ms ease;
+		transition:
+			max-height 300ms ease,
+			height 300ms ease;
 
 		&.fullHeight {
 			max-height: 100vh;
 		}
-		
+
 		.page {
 			flex: 1;
 			overflow-y: auto;
@@ -91,7 +74,6 @@
 			background-position: center;
 			background-size: contain;
 			box-shadow: var(--shadow-sm);
-			
 		}
 	}
 </style>

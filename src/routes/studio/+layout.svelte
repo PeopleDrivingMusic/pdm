@@ -2,14 +2,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import NotificationContainer from '$lib/ui/NotificationContainer.svelte';
-	import {
-		mdiViewDashboard,
-		mdiMusicNoteEighth,
-		mdiVideoBox,
-		mdiAccountGroup,
-		mdiChartLine,
-		mdiWallet
-	} from '@mdi/js/mdi.js';
+	import { mdiMusicNoteEighth, mdiVideoBox } from '@mdi/js/mdi.js';
 	import '../../app.scss';
 	import type { Snapshot } from './$types';
 
@@ -21,12 +14,8 @@
 	let sidebarExpand = $state(true);
 
 	const sidebarItems = [
-		{ label: 'Dashboard', icon: mdiViewDashboard, href: '/studio/dashboard' },
 		{ label: 'Music', icon: mdiMusicNoteEighth, href: '/studio/music' },
-		{ label: 'Content', icon: mdiVideoBox, href: '/studio/content' },
-		{ label: 'Community', icon: mdiAccountGroup, href: '/studio/community' },
-		{ label: 'Analytics', icon: mdiChartLine, href: '/studio/analytics' },
-		{ label: 'Wallet', icon: mdiWallet, href: '/studio/wallet' },
+		{ label: 'Content', icon: mdiVideoBox, href: '/studio/content' }
 	];
 </script>
 
@@ -38,15 +27,13 @@
 		bind:expand={sidebarExpand}
 		items={sidebarItems}
 		showSearch={false}
-		account={
-			data.artist
-				? {
-						name: data.artist.name,
-						avatarUrl: data.artist.avatar,
-						profileHref: data.artist.slug ? `/artist/${data.artist.slug}` : undefined
-					}
-				: null
-		}
+		account={data.artist
+			? {
+					name: data.artist.name,
+					avatarUrl: data.artist.avatar,
+					profileHref: data.artist.slug ? `/artist/${data.artist.slug}` : undefined
+				}
+			: null}
 	/>
 	<div class="page">
 		{@render children?.()}
@@ -64,7 +51,9 @@
 		background: var(--bg-secondary);
 		color: var(--text-primary);
 		padding-top: 20px;
-		transition: max-height 300ms ease, height 300ms ease;
+		transition:
+			max-height 300ms ease,
+			height 300ms ease;
 
 		.page {
 			flex: 1;
