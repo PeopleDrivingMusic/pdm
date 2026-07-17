@@ -1,5 +1,6 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 import net from 'node:net';
 import path from 'path';
 
