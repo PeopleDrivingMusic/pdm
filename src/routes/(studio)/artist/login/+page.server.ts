@@ -16,7 +16,7 @@ export const load: PageServerLoad = async (event) => {
 	if (artistToken) {
 		const result = await validateArtistSessionToken(artistToken);
 		if (result.artist) {
-			throw redirect(302, '/studio/dashboard');
+			throw redirect(302, '/studio/music');
 		}
 		deleteArtistSessionTokenCookie(event);
 	}
@@ -55,7 +55,7 @@ export const actions: Actions = {
 				metadata: { artistAccountId: account.id }
 			});
 
-			throw redirect(302, '/studio/dashboard');
+			throw redirect(302, '/studio/music');
 		} catch (error) {
 			if (isRedirect(error)) {
 				throw error;

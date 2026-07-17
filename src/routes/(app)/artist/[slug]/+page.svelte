@@ -58,18 +58,16 @@
 <div class="artist-page">
 	<main class="main-content">
 		<header class="hero">
-			<div class="cover" style:background-image={artist?.coverImg ? `url('${artist.coverImg}')` : undefined}>
-			</div>
+			<div
+				class="cover"
+				style:background-image={artist?.coverImg ? `url('${artist.coverImg}')` : undefined}
+			></div>
 			<div class="hero-content">
 				<div class="identity">
 					<Avatar size="lg" src={artist.avatar} name={artist.name} />
 					<div>
 						<p class="eyebrow">Artist</p>
 						<h1>{artist?.name || 'Unknown Artist'}</h1>
-						<div class="community">
-							<span><strong>1.5m</strong> followers</span>
-							<span><strong>100k</strong> subscribers</span>
-						</div>
 					</div>
 				</div>
 				<div class="actions">
@@ -222,7 +220,11 @@
 											{#if post.media.length}
 												<div class="post-media-grid">
 													{#each post.media as media}
-														<img src={media.thumbnailUrl || media.fileUrl} alt={media.alt || media.caption || post.title} loading="lazy" />
+														<img
+															src={media.thumbnailUrl || media.fileUrl}
+															alt={media.alt || media.caption || post.title}
+															loading="lazy"
+														/>
 													{/each}
 												</div>
 											{/if}
@@ -230,12 +232,15 @@
 											{#if post.musicAttachments.length}
 												<div class="music-attachments">
 													{#each post.musicAttachments as item}
-														{@const trackEntry = item.type === 'track' ? trackMap.get(item.id) : undefined}
+														{@const trackEntry =
+															item.type === 'track' ? trackMap.get(item.id) : undefined}
 														<PostMusicAttachment
 															attachment={item}
 															{trackEntry}
 															artist={artist ?? null}
-															album={trackEntry?.track.albumId ? albumMap.get(trackEntry.track.albumId) : null}
+															album={trackEntry?.track.albumId
+																? albumMap.get(trackEntry.track.albumId)
+																: null}
 														/>
 													{/each}
 												</div>
@@ -247,8 +252,12 @@
 										{/if}
 									</div>
 									<footer class="post-actions">
-										<button aria-label="Like post"><SvgIcon path={mdiHeartOutline} size={20} /></button>
-										<button aria-label="Comment on post"><SvgIcon path={mdiChatOutline} size={20} /></button>
+										<button aria-label="Like post"
+											><SvgIcon path={mdiHeartOutline} size={20} /></button
+										>
+										<button aria-label="Comment on post"
+											><SvgIcon path={mdiChatOutline} size={20} /></button
+										>
 									</footer>
 								</article>
 							{/each}
@@ -271,9 +280,16 @@
 								<article class="gallery-card" class:is-locked={album.isLocked}>
 									<div class="gallery-preview">
 										{#if album.photos[0]}
-											<img src={album.photos[0].thumbnailUrl || album.photos[0].fileUrl} alt={album.photos[0].alt || album.title} loading="lazy" />
+											<img
+												src={album.photos[0].thumbnailUrl || album.photos[0].fileUrl}
+												alt={album.photos[0].alt || album.title}
+												loading="lazy"
+											/>
 										{:else}
-											<SvgIcon path={album.isLocked ? mdiLockOutline : mdiImageMultipleOutline} size={34} />
+											<SvgIcon
+												path={album.isLocked ? mdiLockOutline : mdiImageMultipleOutline}
+												size={34}
+											/>
 										{/if}
 										{#if album.isLocked}
 											<div class="lock-overlay">
@@ -321,7 +337,10 @@
 											<SvgIcon path={item.isLocked ? mdiLockOutline : mdiVideoOutline} size={36} />
 										{/if}
 										<div class="play-badge">
-											<SvgIcon path={item.isLocked ? mdiLockOutline : mdiPlayCircleOutline} size={28} />
+											<SvgIcon
+												path={item.isLocked ? mdiLockOutline : mdiPlayCircleOutline}
+												size={28}
+											/>
 										</div>
 									</div>
 									<div class="card-copy">
@@ -385,7 +404,11 @@
 			{#if latestPhotos.length}
 				<div class="mini-photo-grid">
 					{#each latestPhotos as photo}
-						<img src={photo.thumbnailUrl || photo.fileUrl} alt={photo.alt || photo.caption || 'Artist photo'} loading="lazy" />
+						<img
+							src={photo.thumbnailUrl || photo.fileUrl}
+							alt={photo.alt || photo.caption || 'Artist photo'}
+							loading="lazy"
+						/>
 					{/each}
 				</div>
 			{:else}
@@ -422,8 +445,16 @@
 		position: relative;
 		border-radius: var(--radius-xl, 24px);
 		background:
-			radial-gradient(circle at 18% 18%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 34%),
-			linear-gradient(135deg, color-mix(in srgb, var(--bg-tertiary) 92%, var(--primary)), var(--bg-primary));
+			radial-gradient(
+				circle at 18% 18%,
+				color-mix(in srgb, var(--primary) 18%, transparent),
+				transparent 34%
+			),
+			linear-gradient(
+				135deg,
+				color-mix(in srgb, var(--bg-tertiary) 92%, var(--primary)),
+				var(--bg-primary)
+			);
 		box-shadow: 0 18px 56px rgba(0, 0, 0, 0.24);
 	}
 

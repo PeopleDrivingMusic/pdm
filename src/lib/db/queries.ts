@@ -39,6 +39,14 @@ function playableTrackStatus() {
 	return or(eq(tracks.status, 'uploaded'), eq(tracks.status, 'ready'));
 }
 
+// Anonymous viewers have no userId; joining an empty string against a uuid column
+// makes Postgres reject the whole query (22P02), so match no rows instead.
+function favoritesJoinFor(userId: string) {
+	return userId
+		? and(eq(tracks.id, userFavorites.trackId), eq(userFavorites.userId, userId))
+		: sql`false`;
+}
+
 // User operations
 export class UserService {
 	static async createUser(data: NewUser): Promise<User> {
@@ -377,12 +385,11 @@ export class TrackService {
 						isLiked: sql<boolean>`CASE WHEN ${userFavorites.id} IS NOT NULL THEN true ELSE false END`
 					})
 					.from(tracks)
-					.leftJoin(
-						userFavorites,
-						and(eq(tracks.id, userFavorites.trackId), eq(userFavorites.userId, userId))
-					);
+					.leftJoin(userFavorites, favoritesJoinFor(userId));
 				const result = await query
-					.where(and(eq(tracks.artistId, artistId), eq(tracks.isPublished, true), playableTrackStatus()))
+					.where(
+						and(eq(tracks.artistId, artistId), eq(tracks.isPublished, true), playableTrackStatus())
+					)
 					.orderBy(desc(tracks.createdAt))
 					.limit(limit);
 				return result;
@@ -438,10 +445,7 @@ export class TrackService {
 					.leftJoin(trackStats, eq(tracks.id, trackStats.trackId))
 					.leftJoin(artists, eq(tracks.artistId, artists.id))
 					.leftJoin(albums, eq(tracks.albumId, albums.id))
-					.leftJoin(
-						userFavorites,
-						and(eq(tracks.id, userFavorites.trackId), eq(userFavorites.userId, userId))
-					);
+					.leftJoin(userFavorites, favoritesJoinFor(userId));
 
 				const result = await query
 					.where(and(eq(tracks.isPublished, true), playableTrackStatus()))
