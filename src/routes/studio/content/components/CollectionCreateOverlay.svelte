@@ -2,7 +2,7 @@
 	import { mdiClose } from '@mdi/js';
 	import { Button, IconButton, Input, Select } from '$lib/ui';
 
-	type Visibility = 'public' | 'followers' | 'subscribers' | 'investors';
+	type Visibility = 'public' | 'subscribers';
 	type Status = 'draft' | 'published' | 'scheduled' | 'archived';
 
 	interface Payload {
@@ -52,9 +52,7 @@
 
 	const visibilityOptions = [
 		{ label: 'Public', value: 'public' },
-		{ label: 'Followers', value: 'followers' },
-		{ label: 'Subscribers', value: 'subscribers' },
-		{ label: 'Investors', value: 'investors' }
+		{ label: 'Subscribers', value: 'subscribers' }
 	];
 	const statusOptions = [
 		{ label: 'Draft', value: 'draft' },

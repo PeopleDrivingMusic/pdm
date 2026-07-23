@@ -403,7 +403,7 @@
 	async function createPhotoAlbum(payload: {
 		title: string;
 		description: string;
-		visibility: 'public' | 'followers' | 'subscribers' | 'investors';
+		visibility: 'public' | 'subscribers';
 	}) {
 		const response = await fetch('/api/studio/content/photo-albums', {
 			method: 'POST',
@@ -425,7 +425,7 @@
 	async function createVideoCollection(payload: {
 		title: string;
 		description: string;
-		visibility: 'public' | 'followers' | 'subscribers' | 'investors';
+		visibility: 'public' | 'subscribers';
 	}) {
 		const response = await fetch('/api/studio/content/video-collections', {
 			method: 'POST',

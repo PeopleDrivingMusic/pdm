@@ -4,7 +4,7 @@ import { getArtistByCookie } from '$lib/server/artist-session';
 import { ContentApplicationService } from '$lib/server/content';
 
 const STATUS_VALUES = new Set(['draft', 'scheduled', 'published', 'archived']);
-const VISIBILITY_VALUES = new Set(['public', 'followers', 'subscribers', 'investors']);
+const VISIBILITY_VALUES = new Set(['public', 'subscribers']);
 
 function normalizeStatus(value: unknown): ContentStatus {
 	return typeof value === 'string' && STATUS_VALUES.has(value) ? (value as ContentStatus) : 'draft';

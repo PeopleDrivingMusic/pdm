@@ -12,7 +12,7 @@ import { uploadFile, uploadImage } from '$lib/server/upload';
 import { headR2Object } from '$lib/db/services/R2Service';
 
 const STATUS_VALUES = new Set(['draft', 'scheduled', 'published', 'archived']);
-const VISIBILITY_VALUES = new Set(['public', 'followers', 'subscribers', 'investors']);
+const VISIBILITY_VALUES = new Set(['public', 'subscribers']);
 
 function getStatus(value: FormDataEntryValue | null): ContentStatus {
 	const status = typeof value === 'string' ? value : 'draft';

@@ -3,7 +3,7 @@ import type { ContentVisibility } from '$lib/db/services/ContentService';
 import { getArtistByCookie } from '$lib/server/artist-session';
 import { ContentApplicationService } from '$lib/server/content';
 
-const VISIBILITY_VALUES = new Set(['public', 'followers', 'subscribers', 'investors']);
+const VISIBILITY_VALUES = new Set(['public', 'subscribers']);
 
 function normalizeVisibility(value: unknown): ContentVisibility {
 	return typeof value === 'string' && VISIBILITY_VALUES.has(value)

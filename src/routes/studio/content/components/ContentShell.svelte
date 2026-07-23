@@ -8,7 +8,7 @@
 	import CollectionCreateOverlay from './CollectionCreateOverlay.svelte';
 
 	type CollectionStatus = 'draft' | 'published' | 'scheduled' | 'archived';
-	type CollectionVisibility = 'public' | 'followers' | 'subscribers' | 'investors';
+	type CollectionVisibility = 'public' | 'subscribers';
 
 	interface ManageableContentItem {
 		id: string;
