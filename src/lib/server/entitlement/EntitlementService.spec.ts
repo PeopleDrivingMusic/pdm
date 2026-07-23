@@ -40,6 +40,7 @@ describe('getSubscribedArtistIds', () => {
 		(SubscriptionService.listActiveArtistIds as any).mockResolvedValue(['a1', 'a2']);
 		const result = await EntitlementService.getSubscribedArtistIds('u1');
 		expect(result).toEqual(['a1', 'a2']);
+		expect(SubscriptionService.listActiveArtistIds).toHaveBeenCalledWith('u1');
 	});
 });
 
