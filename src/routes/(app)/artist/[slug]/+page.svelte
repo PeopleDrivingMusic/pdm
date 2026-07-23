@@ -2,8 +2,6 @@
 	import type { PageData } from './$types';
 	import { page } from '$app/state';
 	import {
-		mdiChatOutline,
-		mdiHeartOutline,
 		mdiImageMultipleOutline,
 		mdiLockOutline,
 		mdiPlayCircleOutline,
@@ -14,7 +12,7 @@
 	import MusicAlbum from '$lib/ui/components/MusicAlbum.svelte';
 	import MusicTrack from '$lib/ui/components/MusicTrack.svelte';
 	import PostMusicAttachment from '$lib/ui/components/PostMusicAttachment.svelte';
-	import PostPoll from '$lib/ui/components/PostPoll.svelte';
+	import PostCard from '$lib/ui/components/PostCard/PostCard.svelte';
 
 	const { artist, tracks, albums, content } = $derived(page.data as PageData);
 	const albumMap = $derived(new Map(albums.map((album) => [album.id, album])));
@@ -185,81 +183,26 @@
 					</div>
 					{#if content.posts.length}
 						<div class="posts-list">
-							{#each content.posts as post}
-								<article class="post-card" class:is-locked={post.isLocked}>
-									<header class="post-header">
-										<Avatar size="md" src={artist.avatar} name={artist.name} />
-										<div>
-											<div class="author">{artist.name}</div>
-											<div class="meta-row">
-												<span>{formatDate(post.publishedAt)}</span>
-												{#if post.visibility !== 'public'}
-													<span class="visibility">
-														<SvgIcon path={mdiLockOutline} size={13} />
-														{post.visibility}
-													</span>
-												{/if}
-											</div>
-										</div>
-									</header>
-									<div class="post-content">
-										<h3>{post.title}</h3>
-										{#if post.isLocked}
-											<p>{post.excerpt}</p>
-											<div class="locked-panel">
-												<SvgIcon path={mdiLockOutline} size={22} />
-												<span>{post.lockReason}</span>
-											</div>
-										{:else}
-											{#if post.bodyHtml}
-												<div class="rich-text">{@html post.bodyHtml}</div>
-											{:else}
-												<p>{post.excerpt}</p>
-											{/if}
-
-											{#if post.media.length}
-												<div class="post-media-grid">
-													{#each post.media as media}
-														<img
-															src={media.thumbnailUrl || media.fileUrl}
-															alt={media.alt || media.caption || post.title}
-															loading="lazy"
-														/>
-													{/each}
-												</div>
-											{/if}
-
-											{#if post.musicAttachments.length}
-												<div class="music-attachments">
-													{#each post.musicAttachments as item}
-														{@const trackEntry =
-															item.type === 'track' ? trackMap.get(item.id) : undefined}
-														<PostMusicAttachment
-															attachment={item}
-															{trackEntry}
-															artist={artist ?? null}
-															album={trackEntry?.track.albumId
-																? albumMap.get(trackEntry.track.albumId)
-																: null}
-														/>
-													{/each}
-												</div>
-											{/if}
-
-											{#if post.poll}
-												<PostPoll poll={post.poll} />
-											{/if}
-										{/if}
-									</div>
-									<footer class="post-actions">
-										<button aria-label="Like post"
-											><SvgIcon path={mdiHeartOutline} size={20} /></button
-										>
-										<button aria-label="Comment on post"
-											><SvgIcon path={mdiChatOutline} size={20} /></button
-										>
-									</footer>
-								</article>
+							{#each content.posts as post (post.id)}
+								{#snippet music()}
+									{#each post.musicAttachments as item}
+										{@const trackEntry =
+											item.type === 'track' ? trackMap.get(item.id) : undefined}
+										<PostMusicAttachment
+											attachment={item}
+											{trackEntry}
+											artist={artist ?? null}
+											album={trackEntry?.track.albumId
+												? albumMap.get(trackEntry.track.albumId)
+												: null}
+										/>
+									{/each}
+								{/snippet}
+								<PostCard
+									{post}
+									author={{ name: artist.name, avatar: artist.avatar }}
+									music={post.musicAttachments.length ? music : undefined}
+								/>
 							{/each}
 						</div>
 					{:else}
@@ -605,7 +548,6 @@
 	}
 
 	.feed-card,
-	.post-card,
 	.gallery-card,
 	.video-card {
 		position: relative;
@@ -646,8 +588,7 @@
 	}
 
 	.feed-body,
-	.card-copy,
-	.post-content {
+	.card-copy {
 		min-width: 0;
 
 		h3 {
@@ -673,79 +614,10 @@
 		text-transform: capitalize;
 	}
 
-	.post-card {
-		padding: var(--space-5);
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
-	}
-
-	.post-header,
-	.post-actions {
-		display: flex;
-		align-items: center;
-		gap: var(--space-3);
-	}
-
-	.author {
-		color: var(--text-primary);
-		font-size: var(--font-size-sm);
-		font-weight: 700;
-	}
-
-	.rich-text {
-		color: var(--text-primary);
-		font-size: var(--font-size-sm);
-		line-height: 1.6;
-	}
-
-	.post-media-grid,
 	.gallery-grid,
 	.video-grid {
 		display: grid;
 		gap: var(--space-3);
-	}
-
-	.post-media-grid {
-		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-		margin-top: var(--space-3);
-
-		img {
-			width: 100%;
-			aspect-ratio: 16 / 10;
-			object-fit: cover;
-			border-radius: var(--radius-md);
-		}
-	}
-
-	.music-attachments {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-3);
-		margin-top: var(--space-3);
-	}
-
-	.post-actions {
-		justify-content: flex-end;
-
-		button {
-			width: 44px;
-			height: 44px;
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
-			border-radius: var(--radius-md);
-			color: var(--text-secondary);
-
-			&:hover {
-				background: var(--bg-tertiary);
-				color: var(--text-primary);
-			}
-		}
-	}
-
-	.gallery-grid,
-	.video-grid {
 		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 	}
 
@@ -784,7 +656,6 @@
 	}
 
 	.lock-overlay,
-	.locked-panel,
 	.locked-inline {
 		display: flex;
 		align-items: center;
@@ -802,17 +673,6 @@
 		text-align: center;
 		font-size: var(--font-size-sm);
 		font-weight: 700;
-	}
-
-	.locked-panel {
-		justify-content: center;
-		min-height: 140px;
-		margin-top: var(--space-3);
-		border: 1px dashed color-mix(in srgb, var(--primary) 45%, var(--border-primary));
-		border-radius: var(--radius-lg);
-		background:
-			linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), transparent),
-			color-mix(in srgb, var(--bg-surface) 70%, var(--bg-primary));
 	}
 
 	.locked-inline {

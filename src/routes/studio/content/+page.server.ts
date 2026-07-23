@@ -3,6 +3,11 @@ import { error, fail } from '@sveltejs/kit';
 import { type ContentStatus, type ContentVisibility } from '$lib/db/services/ContentService';
 import { getArtistByCookie } from '$lib/server/artist-session';
 import { ContentApplicationService } from '$lib/server/content';
+import {
+	PostPhotoError,
+	resolvePostPhotoMedia,
+	type UploadedPhotoInput
+} from '$lib/server/content/resolvePostPhotos';
 import { uploadFile, uploadImage } from '$lib/server/upload';
 import { headR2Object } from '$lib/db/services/R2Service';
 
@@ -44,6 +49,23 @@ function getNumber(data: FormData, key: string) {
 	if (typeof value !== 'string') return null;
 	const parsed = Number(value);
 	return Number.isFinite(parsed) ? parsed : null;
+}
+
+// Parses the parallel `uploadedPhotoKeys` / `uploadedPhotoTypes` / `uploadedPhotoSizes`
+// arrays the composer sends after uploading each post photo directly to R2.
+function getUploadedPhotos(data: FormData): UploadedPhotoInput[] {
+	const keys = data.getAll('uploadedPhotoKeys');
+	const types = data.getAll('uploadedPhotoTypes');
+	const sizes = data.getAll('uploadedPhotoSizes');
+
+	return keys
+		.map((value, index) => {
+			const key = typeof value === 'string' ? value.trim() : '';
+			const contentType = typeof types[index] === 'string' ? (types[index] as string) : null;
+			const size = typeof sizes[index] === 'string' ? Number(sizes[index]) || null : null;
+			return { key, contentType, size } satisfies UploadedPhotoInput;
+		})
+		.filter((photo) => photo.key);
 }
 
 function parseDate(value: string) {
@@ -135,6 +157,13 @@ export const actions: Actions = {
 			mediaIds.push(media.id);
 		}
 
+		try {
+			mediaIds.push(...(await resolvePostPhotoMedia(artist.id, getUploadedPhotos(data))));
+		} catch (error) {
+			if (error instanceof PostPhotoError) return fail(error.status, { error: error.message });
+			throw error;
+		}
+
 		const post = await ContentApplicationService.createPost({
 			artistId: artist.id,
 			title,
@@ -213,7 +242,7 @@ export const actions: Actions = {
 			}
 		}
 
-		let mediaIds = [...existingMediaIds];
+		const mediaIds = [...existingMediaIds];
 		if (imageFile && imageFile.size > 0) {
 			const upload = await uploadImage(imageFile, `content/posts/${artist.id}`);
 			if (!upload.success || !upload.path) {
@@ -224,7 +253,14 @@ export const actions: Actions = {
 				type: 'image',
 				fileUrl: upload.path
 			});
-			mediaIds = [media.id];
+			mediaIds.push(media.id);
+		}
+
+		try {
+			mediaIds.push(...(await resolvePostPhotoMedia(artist.id, getUploadedPhotos(data))));
+		} catch (error) {
+			if (error instanceof PostPhotoError) return fail(error.status, { error: error.message });
+			throw error;
 		}
 
 		let post;

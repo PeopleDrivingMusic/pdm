@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { mdiArrowLeft, mdiClose, mdiImageOutline, mdiMusicNotePlus, mdiPoll } from '@mdi/js';
 	import { Button, FileUpload, IconButton, Input, Select, SvgIcon } from '$lib/ui';
+	import MultiPhotoInput from '$lib/ui/components/MultiPhotoInput.svelte';
 	import type { Editor } from '@tiptap/core';
 	import CollectionCreateOverlay from './CollectionCreateOverlay.svelte';
 	import MusicAttachmentPicker from './MusicAttachmentPicker.svelte';
@@ -11,6 +12,11 @@
 	import PostEditorToolbar from './PostEditorToolbar.svelte';
 	import PublishPanel from './PublishPanel.svelte';
 	import { uploadR2Target, type ClientMediaUploadTarget } from '$lib/utils/helpers';
+	import {
+		preparePostPhoto,
+		deleteContentPhotos,
+		beaconDeleteContentPhotos
+	} from '$lib/utils/postPhotos';
 
 	interface EditablePost {
 		id: string;
@@ -96,6 +102,27 @@
 	let coverEnabled = $state(false);
 	let musicEnabled = $state(false);
 	let pollEnabled = $state(false);
+	let postPhotoUploads = $state<Array<{ key: string; contentType: string; size: number }>>([]);
+
+	function handleClose() {
+		// Photos uploaded to R2 but never published are orphans — best-effort clean them up.
+		if (postPhotoUploads.length) {
+			void deleteContentPhotos(postPhotoUploads.map((photo) => photo.key));
+			postPhotoUploads = [];
+		}
+		onClose();
+	}
+
+	// Survives a hard tab/window close, when handleClose never runs.
+	$effect(() => {
+		function onBeforeUnload() {
+			if (postPhotoUploads.length) {
+				beaconDeleteContentPhotos(postPhotoUploads.map((photo) => photo.key));
+			}
+		}
+		window.addEventListener('beforeunload', onBeforeUnload);
+		return () => window.removeEventListener('beforeunload', onBeforeUnload);
+	});
 	let editor = $state<Editor | null>(null);
 	let submitError = $state('');
 	let isSubmitting = $state(false);
@@ -249,7 +276,11 @@
 		for (let attempt = 0; attempt < 2; attempt += 1) {
 			try {
 				const preparedFormData =
-					contentType === 'gallery' ? await prepareGalleryUpload(formData) : formData;
+					contentType === 'gallery'
+						? await prepareGalleryUpload(formData)
+						: contentType === 'post'
+							? attachPostPhotos(formData)
+							: formData;
 				const response = await fetch(action, {
 					method: 'POST',
 					body: preparedFormData
@@ -259,6 +290,8 @@
 				if (result.type === 'success' || result.type === 'redirect') {
 					await invalidateAll();
 					const message = getSuccessMessage(contentType, preparedFormData);
+					// Photos are now attached to the post — clear so close-cleanup won't delete them.
+					postPhotoUploads = [];
 					onSuccess?.(message);
 					onClose();
 					return;
@@ -274,12 +307,15 @@
 
 				if (result.type === 'error') {
 					if (attempt === 0 && response.status >= 500) continue;
-					throw new Error(result.error?.message || 'Could not save content. Your draft is still here.');
+					throw new Error(
+						result.error?.message || 'Could not save content. Your draft is still here.'
+					);
 				}
 			} catch (err) {
 				if (attempt === 0) continue;
 
-				const message = err instanceof Error ? err.message : 'Could not save content. Your draft is still here.';
+				const message =
+					err instanceof Error ? err.message : 'Could not save content. Your draft is still here.';
 				submitError = message;
 				onError?.(message);
 				mediaUpload.active = false;
@@ -333,8 +369,30 @@
 		return formData;
 	}
 
+	// Photos are already uploaded to R2 on selection, so publishing just attaches their keys.
+	// Idempotent: a submit retry re-runs this on the same FormData, so clear first.
+	function attachPostPhotos(formData: FormData) {
+		formData.delete('uploadedPhotoKeys');
+		formData.delete('uploadedPhotoTypes');
+		formData.delete('uploadedPhotoSizes');
+		for (const photo of postPhotoUploads) {
+			formData.append('uploadedPhotoKeys', photo.key);
+			formData.append('uploadedPhotoTypes', photo.contentType);
+			formData.append('uploadedPhotoSizes', String(photo.size));
+		}
+		return formData;
+	}
+
 	function createSubmitHandler(contentType: 'post' | 'gallery' | 'video') {
-		return ({ action, formData, cancel }: { action: URL; formData: FormData; cancel: () => void }) => {
+		return ({
+			action,
+			formData,
+			cancel
+		}: {
+			action: URL;
+			formData: FormData;
+			cancel: () => void;
+		}) => {
 			cancel();
 			void submitWithRetry(action, formData, contentType).finally(() => {
 				isSubmitting = false;
@@ -389,7 +447,7 @@
 
 {#if open}
 	<div class="modal-backdrop">
-		<button class="backdrop-button" type="button" aria-label="Close composer" onclick={onClose}
+		<button class="backdrop-button" type="button" aria-label="Close composer" onclick={handleClose}
 		></button>
 		<div class="composer-modal" role="dialog" aria-modal="true" aria-label={title}>
 			<header class="modal-header">
@@ -415,7 +473,7 @@
 					</div>
 				</div>
 
-				<IconButton path={mdiClose} label="Close composer" onClick={onClose} />
+				<IconButton path={mdiClose} label="Close composer" onClick={handleClose} />
 			</header>
 
 			{#if type === 'post'}
@@ -432,7 +490,7 @@
 					<input type="hidden" name="visibility" value={postVisibility} />
 					<input type="hidden" name="pollEnabled" value={pollEnabled ? 'true' : 'false'} />
 					{#if coverEnabled}
-						{#each initialPost?.mediaIds ?? [] as mediaId}
+						{#each initialPost?.mediaIds ?? [] as mediaId (mediaId)}
 							<input type="hidden" name="existingMediaIds" value={mediaId} />
 						{/each}
 					{/if}
@@ -459,7 +517,7 @@
 										<div>
 											<h3>
 												{activeWidget === 'cover'
-													? 'Cover image'
+													? 'Photos'
 													: activeWidget === 'music'
 														? 'Attach music'
 														: 'Poll'}
@@ -484,12 +542,10 @@
 
 									{#if coverEnabled}
 										<div class:widget-panel--hidden={activeWidget !== 'cover'}>
-											<FileUpload
-												label=""
-												name="coverImage"
-												accept="image/jpeg,image/png,image/webp"
-												maxSize={5}
-												helpText=""
+											<MultiPhotoInput
+												onUpload={preparePostPhoto}
+												onRemovePhoto={(photo) => deleteContentPhotos([photo.key])}
+												onChange={(photos) => (postPhotoUploads = photos)}
 											/>
 										</div>
 									{/if}
@@ -562,7 +618,7 @@
 								<div class="widget-toolbar" aria-label="Post widgets">
 									<IconButton
 										path={mdiImageOutline}
-										label={coverEnabled ? 'Edit cover image' : 'Add cover image'}
+										label={coverEnabled ? 'Edit photos' : 'Add photos'}
 										active={coverEnabled}
 										onClick={() => openWidget('cover')}
 									/>
@@ -582,12 +638,14 @@
 							</div>
 
 							<div class="submit-area">
-							<Button type="button" disabled={isSubmitting} onClick={openPublishStep}>Continue</Button>
-						</div>
-					</footer>
-				{/if}
-			</form>
-		{:else if type === 'gallery'}
+								<Button type="button" disabled={isSubmitting} onClick={openPublishStep}
+									>Continue</Button
+								>
+							</div>
+						</footer>
+					{/if}
+				</form>
+			{:else if type === 'gallery'}
 				<form
 					method="POST"
 					action="?/createGallery"
