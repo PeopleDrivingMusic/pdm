@@ -36,7 +36,7 @@ import type {
 } from '$lib/db';
 
 export type ContentStatus = 'draft' | 'scheduled' | 'published' | 'archived';
-export type ContentVisibility = 'public' | 'followers' | 'subscribers' | 'investors';
+export type ContentVisibility = 'public' | 'subscribers';
 export type FeedSourceType = 'post' | 'photo_album' | 'video' | 'track' | 'album' | 'merch';
 
 export interface ArtistContentViewer {
@@ -253,25 +253,21 @@ function normalizeSourceUrl(pathOrUrl: string | null | undefined) {
 	return `${PUBLIC_R2_IMAGES_BUCKET.replace(/\/+$/g, '')}/${encodedKey}`;
 }
 
-function canViewVisibility(visibility: ContentVisibility, viewer: ArtistContentViewer) {
+export function canViewVisibility(visibility: ContentVisibility, viewer: ArtistContentViewer) {
 	if (viewer.isOwner) return true;
 	if (visibility === 'public') return true;
-	if (visibility === 'followers') return Boolean(viewer.isFollower || viewer.isSubscriber);
 	if (visibility === 'subscribers') return Boolean(viewer.isSubscriber);
-	if (visibility === 'investors') return Boolean(viewer.isInvestor);
 	return false;
 }
 
-function lockReasonFor(visibility: ContentVisibility) {
-	if (visibility === 'followers') return 'Follow this artist to unlock';
+export function lockReasonFor(visibility: ContentVisibility) {
 	if (visibility === 'subscribers') return 'Subscribe to unlock';
-	if (visibility === 'investors') return 'Available to supporters';
 	return null;
 }
 
-function sanitizeVisibility(value: string): ContentVisibility {
-	if (value === 'followers' || value === 'subscribers' || value === 'investors') return value;
-	return 'public';
+export function sanitizeVisibility(value: string): ContentVisibility {
+	if (value === 'subscribers') return 'subscribers';
+	return 'public'; // legacy followers/investors + anything unknown degrade to public
 }
 
 export class ContentFeedService {
@@ -1144,7 +1140,9 @@ export class ArtistPublicContentService {
 				db
 					.select()
 					.from(videoCollections)
-					.where(and(eq(videoCollections.artistId, artistId), eq(videoCollections.status, 'published')))
+					.where(
+						and(eq(videoCollections.artistId, artistId), eq(videoCollections.status, 'published'))
+					)
 					.orderBy(desc(videoCollections.publishedAt), desc(videoCollections.createdAt))
 			]);
 
@@ -1194,9 +1192,7 @@ export class ArtistPublicContentService {
 							.where(inArray(postMusicAttachments.postId, postIds))
 							.orderBy(asc(postMusicAttachments.sortOrder))
 					: [],
-				postIds.length
-					? db.select().from(postPolls).where(inArray(postPolls.postId, postIds))
-					: [],
+				postIds.length ? db.select().from(postPolls).where(inArray(postPolls.postId, postIds)) : [],
 				postIds.length
 					? db
 							.select({
@@ -1227,7 +1223,9 @@ export class ArtistPublicContentService {
 							})
 							.from(postPollVotes)
 							.innerJoin(postPolls, eq(postPollVotes.pollId, postPolls.id))
-							.where(and(inArray(postPolls.postId, postIds), eq(postPollVotes.userId, viewer.userId)))
+							.where(
+								and(inArray(postPolls.postId, postIds), eq(postPollVotes.userId, viewer.userId))
+							)
 					: [],
 				photoAlbumIds.length
 					? db
@@ -1306,7 +1304,9 @@ export class ArtistPublicContentService {
 				const document = documentsByPost.get(post.id);
 				const poll = pollByPost.get(post.id);
 				const pollOptions = optionsByPost.get(post.id) ?? [];
-				const selectedOptionIds = poll ? (viewerVotesByPoll.get(poll.id) ?? new Set<string>()) : new Set<string>();
+				const selectedOptionIds = poll
+					? (viewerVotesByPoll.get(poll.id) ?? new Set<string>())
+					: new Set<string>();
 				const totalVotes = pollOptions.reduce(
 					(total, row) => total + (votesByOption.get(row.option.id) ?? 0),
 					0
@@ -1355,7 +1355,9 @@ export class ArtistPublicContentService {
 									}
 									return null;
 								})
-								.filter((item): item is PublicArtistPost['musicAttachments'][number] => Boolean(item)),
+								.filter((item): item is PublicArtistPost['musicAttachments'][number] =>
+									Boolean(item)
+								),
 					poll:
 						!isLocked && poll
 							? {
@@ -1496,7 +1498,9 @@ export class PostPollService {
 			if (pollOption.mode === 'single') {
 				await db
 					.delete(postPollVotes)
-					.where(and(eq(postPollVotes.pollId, input.pollId), eq(postPollVotes.userId, input.userId)));
+					.where(
+						and(eq(postPollVotes.pollId, input.pollId), eq(postPollVotes.userId, input.userId))
+					);
 			} else {
 				const [existingVote] = await db
 					.select({ id: postPollVotes.id })
