@@ -266,8 +266,11 @@ export function lockReasonFor(visibility: ContentVisibility) {
 }
 
 export function sanitizeVisibility(value: string): ContentVisibility {
-	if (value === 'subscribers') return 'subscribers';
-	return 'public'; // legacy followers/investors + anything unknown degrade to public
+	if (value === 'public') return 'public';
+	// Fail closed: legacy followers/investors + anything unknown collapse to the
+	// restricted tier, so content that was already gated never becomes public as a
+	// side effect of the tier consolidation. An artist can re-open it explicitly.
+	return 'subscribers';
 }
 
 export class ContentFeedService {

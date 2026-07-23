@@ -4,11 +4,12 @@ import { canViewVisibility, lockReasonFor, sanitizeVisibility } from './ContentS
 describe('sanitizeVisibility', () => {
 	it('keeps subscribers', () => expect(sanitizeVisibility('subscribers')).toBe('subscribers'));
 	it('keeps public', () => expect(sanitizeVisibility('public')).toBe('public'));
-	it('degrades legacy followers to public', () =>
-		expect(sanitizeVisibility('followers')).toBe('public'));
-	it('degrades legacy investors to public', () =>
-		expect(sanitizeVisibility('investors')).toBe('public'));
-	it('degrades unknown to public', () => expect(sanitizeVisibility('garbage')).toBe('public'));
+	it('fails closed: legacy followers → subscribers', () =>
+		expect(sanitizeVisibility('followers')).toBe('subscribers'));
+	it('fails closed: legacy investors → subscribers', () =>
+		expect(sanitizeVisibility('investors')).toBe('subscribers'));
+	it('fails closed: unknown value → subscribers', () =>
+		expect(sanitizeVisibility('garbage')).toBe('subscribers'));
 });
 
 describe('canViewVisibility', () => {
