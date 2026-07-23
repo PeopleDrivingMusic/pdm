@@ -92,6 +92,13 @@
 		items = items.filter((entry) => entry.id !== id);
 		emitChange();
 	}
+
+	// Revoke any object URLs still open when the picker unmounts.
+	$effect(() => {
+		return () => {
+			for (const item of items) URL.revokeObjectURL(item.url);
+		};
+	});
 </script>
 
 <div class="multi-photo">

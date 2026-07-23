@@ -1,4 +1,5 @@
 import { headR2Object } from '$lib/db/services/R2Service';
+import { isOwnedContentPhotoKey } from '$lib/server/media/contentPhotoDelete';
 import { ContentApplicationService } from './ContentApplicationService';
 
 export interface UploadedPhotoInput {
@@ -29,6 +30,11 @@ export async function resolvePostPhotoMedia(
 
 	for (const photo of photos) {
 		if (!photo.key) continue;
+
+		// Keys are artist-namespaced; never attach another artist's object (IDOR).
+		if (!isOwnedContentPhotoKey(artistId, photo.key)) {
+			throw new PostPhotoError('Photo does not belong to this artist', 403);
+		}
 
 		const object = await headR2Object({ bucket: 'images', key: photo.key });
 		if (!object.exists) {

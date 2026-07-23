@@ -1,8 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-const OUT =
-	'C:/Users/USER/AppData/Local/Temp/claude/D--IT-pet-projects-PDM-pdm/a6cc1a51-3f9d-4c52-9959-dc0ea573b2a9/scratchpad';
-
 test.describe('post rendering preview', () => {
 	test('renders every post variation with correct media layout', async ({ page }) => {
 		await page.goto('/dev/post-preview');
@@ -36,14 +33,14 @@ test.describe('post rendering preview', () => {
 		await expect(dialog).toBeHidden();
 	});
 
-	test('is responsive and captures desktop + mobile screenshots', async ({ page }) => {
+	test('is responsive and captures desktop + mobile screenshots', async ({ page }, testInfo) => {
 		await page.setViewportSize({ width: 1280, height: 900 });
 		await page.goto('/dev/post-preview');
-		await page.screenshot({ path: `${OUT}/e2e-preview-desktop.png`, fullPage: true });
+		await page.screenshot({ path: testInfo.outputPath('preview-desktop.png'), fullPage: true });
 
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.goto('/dev/post-preview');
-		await page.screenshot({ path: `${OUT}/e2e-preview-mobile.png`, fullPage: true });
+		await page.screenshot({ path: testInfo.outputPath('preview-mobile.png'), fullPage: true });
 
 		// No horizontal overflow on a phone-width viewport.
 		const overflow = await page.evaluate(

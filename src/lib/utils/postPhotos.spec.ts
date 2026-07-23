@@ -5,12 +5,7 @@ vi.mock('$lib/utils/helpers', () => ({
 }));
 
 import { uploadR2Target } from '$lib/utils/helpers';
-import {
-	beaconDeleteContentPhotos,
-	deleteContentPhotos,
-	preparePostPhoto,
-	preparePostPhotos
-} from './postPhotos';
+import { beaconDeleteContentPhotos, deleteContentPhotos, preparePostPhoto } from './postPhotos';
 
 const file = (name = 'shot.jpg', type = 'image/jpeg') =>
 	new File([new Uint8Array([1, 2, 3])], name, { type });
@@ -63,34 +58,6 @@ describe('preparePostPhoto', () => {
 
 		await expect(preparePostPhoto(file())).rejects.toThrow('File too large');
 		expect(uploadR2Target).not.toHaveBeenCalled();
-	});
-});
-
-describe('preparePostPhotos', () => {
-	it('processes files in order and returns every key', async () => {
-		(global.fetch as any)
-			.mockResolvedValueOnce(mockTarget('a1/content/photos/1.jpg'))
-			.mockResolvedValueOnce(mockTarget('a1/content/photos/2.jpg'));
-
-		const result = await preparePostPhotos([file('1.jpg'), file('2.jpg')]);
-
-		expect(result.map((p) => p.key)).toEqual([
-			'a1/content/photos/1.jpg',
-			'a1/content/photos/2.jpg'
-		]);
-		expect(uploadR2Target).toHaveBeenCalledTimes(2);
-	});
-
-	it('reports progress with the file index', async () => {
-		(global.fetch as any).mockResolvedValueOnce(mockTarget('a1/content/photos/1.jpg'));
-		(uploadR2Target as any).mockImplementationOnce(async ({ onProgress }: any) => {
-			onProgress?.(100);
-		});
-		const onProgress = vi.fn();
-
-		await preparePostPhotos([file('1.jpg')], onProgress);
-
-		expect(onProgress).toHaveBeenCalledWith(0, 100);
 	});
 });
 

@@ -55,9 +55,17 @@ describe('resolvePostPhotoMedia', () => {
 
 	it('throws when an uploaded object is missing from R2', async () => {
 		(headR2Object as any).mockResolvedValue({ exists: false });
-		await expect(resolvePostPhotoMedia('a1', [{ key: 'missing.jpg' }])).rejects.toBeInstanceOf(
-			PostPhotoError
-		);
+		await expect(
+			resolvePostPhotoMedia('a1', [{ key: 'a1/content/photos/missing.jpg' }])
+		).rejects.toBeInstanceOf(PostPhotoError);
+		expect(ContentApplicationService.createMedia).not.toHaveBeenCalled();
+	});
+
+	it('rejects a key that belongs to another artist (no R2 or DB touch)', async () => {
+		await expect(
+			resolvePostPhotoMedia('a1', [{ key: 'a2/content/photos/1.jpg' }])
+		).rejects.toBeInstanceOf(PostPhotoError);
+		expect(headR2Object).not.toHaveBeenCalled();
 		expect(ContentApplicationService.createMedia).not.toHaveBeenCalled();
 	});
 

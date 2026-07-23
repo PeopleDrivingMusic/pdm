@@ -370,7 +370,11 @@
 	}
 
 	// Photos are already uploaded to R2 on selection, so publishing just attaches their keys.
+	// Idempotent: a submit retry re-runs this on the same FormData, so clear first.
 	function attachPostPhotos(formData: FormData) {
+		formData.delete('uploadedPhotoKeys');
+		formData.delete('uploadedPhotoTypes');
+		formData.delete('uploadedPhotoSizes');
 		for (const photo of postPhotoUploads) {
 			formData.append('uploadedPhotoKeys', photo.key);
 			formData.append('uploadedPhotoTypes', photo.contentType);

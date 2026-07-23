@@ -54,15 +54,3 @@ export function beaconDeleteContentPhotos(keys: string[]): void {
 	const blob = new Blob([JSON.stringify({ keys })], { type: 'application/json' });
 	navigator.sendBeacon(DELETE_ENDPOINT, blob);
 }
-
-/** Upload several post photos sequentially, reporting progress per file index. */
-export async function preparePostPhotos(
-	files: File[],
-	onProgress?: (fileIndex: number, percent: number) => void
-): Promise<PreparedPhoto[]> {
-	const prepared: PreparedPhoto[] = [];
-	for (let index = 0; index < files.length; index += 1) {
-		prepared.push(await preparePostPhoto(files[index], (percent) => onProgress?.(index, percent)));
-	}
-	return prepared;
-}
