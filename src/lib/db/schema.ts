@@ -24,7 +24,7 @@ export {
 export { genres, albums, tracks, albumTracks } from './schemas/catalog';
 export { trackStats } from './schemas/engagement';
 export { playlists, playlistTracks, userFavorites } from './schemas/user-library';
-export { purchases } from './schemas/finance';
+export { purchases, subscriptions } from './schemas/finance';
 import { users, sessions } from './schemas/users';
 import {
 	artists,
@@ -50,7 +50,7 @@ import {
 import { genres, albums, tracks, albumTracks } from './schemas/catalog';
 import { trackStats } from './schemas/engagement';
 import { playlists, playlistTracks, userFavorites } from './schemas/user-library';
-import { purchases } from './schemas/finance';
+import { purchases, subscriptions } from './schemas/finance';
 
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
@@ -161,6 +161,17 @@ export const purchasesRelations = relations(purchases, ({ one }) => ({
 	album: one(albums, {
 		fields: [purchases.albumId],
 		references: [albums.id]
+	})
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+	user: one(users, {
+		fields: [subscriptions.userId],
+		references: [users.id]
+	}),
+	artist: one(artists, {
+		fields: [subscriptions.artistId],
+		references: [artists.id]
 	})
 }));
 
@@ -372,6 +383,8 @@ export type VideoCollectionItem = typeof videoCollectionItems.$inferSelect;
 export type NewVideoCollectionItem = typeof videoCollectionItems.$inferInsert;
 export type ArtistFeedItem = typeof artistFeedItems.$inferSelect;
 export type NewArtistFeedItem = typeof artistFeedItems.$inferInsert;
+export type Subscription = typeof subscriptions.$inferSelect;
+export type NewSubscription = typeof subscriptions.$inferInsert;
 
 // Export all tables for migrations
 export const schema = {
@@ -402,5 +415,6 @@ export const schema = {
 	playlists,
 	playlistTracks,
 	userFavorites,
-	purchases
+	purchases,
+	subscriptions
 };
