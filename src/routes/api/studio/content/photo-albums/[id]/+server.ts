@@ -13,7 +13,7 @@ function normalizeStatus(value: unknown): ContentStatus {
 function normalizeVisibility(value: unknown): ContentVisibility {
 	return typeof value === 'string' && VISIBILITY_VALUES.has(value)
 		? (value as ContentVisibility)
-		: 'public';
+		: 'subscribers'; // fail closed: unknown/legacy → restricted (matches sanitizeVisibility)
 }
 
 export const PATCH: RequestHandler = async (event) => {

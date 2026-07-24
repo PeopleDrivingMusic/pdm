@@ -20,8 +20,9 @@ function getStatus(value: FormDataEntryValue | null): ContentStatus {
 }
 
 function getVisibility(value: FormDataEntryValue | null): ContentVisibility {
-	const visibility = typeof value === 'string' ? value : 'public';
-	return VISIBILITY_VALUES.has(visibility) ? (visibility as ContentVisibility) : 'public';
+	const visibility = typeof value === 'string' ? value : '';
+	// fail closed: unknown/legacy/missing → restricted (matches sanitizeVisibility)
+	return VISIBILITY_VALUES.has(visibility) ? (visibility as ContentVisibility) : 'subscribers';
 }
 
 function getString(data: FormData, key: string) {

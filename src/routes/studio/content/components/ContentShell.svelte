@@ -134,7 +134,9 @@
 		formData.set('title', overrides.title ?? post.title);
 		formData.set('bodyHtml', post.bodyHtml ?? '');
 		formData.set('bodyJson', post.bodyJson ? JSON.stringify(post.bodyJson) : '');
-		formData.set('visibility', overrides.visibility ?? post.visibility);
+		const primedVisibility =
+			(overrides.visibility ?? post.visibility) === 'public' ? 'public' : 'subscribers';
+		formData.set('visibility', primedVisibility);
 		formData.set('status', overrides.status ?? post.status);
 
 		for (const mediaId of post.mediaIds ?? []) formData.append('existingMediaIds', mediaId);
@@ -352,7 +354,9 @@
 		submitLabel="Save changes"
 		initialTitle={editingItem?.title ?? ''}
 		initialDescription={editingItem?.previewText ?? ''}
-		initialVisibility={(editingItem?.visibility ?? 'public') as CollectionVisibility}
+		initialVisibility={((editingItem?.visibility ?? 'public') === 'public'
+			? 'public'
+			: 'subscribers') as CollectionVisibility}
 		initialStatus={(editingItem?.status ?? 'draft') as CollectionStatus}
 		showStatus
 		deleteLabel={editingItem?.sourceType === 'post' ? 'Delete post' : editingItem?.sourceType === 'photo_album' ? 'Delete gallery' : 'Delete playlist'}
