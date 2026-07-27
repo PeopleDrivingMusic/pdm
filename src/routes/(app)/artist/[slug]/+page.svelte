@@ -207,6 +207,7 @@
 										album={trackEntry?.track.albumId
 											? albumMap.get(trackEntry.track.albumId)
 											: null}
+										locked={trackEntry?.locked ?? false}
 									/>
 								{/each}
 							{/snippet}

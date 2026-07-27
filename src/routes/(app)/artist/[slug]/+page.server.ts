@@ -26,10 +26,15 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		limit: 1000
 	});
 
-	// Await the essential above-the-fold flag (a single-row lookup). Resolving it here — rather
-	// than chaining the streamed promises off the still-pending promise — means a failed
-	// entitlement lookup rejects the load cleanly, with no dangling rejected promises.
-	const isSubscriber = await isSubscriberPromise;
+	// Await the essential above-the-fold flag (a single-row lookup). Fail closed if the lookup
+	// errors: treat the viewer as a non-subscriber (content stays locked) rather than throwing —
+	// which also prevents the already-firing list queries from dangling as unhandled rejections.
+	let isSubscriber: boolean;
+	try {
+		isSubscriber = await isSubscriberPromise;
+	} catch {
+		isSubscriber = false;
+	}
 
 	// Streamed: derive the per-track `locked` flag from the already-firing query + resolved flag.
 	const tracksPromise = tracksQueryPromise.then((tracks) =>
