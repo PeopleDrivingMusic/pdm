@@ -13,32 +13,38 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const userId = locals.user?.id;
 	const isOwner = userId === artist.userId;
 
-	// Kick everything off WITHOUT awaiting (no waterfall). Owner is always entitled.
+	// Fire the entitlement lookup + the independent list queries immediately (no waterfall).
+	// The list queries don't need entitlement, so they run in parallel with it. Owner is
+	// always entitled.
 	const isSubscriberPromise = isOwner
 		? Promise.resolve(true)
 		: EntitlementService.isSubscriberOf(userId, artist.id);
-
 	const albumsPromise = AlbumService.getAlbumsByArtist(artist.id);
+	const tracksQueryPromise = TrackService.getTracksByArtist({
+		artistId: artist.id,
+		userId,
+		limit: 1000
+	});
 
-	// tracks list query doesn't need entitlement, but the per-track `locked` flag does — chain it.
-	const tracksPromise = Promise.all([
-		TrackService.getTracksByArtist({ artistId: artist.id, userId, limit: 1000 }),
-		isSubscriberPromise
-	]).then(([tracks, isSubscriber]) =>
+	// Await the essential above-the-fold flag (a single-row lookup). Resolving it here — rather
+	// than chaining the streamed promises off the still-pending promise — means a failed
+	// entitlement lookup rejects the load cleanly, with no dangling rejected promises.
+	const isSubscriber = await isSubscriberPromise;
+
+	// Streamed: derive the per-track `locked` flag from the already-firing query + resolved flag.
+	const tracksPromise = tracksQueryPromise.then((tracks) =>
 		tracks.map((entry) => ({
 			...entry,
 			locked: !isSubscriber && entry.track.visibility === 'subscribers_only'
 		}))
 	);
 
-	// content aggregation needs the viewer's subscription — chain it too.
-	const contentPromise = isSubscriberPromise.then((isSubscriber) =>
-		ArtistPublicContentService.getArtistContent(artist.id, { userId, isOwner, isSubscriber })
-	);
-
-	// Await ONLY the essential, above-the-fold data (single-row lookup) — at the END,
-	// so it doesn't block the streamed promises from starting.
-	const isSubscriber = await isSubscriberPromise;
+	// Streamed: content aggregation (the heavy query) starts right after the flag resolves.
+	const contentPromise = ArtistPublicContentService.getArtistContent(artist.id, {
+		userId,
+		isOwner,
+		isSubscriber
+	});
 
 	return {
 		artist,

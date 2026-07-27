@@ -90,7 +90,7 @@ test.describe.serial('artist page subscription gating', () => {
 
 	test('anonymous visitor sees a log-in CTA and locked content is dimmed with a teaser', async ({
 		page
-	}) => {
+	}, testInfo) => {
 		await page.goto(`/artist/${ARTIST_SLUG}`);
 
 		await expect(page.getByRole('link', { name: 'Log in to subscribe' })).toBeVisible();
@@ -100,12 +100,14 @@ test.describe.serial('artist page subscription gating', () => {
 		await expect(lockedFeedCard.getByText('Subscribe to unlock')).toBeVisible();
 
 		await expect(page.locator('.music-track.is-locked')).toHaveCount(1);
+
+		await page.screenshot({ path: testInfo.outputPath('artist-anonymous.png'), fullPage: true });
 	});
 
 	test('logged-in non-subscriber sees the Subscribe CTA; subscribing unlocks the track', async ({
 		browser,
 		baseURL
-	}) => {
+	}, testInfo) => {
 		const context = await browser.newContext();
 		await context.addCookies([
 			{
@@ -124,12 +126,17 @@ test.describe.serial('artist page subscription gating', () => {
 		const subscribeButton = page.getByRole('button', { name: 'Subscribe · $1/mo' });
 		await expect(subscribeButton).toBeVisible();
 		await expect(page.locator('.music-track.is-locked')).toHaveCount(1);
+		await page.screenshot({
+			path: testInfo.outputPath('artist-nonsubscriber.png'),
+			fullPage: true
+		});
 
 		await subscribeButton.click();
 		await expect(page.getByRole('button', { name: 'Subscribed ✓' })).toBeVisible();
 
 		// The per-track `locked` hint reflects real entitlement after invalidateAll().
 		await expect(page.locator('.music-track.is-locked')).toHaveCount(0);
+		await page.screenshot({ path: testInfo.outputPath('artist-subscribed.png'), fullPage: true });
 
 		await context.close();
 	});

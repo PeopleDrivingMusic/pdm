@@ -28,26 +28,27 @@
 
 	let activeTab = $state(tabs[0]);
 	let busy = $state(false);
+	let ctaError = $state('');
 
-	async function subscribe() {
+	async function setSubscription(method: 'POST' | 'DELETE', failMessage: string) {
 		busy = true;
+		ctaError = '';
 		try {
-			await fetch(`/api/artist/${artist.id}/subscription`, { method: 'POST' });
+			const response = await fetch(`/api/artist/${artist.id}/subscription`, { method });
+			if (!response.ok) {
+				ctaError = failMessage;
+				return;
+			}
 			await invalidateAll();
+		} catch {
+			ctaError = failMessage;
 		} finally {
 			busy = false;
 		}
 	}
 
-	async function unsubscribe() {
-		busy = true;
-		try {
-			await fetch(`/api/artist/${artist.id}/subscription`, { method: 'DELETE' });
-			await invalidateAll();
-		} finally {
-			busy = false;
-		}
-	}
+	const subscribe = () => setSubscription('POST', 'Could not subscribe. Please try again.');
+	const unsubscribe = () => setSubscription('DELETE', 'Could not update your subscription.');
 
 	function formatDate(value: Date | string | null) {
 		if (!value) return '';
@@ -394,6 +395,9 @@
 					{:else if !viewer.isLoggedIn}
 						<Button href="/login" variant="secondary">Log in to subscribe</Button>
 					{/if}
+					{#if ctaError}
+						<span class="cta-error" role="alert">{ctaError}</span>
+					{/if}
 				</div>
 			</div>
 		</header>
@@ -629,6 +633,12 @@
 		color: var(--text-secondary);
 		font-size: var(--font-size-sm);
 		font-weight: 600;
+	}
+
+	.cta-error {
+		color: var(--error, #e5484d);
+		font-size: var(--font-size-sm);
+		align-self: center;
 	}
 
 	.content-surface,
