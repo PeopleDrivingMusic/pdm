@@ -1,18 +1,19 @@
-import 'dotenv/config';
 import { expect, test } from '@playwright/test';
 import { encodeBase32LowerCaseNoPadding, encodeHexLowerCase } from '@oslojs/encoding';
 import { sha256 } from '@oslojs/crypto/sha2';
 import postgres from 'postgres';
+import { TEST_DATABASE_URL } from './test-db.mjs';
 
 /**
- * Exercises the artist page's streaming load + gating end to end against the real
- * dev database: anonymous viewer, logged-in non-subscriber, and post-subscribe states.
+ * Exercises the artist page's streaming load + entitlement gating end to end
+ * against the ephemeral e2e database: anonymous viewer, logged-in non-subscriber,
+ * and post-subscribe states.
  *
- * Seeds a throwaway fan user/session and temporarily locks one artist track + adds a
- * subscribers-only post, then restores everything in afterAll.
+ * The test seeds ALL of its own fixtures (owner + artist + a subscribers-only
+ * track + a subscribers post + a fan user/session) — it does not depend on any
+ * pre-existing dev data. The whole `pdm_e2e` database is dropped after the run
+ * (e2e/global-teardown.ts), so no per-row cleanup is needed.
  */
-
-const ARTIST_SLUG = 'metallica';
 
 function generateSessionToken(): string {
 	const bytes = new Uint8Array(20);
@@ -25,73 +26,68 @@ function sessionIdFor(token: string): string {
 }
 
 test.describe.serial('artist page subscription gating', () => {
-	const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
+	const sql = postgres(TEST_DATABASE_URL, { max: 1 });
 
-	let artistId: string;
-	let lockedTrackId: string;
-	let originalTrackVisibility: string;
-	let lockedPostId: string;
-	let fanUserId: string;
-	let sessionToken: string;
+	let artistSlug: string;
+	let fanSessionToken: string;
 
 	test.beforeAll(async () => {
-		const [artist] = await sql`select id from artist.artists where slug = ${ARTIST_SLUG}`;
-		if (!artist) throw new Error(`Seed artist "${ARTIST_SLUG}" not found — cannot run e2e fixture`);
-		artistId = artist.id;
+		const stamp = Date.now();
+		artistSlug = `e2e-artist-${stamp}`;
 
-		const [track] = await sql`
-			select id, visibility from catalog.tracks
-			where artist_id = ${artistId} and is_published = true
-			limit 1
+		const [owner] = await sql`
+			insert into users.users (email, display_name)
+			values (${`e2e-owner-${stamp}@example.test`}, 'E2E Owner')
+			returning id
 		`;
-		if (!track) throw new Error(`Seed artist "${ARTIST_SLUG}" has no published track to lock`);
-		lockedTrackId = track.id;
-		originalTrackVisibility = track.visibility;
-		await sql`update catalog.tracks set visibility = 'subscribers' where id = ${lockedTrackId}`;
 
-		const [post] = await sql`
+		const [artist] = await sql`
+			insert into artist.artists (user_id, name, slug)
+			values (${owner.id}, 'E2E Artist', ${artistSlug})
+			returning id
+		`;
+
+		// A published, subscribers-only track — appears dimmed/locked for non-subscribers.
+		await sql`
+			insert into catalog.tracks (artist_id, title, status, is_published, visibility, audio_url)
+			values (${artist.id}, 'E2E Track', 'ready', true, 'subscribers', ${`${artist.id}/audio/e2e.mp3`})
+		`;
+
+		// A published, subscribers-only post — shows a locked teaser for non-subscribers.
+		await sql`
 			insert into content.posts (artist_id, title, slug, excerpt, visibility, status, published_at)
 			values (
-				${artistId},
+				${artist.id},
 				'E2E locked update',
-				${'e2e-locked-update-' + Date.now()},
+				${`e2e-locked-update-${stamp}`},
 				'Exclusive update for subscribers',
 				'subscribers',
 				'published',
 				now()
 			)
-			returning id
 		`;
-		lockedPostId = post.id;
 
-		const email = `e2e-fan-${Date.now()}@example.test`;
-		const [user] = await sql`
+		const [fan] = await sql`
 			insert into users.users (email, display_name)
-			values (${email}, 'E2E Fan')
+			values (${`e2e-fan-${stamp}@example.test`}, 'E2E Fan')
 			returning id
 		`;
-		fanUserId = user.id;
 
-		sessionToken = generateSessionToken();
+		fanSessionToken = generateSessionToken();
 		await sql`
 			insert into users.sessions (id, user_id, expires_at)
-			values (${sessionIdFor(sessionToken)}, ${fanUserId}, now() + interval '1 day')
+			values (${sessionIdFor(fanSessionToken)}, ${fan.id}, now() + interval '1 day')
 		`;
 	});
 
 	test.afterAll(async () => {
-		await sql`delete from finance.subscriptions where user_id = ${fanUserId}`;
-		await sql`delete from users.sessions where user_id = ${fanUserId}`;
-		await sql`delete from users.users where id = ${fanUserId}`;
-		await sql`delete from content.posts where id = ${lockedPostId}`;
-		await sql`update catalog.tracks set visibility = ${originalTrackVisibility} where id = ${lockedTrackId}`;
 		await sql.end();
 	});
 
 	test('anonymous visitor sees a log-in CTA and locked content is dimmed with a teaser', async ({
 		page
 	}, testInfo) => {
-		await page.goto(`/artist/${ARTIST_SLUG}`);
+		await page.goto(`/artist/${artistSlug}`);
 
 		await expect(page.getByRole('link', { name: 'Log in to subscribe' })).toBeVisible();
 
@@ -112,7 +108,7 @@ test.describe.serial('artist page subscription gating', () => {
 		await context.addCookies([
 			{
 				name: 'session',
-				value: sessionToken,
+				value: fanSessionToken,
 				url: baseURL,
 				httpOnly: true,
 				secure: true,
@@ -121,7 +117,7 @@ test.describe.serial('artist page subscription gating', () => {
 		]);
 		const page = await context.newPage();
 
-		await page.goto(`/artist/${ARTIST_SLUG}`);
+		await page.goto(`/artist/${artistSlug}`);
 
 		const subscribeButton = page.getByRole('button', { name: 'Subscribe · $1/mo' });
 		await expect(subscribeButton).toBeVisible();
