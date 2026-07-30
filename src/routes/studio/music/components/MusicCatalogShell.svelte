@@ -94,7 +94,7 @@
 		await invalidateAll();
 	}
 
-	async function changeTrackVisibility(track: TrackDTO, v: 'public' | 'subscribers_only') {
+	async function changeTrackVisibility(track: TrackDTO, v: 'public' | 'subscribers') {
 		try {
 			const fd = new FormData();
 			fd.set('trackId', track.id);

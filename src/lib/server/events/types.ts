@@ -1,4 +1,7 @@
-export type Visibility = 'public' | 'subscribers_only';
+// Music/catalog visibility shares the same two-tier vocabulary as content —
+// aliased to the single source of truth so they can never drift apart.
+import type { ContentVisibility } from '$lib/db/content-visibility';
+export type Visibility = ContentVisibility;
 
 export type DomainEvent =
 	| { type: 'track.uploaded'; trackId: string; artistId: string; occurredAt: string }

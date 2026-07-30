@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import AlbumTile from './AlbumTile.svelte';
 
-const album = (visibility: 'public' | 'subscribers_only') => ({
+const album = (visibility: 'public' | 'subscribers') => ({
 	id: 'al1',
 	artistId: 'a1',
 	title: 'Test Album',
@@ -19,7 +19,7 @@ const album = (visibility: 'public' | 'subscribers_only') => ({
 const cb = { onEdit: vi.fn(), onDelete: vi.fn() };
 
 test('shows the gate badge only for subscribers-only albums', async () => {
-	render(AlbumTile, { album: album('subscribers_only'), trackCount: 3, ...cb });
+	render(AlbumTile, { album: album('subscribers'), trackCount: 3, ...cb });
 	await expect.element(page.getByText('Subscribers', { exact: true })).toBeInTheDocument();
 });
 

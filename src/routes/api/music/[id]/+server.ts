@@ -14,7 +14,7 @@ export const GET: RequestHandler = async ({ params: { id }, locals }) => {
 			return new Response('Track is not ready', { status: 409 });
 		}
 
-		if (track.visibility === 'subscribers_only') {
+		if (track.visibility === 'subscribers') {
 			const userId = locals.user?.id;
 			if (!userId) {
 				return new Response('Subscribe to listen', { status: 403 });

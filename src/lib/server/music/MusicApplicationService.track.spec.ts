@@ -83,7 +83,7 @@ describe('createTrack', () => {
 
 		const result = await MusicApplicationService.createTrack('a1', {
 			title: 'S',
-			visibility: 'subscribers_only',
+			visibility: 'subscribers',
 			audio: { fileName: 'x.mp3', contentType: 'audio/mpeg', size: 1024 }
 		});
 
@@ -91,7 +91,7 @@ describe('createTrack', () => {
 			expect.objectContaining({
 				artistId: 'a1',
 				status: 'pending_upload',
-				visibility: 'subscribers_only'
+				visibility: 'subscribers'
 			})
 		);
 		expect(result.uploadTargets.audio).toBeDefined();

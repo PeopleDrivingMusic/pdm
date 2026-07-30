@@ -22,7 +22,7 @@
 	let description = $state('');
 	let releaseDate = $state('');
 	let genres = $state('');
-	let visibility = $state<'public' | 'subscribers_only'>('public');
+	let visibility = $state<'public' | 'subscribers'>('public');
 	let isPublished = $state(false);
 	let coverFile = $state<File | null>(null);
 	let submitting = $state(false);

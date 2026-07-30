@@ -37,29 +37,29 @@ it('streams a public track to anyone', async () => {
 	expect(res.status).toBe(200);
 });
 
-it('403s a subscribers_only track for an anonymous viewer', async () => {
-	(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'subscribers_only' }));
+it('403s a subscribers track for an anonymous viewer', async () => {
+	(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'subscribers' }));
 	const res = await call({ user: null });
 	expect(res.status).toBe(403);
 	expect(EntitlementService.isSubscriberOf).not.toHaveBeenCalled();
 });
 
-it('403s a subscribers_only track for a non-subscriber', async () => {
-	(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'subscribers_only' }));
+it('403s a subscribers track for a non-subscriber', async () => {
+	(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'subscribers' }));
 	(EntitlementService.isSubscriberOf as any).mockResolvedValue(false);
 	const res = await call({ user: { id: 'u2' } });
 	expect(res.status).toBe(403);
 });
 
-it('streams a subscribers_only track to an active subscriber', async () => {
-	(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'subscribers_only' }));
+it('streams a subscribers track to an active subscriber', async () => {
+	(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'subscribers' }));
 	(EntitlementService.isSubscriberOf as any).mockResolvedValue(true);
 	const res = await call({ user: { id: 'u2' } });
 	expect(res.status).toBe(200);
 });
 
-it('streams a subscribers_only track to its owner without checking entitlement', async () => {
-	(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'subscribers_only' }));
+it('streams a subscribers track to its owner without checking entitlement', async () => {
+	(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'subscribers' }));
 	const res = await call({ user: { id: 'owner1' } });
 	expect(res.status).toBe(200);
 	expect(EntitlementService.isSubscriberOf).not.toHaveBeenCalled();

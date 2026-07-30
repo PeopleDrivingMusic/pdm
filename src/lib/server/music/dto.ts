@@ -130,7 +130,7 @@ export interface TrackUploadMetadata {
 }
 
 export function coerceVisibility(value: unknown): Visibility {
-	return value === 'subscribers_only' ? 'subscribers_only' : 'public';
+	return value === 'subscribers' ? 'subscribers' : 'public';
 }
 
 export function toTrackDTO(track: Track): TrackDTO {

@@ -15,7 +15,7 @@ const baseTrack = {
 	genre: ['rock'],
 	status: 'uploaded',
 	isPublished: true,
-	visibility: 'subscribers_only',
+	visibility: 'subscribers',
 	contentId: null,
 	metadata: { upload: { secret: 1 } },
 	createdAt: new Date('2026-06-30T00:00:00Z'),
@@ -27,7 +27,7 @@ describe('toTrackDTO', () => {
 		const dto = toTrackDTO(baseTrack);
 		expect(dto.audioKey).toBe('a1/tracks/t1/source.mp3');
 		expect(dto.imageKey).toBe('a1/tracks/t1/cover.jpg');
-		expect(dto.visibility).toBe('subscribers_only');
+		expect(dto.visibility).toBe('subscribers');
 		expect(dto.genres).toEqual(['rock']);
 		expect('audioUrl' in dto).toBe(false);
 		expect('metadata' in dto).toBe(false);

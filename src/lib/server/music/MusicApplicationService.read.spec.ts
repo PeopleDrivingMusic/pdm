@@ -25,7 +25,7 @@ const track = (over = {}) => ({
 	genre: [],
 	status: 'uploaded',
 	isPublished: true,
-	visibility: 'subscribers_only',
+	visibility: 'subscribers',
 	contentId: null,
 	metadata: null,
 	createdAt: d,

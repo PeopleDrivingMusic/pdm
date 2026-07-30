@@ -40,7 +40,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const tracksPromise = tracksQueryPromise.then((tracks) =>
 		tracks.map((entry) => ({
 			...entry,
-			locked: !isSubscriber && entry.track.visibility === 'subscribers_only'
+			locked: !isSubscriber && entry.track.visibility === 'subscribers'
 		}))
 	);
 

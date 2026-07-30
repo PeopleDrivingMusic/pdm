@@ -5,7 +5,7 @@ import SegmentedControl from './SegmentedControl.svelte';
 
 const options = [
 	{ value: 'public', label: 'Public' },
-	{ value: 'subscribers_only', label: 'Subscribers' }
+	{ value: 'subscribers', label: 'Subscribers' }
 ];
 
 test('marks the selected option aria-checked', async () => {
@@ -19,5 +19,5 @@ test('fires onChange when another option is clicked', async () => {
 	const onChange = vi.fn();
 	render(SegmentedControl, { value: 'public', options, ariaLabel: 'Visibility', onChange });
 	await page.getByRole('radio', { name: 'Subscribers' }).click();
-	expect(onChange).toHaveBeenCalledWith('subscribers_only');
+	expect(onChange).toHaveBeenCalledWith('subscribers');
 });

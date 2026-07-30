@@ -47,7 +47,7 @@
 
 		{#if featured}<span class="idx">{String(index).padStart(2, '0')} / Latest</span>{/if}
 
-		{#if album.visibility === 'subscribers_only'}
+		{#if album.visibility === 'subscribers'}
 			<span class="gate"><SvgIcon path={mdiLock} size={12} /> Subscribers</span>
 		{/if}
 

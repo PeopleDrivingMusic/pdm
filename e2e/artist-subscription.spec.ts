@@ -47,7 +47,7 @@ test.describe.serial('artist page subscription gating', () => {
 		if (!track) throw new Error(`Seed artist "${ARTIST_SLUG}" has no published track to lock`);
 		lockedTrackId = track.id;
 		originalTrackVisibility = track.visibility;
-		await sql`update catalog.tracks set visibility = 'subscribers_only' where id = ${lockedTrackId}`;
+		await sql`update catalog.tracks set visibility = 'subscribers' where id = ${lockedTrackId}`;
 
 		const [post] = await sql`
 			insert into content.posts (artist_id, title, slug, excerpt, visibility, status, published_at)

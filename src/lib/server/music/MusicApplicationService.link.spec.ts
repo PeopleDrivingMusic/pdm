@@ -49,21 +49,21 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('linkTrackToAlbum inheritance', () => {
 	it('overwrites track visibility with the album visibility and emits', async () => {
-		(AlbumService.getAlbumById as any).mockResolvedValue(album({ visibility: 'subscribers_only' }));
+		(AlbumService.getAlbumById as any).mockResolvedValue(album({ visibility: 'subscribers' }));
 		(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'public' }));
 		(AlbumTrackService.linkTrackToAlbum as any).mockResolvedValue({
 			albumId: 'al1',
 			trackId: 't1',
 			trackNumber: 1
 		});
-		(TrackService.updateTrack as any).mockResolvedValue(track({ visibility: 'subscribers_only' }));
+		(TrackService.updateTrack as any).mockResolvedValue(track({ visibility: 'subscribers' }));
 
 		const res = await MusicApplicationService.linkTrackToAlbum('a1', 'al1', 't1', 1);
 		expect(TrackService.updateTrack).toHaveBeenCalledWith('t1', {
-			visibility: 'subscribers_only'
+			visibility: 'subscribers'
 		});
 		expect(eventPublisher.publish).toHaveBeenCalledWith(
-			expect.objectContaining({ type: 'track.visibility_changed', visibility: 'subscribers_only' })
+			expect.objectContaining({ type: 'track.visibility_changed', visibility: 'subscribers' })
 		);
 		expect(res).toEqual({ albumId: 'al1', trackId: 't1', trackNumber: 1 });
 	});
@@ -86,10 +86,10 @@ describe('updateTrackMetadata', () => {
 			track({ visibility: 'public', isPublished: false })
 		);
 		(TrackService.updateTrack as any).mockResolvedValue(
-			track({ visibility: 'subscribers_only', isPublished: true })
+			track({ visibility: 'subscribers', isPublished: true })
 		);
 		await MusicApplicationService.updateTrackMetadata('a1', 't1', {
-			visibility: 'subscribers_only',
+			visibility: 'subscribers',
 			isPublished: true
 		});
 		expect(eventPublisher.publish).toHaveBeenCalledWith(
