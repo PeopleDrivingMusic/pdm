@@ -4,6 +4,7 @@
 	import { mdiArrowLeft, mdiClose, mdiImageOutline, mdiMusicNotePlus, mdiPoll } from '@mdi/js';
 	import { Button, FileUpload, IconButton, Input, Select, SvgIcon } from '$lib/ui';
 	import MultiPhotoInput from '$lib/ui/components/MultiPhotoInput.svelte';
+	import type { ContentVisibility } from '$lib/db/content-visibility';
 	import type { Editor } from '@tiptap/core';
 	import CollectionCreateOverlay from './CollectionCreateOverlay.svelte';
 	import MusicAttachmentPicker from './MusicAttachmentPicker.svelte';
@@ -403,7 +404,7 @@
 	async function createPhotoAlbum(payload: {
 		title: string;
 		description: string;
-		visibility: 'public' | 'subscribers';
+		visibility: ContentVisibility;
 	}) {
 		const response = await fetch('/api/studio/content/photo-albums', {
 			method: 'POST',
@@ -425,7 +426,7 @@
 	async function createVideoCollection(payload: {
 		title: string;
 		description: string;
-		visibility: 'public' | 'subscribers';
+		visibility: ContentVisibility;
 	}) {
 		const response = await fetch('/api/studio/content/video-collections', {
 			method: 'POST',

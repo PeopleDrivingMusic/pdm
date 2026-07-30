@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { mdiClose } from '@mdi/js';
 	import { Button, IconButton, Input, Select } from '$lib/ui';
+	import type { ContentStatus, ContentVisibility } from '$lib/db/content-visibility';
 
-	type Visibility = 'public' | 'subscribers';
-	type Status = 'draft' | 'published' | 'scheduled' | 'archived';
+	type Visibility = ContentVisibility;
+	type Status = ContentStatus;
 
 	interface Payload {
 		title: string;

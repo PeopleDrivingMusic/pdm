@@ -1,6 +1,6 @@
 import type { Actions, PageServerLoad } from './$types';
 import { error, fail } from '@sveltejs/kit';
-import { type ContentStatus, type ContentVisibility } from '$lib/db/services/ContentService';
+import { normalizeContentStatus, normalizeContentVisibility } from '$lib/db/content-visibility';
 import { getArtistByCookie } from '$lib/server/artist-session';
 import { ContentApplicationService } from '$lib/server/content';
 import {
@@ -10,20 +10,6 @@ import {
 } from '$lib/server/content/resolvePostPhotos';
 import { uploadFile, uploadImage } from '$lib/server/upload';
 import { headR2Object } from '$lib/db/services/R2Service';
-
-const STATUS_VALUES = new Set(['draft', 'scheduled', 'published', 'archived']);
-const VISIBILITY_VALUES = new Set(['public', 'subscribers']);
-
-function getStatus(value: FormDataEntryValue | null): ContentStatus {
-	const status = typeof value === 'string' ? value : 'draft';
-	return STATUS_VALUES.has(status) ? (status as ContentStatus) : 'draft';
-}
-
-function getVisibility(value: FormDataEntryValue | null): ContentVisibility {
-	const visibility = typeof value === 'string' ? value : '';
-	// fail closed: unknown/legacy/missing → restricted (matches sanitizeVisibility)
-	return VISIBILITY_VALUES.has(visibility) ? (visibility as ContentVisibility) : 'subscribers';
-}
 
 function getString(data: FormData, key: string) {
 	const value = data.get(key);
@@ -107,8 +93,8 @@ export const actions: Actions = {
 		const title = getString(data, 'title');
 		const bodyHtml = sanitizeHtml(getString(data, 'bodyHtml'));
 		const bodyJsonRaw = getString(data, 'bodyJson');
-		const status = getStatus(data.get('status'));
-		const visibility = getVisibility(data.get('visibility'));
+		const status = normalizeContentStatus(data.get('status'));
+		const visibility = normalizeContentVisibility(data.get('visibility'));
 		const scheduledAt = parseDate(getString(data, 'scheduledAt'));
 		const trackIds = getStringList(data, 'trackIds');
 		const albumIds = getStringList(data, 'albumIds');
@@ -204,8 +190,8 @@ export const actions: Actions = {
 		const title = getString(data, 'title');
 		const bodyHtml = sanitizeHtml(getString(data, 'bodyHtml'));
 		const bodyJsonRaw = getString(data, 'bodyJson');
-		const status = getStatus(data.get('status'));
-		const visibility = getVisibility(data.get('visibility'));
+		const status = normalizeContentStatus(data.get('status'));
+		const visibility = normalizeContentVisibility(data.get('visibility'));
 		const scheduledAt = parseDate(getString(data, 'scheduledAt'));
 		const existingMediaIds = getStringList(data, 'existingMediaIds');
 		const trackIds = getStringList(data, 'trackIds');
@@ -331,8 +317,8 @@ export const actions: Actions = {
 		const data = await event.request.formData();
 		const title = getString(data, 'title');
 		const description = getString(data, 'description');
-		const status = getStatus(data.get('status'));
-		const visibility = getVisibility(data.get('visibility'));
+		const status = normalizeContentStatus(data.get('status'));
+		const visibility = normalizeContentVisibility(data.get('visibility'));
 		const scheduledAt = parseDate(getString(data, 'scheduledAt'));
 		const photoFile = data.get('photo') as File | null;
 		const uploadedPhotoKey = getString(data, 'uploadedPhotoKey');
@@ -373,7 +359,11 @@ export const actions: Actions = {
 			if (!object.exists) {
 				return fail(400, { error: 'Uploaded photo was not found in storage' });
 			}
-			if (photoFileSize && typeof object.contentLength === 'number' && object.contentLength !== photoFileSize) {
+			if (
+				photoFileSize &&
+				typeof object.contentLength === 'number' &&
+				object.contentLength !== photoFileSize
+			) {
 				return fail(400, { error: 'Uploaded photo size does not match metadata' });
 			}
 			metadata = {
@@ -419,8 +409,8 @@ export const actions: Actions = {
 		const data = await event.request.formData();
 		const title = getString(data, 'title');
 		const description = getString(data, 'description');
-		const status = getStatus(data.get('status'));
-		const visibility = getVisibility(data.get('visibility'));
+		const status = normalizeContentStatus(data.get('status'));
+		const visibility = normalizeContentVisibility(data.get('visibility'));
 		const scheduledAt = parseDate(getString(data, 'scheduledAt'));
 		const videoFile = data.get('video') as File | null;
 		const collectionMode = getString(data, 'collectionMode') || 'none';

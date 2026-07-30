@@ -35,8 +35,12 @@ import type {
 	VideoCollection
 } from '$lib/db';
 
-export type ContentStatus = 'draft' | 'scheduled' | 'published' | 'archived';
-export type ContentVisibility = 'public' | 'subscribers';
+import {
+	normalizeContentVisibility,
+	type ContentStatus,
+	type ContentVisibility
+} from '../content-visibility';
+export type { ContentStatus, ContentVisibility };
 export type FeedSourceType = 'post' | 'photo_album' | 'video' | 'track' | 'album' | 'merch';
 
 export interface ArtistContentViewer {
@@ -263,14 +267,6 @@ export function canViewVisibility(visibility: ContentVisibility, viewer: ArtistC
 export function lockReasonFor(visibility: ContentVisibility) {
 	if (visibility === 'subscribers') return 'Subscribe to unlock';
 	return null;
-}
-
-export function sanitizeVisibility(value: string): ContentVisibility {
-	if (value === 'public') return 'public';
-	// Fail closed: legacy followers/investors + anything unknown collapse to the
-	// restricted tier, so content that was already gated never becomes public as a
-	// side effect of the tier consolidation. An artist can re-open it explicitly.
-	return 'subscribers';
 }
 
 export class ContentFeedService {
@@ -1302,7 +1298,7 @@ export class ArtistPublicContentService {
 			}
 
 			const publicPosts: PublicArtistPost[] = postRows.map((post) => {
-				const visibility = sanitizeVisibility(post.visibility);
+				const visibility = normalizeContentVisibility(post.visibility);
 				const isLocked = !canViewVisibility(visibility, viewer);
 				const document = documentsByPost.get(post.id);
 				const poll = pollByPost.get(post.id);
@@ -1383,7 +1379,7 @@ export class ArtistPublicContentService {
 			});
 
 			const publicPhotoAlbums: PublicPhotoAlbum[] = albumRows.map((album) => {
-				const visibility = sanitizeVisibility(album.visibility);
+				const visibility = normalizeContentVisibility(album.visibility);
 				const isLocked = !canViewVisibility(visibility, viewer);
 
 				return {
@@ -1414,7 +1410,7 @@ export class ArtistPublicContentService {
 			const publicVideoById = new Map(publicVideos.map((video) => [video.id, video]));
 
 			const publicCollections: PublicVideoCollection[] = collectionRows.map((collection) => {
-				const visibility = sanitizeVisibility(collection.visibility);
+				const visibility = normalizeContentVisibility(collection.visibility);
 				const isLocked = !canViewVisibility(visibility, viewer);
 				const collectionVideos = (collectionItemsByCollection.get(collection.id) ?? [])
 					.map((item) => publicVideoById.get(item.videoId))
@@ -1456,7 +1452,7 @@ export class ArtistPublicContentService {
 	}
 
 	private static toPublicVideo(video: Video, viewer: ArtistContentViewer): PublicArtistVideo {
-		const visibility = sanitizeVisibility(video.visibility);
+		const visibility = normalizeContentVisibility(video.visibility);
 		const isLocked = !canViewVisibility(visibility, viewer);
 
 		return {

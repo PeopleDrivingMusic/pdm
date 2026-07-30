@@ -6,9 +6,10 @@
 	import ContentList from './ContentList.svelte';
 	import ContentTypeTabs, { type ContentTabId } from './ContentTypeTabs.svelte';
 	import CollectionCreateOverlay from './CollectionCreateOverlay.svelte';
+	import type { ContentStatus, ContentVisibility } from '$lib/db/content-visibility';
 
-	type CollectionStatus = 'draft' | 'published' | 'scheduled' | 'archived';
-	type CollectionVisibility = 'public' | 'subscribers';
+	type CollectionStatus = ContentStatus;
+	type CollectionVisibility = ContentVisibility;
 
 	interface ManageableContentItem {
 		id: string;
@@ -67,10 +68,7 @@
 	}
 
 	function findPostForEdit(item: ManageableContentItem) {
-		return (
-			(content.posts as EditablePost[]).find((post) => post.id === getItemId(item)) ??
-			null
-		);
+		return (content.posts as EditablePost[]).find((post) => post.id === getItemId(item)) ?? null;
 	}
 
 	function openPostEditor(item: ManageableContentItem) {
@@ -350,7 +348,11 @@
 
 	<CollectionCreateOverlay
 		open={Boolean(editingItem)}
-		title={editingItem?.sourceType === 'post' ? 'Edit post' : editingItem?.sourceType === 'photo_album' ? 'Edit gallery' : 'Edit playlist'}
+		title={editingItem?.sourceType === 'post'
+			? 'Edit post'
+			: editingItem?.sourceType === 'photo_album'
+				? 'Edit gallery'
+				: 'Edit playlist'}
 		submitLabel="Save changes"
 		initialTitle={editingItem?.title ?? ''}
 		initialDescription={editingItem?.previewText ?? ''}
@@ -359,7 +361,11 @@
 			: 'subscribers') as CollectionVisibility}
 		initialStatus={(editingItem?.status ?? 'draft') as CollectionStatus}
 		showStatus
-		deleteLabel={editingItem?.sourceType === 'post' ? 'Delete post' : editingItem?.sourceType === 'photo_album' ? 'Delete gallery' : 'Delete playlist'}
+		deleteLabel={editingItem?.sourceType === 'post'
+			? 'Delete post'
+			: editingItem?.sourceType === 'photo_album'
+				? 'Delete gallery'
+				: 'Delete playlist'}
 		onCreate={(payload) => {
 			if (!editingItem) return Promise.resolve();
 			return updateItem(editingItem, {

@@ -1,16 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { canViewVisibility, lockReasonFor, sanitizeVisibility } from './ContentService';
+import { canViewVisibility, lockReasonFor } from './ContentService';
 
-describe('sanitizeVisibility', () => {
-	it('keeps subscribers', () => expect(sanitizeVisibility('subscribers')).toBe('subscribers'));
-	it('keeps public', () => expect(sanitizeVisibility('public')).toBe('public'));
-	it('fails closed: legacy followers → subscribers', () =>
-		expect(sanitizeVisibility('followers')).toBe('subscribers'));
-	it('fails closed: legacy investors → subscribers', () =>
-		expect(sanitizeVisibility('investors')).toBe('subscribers'));
-	it('fails closed: unknown value → subscribers', () =>
-		expect(sanitizeVisibility('garbage')).toBe('subscribers'));
-});
+// Visibility normalization (fail-closed) is now owned by content-visibility.ts and
+// covered by content-visibility.spec.ts.
 
 describe('canViewVisibility', () => {
 	it('owner sees subscribers content', () =>
