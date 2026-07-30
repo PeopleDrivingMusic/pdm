@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { page } from '$app/state';
-	import { invalidateAll } from '$app/navigation';
+	import { subscribeToArtist, unsubscribeFromArtist } from '$lib/client/subscription';
 	import {
 		mdiImageMultipleOutline,
 		mdiLockOutline,
@@ -30,25 +30,18 @@
 	let busy = $state(false);
 	let ctaError = $state('');
 
-	async function setSubscription(method: 'POST' | 'DELETE', failMessage: string) {
+	async function runSubscription(
+		action: (artistId: string) => Promise<{ ok: boolean; error?: string }>
+	) {
 		busy = true;
 		ctaError = '';
-		try {
-			const response = await fetch(`/api/artist/${artist.id}/subscription`, { method });
-			if (!response.ok) {
-				ctaError = failMessage;
-				return;
-			}
-			await invalidateAll();
-		} catch {
-			ctaError = failMessage;
-		} finally {
-			busy = false;
-		}
+		const result = await action(artist.id);
+		if (!result.ok) ctaError = result.error ?? 'Something went wrong. Please try again.';
+		busy = false;
 	}
 
-	const subscribe = () => setSubscription('POST', 'Could not subscribe. Please try again.');
-	const unsubscribe = () => setSubscription('DELETE', 'Could not update your subscription.');
+	const subscribe = () => runSubscription(subscribeToArtist);
+	const unsubscribe = () => runSubscription(unsubscribeFromArtist);
 
 	function formatDate(value: Date | string | null) {
 		if (!value) return '';
