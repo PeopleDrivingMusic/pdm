@@ -61,7 +61,6 @@ export interface PublicArtistPost {
 	visibility: ContentVisibility;
 	publishedAt: Date | null;
 	isLocked: boolean;
-	lockReason: string | null;
 	media: Array<{
 		id: string;
 		type: string;
@@ -97,7 +96,6 @@ export interface PublicPhotoAlbum {
 	visibility: ContentVisibility;
 	publishedAt: Date | null;
 	isLocked: boolean;
-	lockReason: string | null;
 	photos: Array<{
 		id: string;
 		fileUrl: string;
@@ -118,7 +116,6 @@ export interface PublicArtistVideo {
 	visibility: ContentVisibility;
 	publishedAt: Date | null;
 	isLocked: boolean;
-	lockReason: string | null;
 }
 
 export interface PublicVideoCollection {
@@ -130,7 +127,6 @@ export interface PublicVideoCollection {
 	visibility: ContentVisibility;
 	publishedAt: Date | null;
 	isLocked: boolean;
-	lockReason: string | null;
 	videos: PublicArtistVideo[];
 }
 
@@ -262,11 +258,6 @@ export function canViewVisibility(visibility: ContentVisibility, viewer: ArtistC
 	if (visibility === 'public') return true;
 	if (visibility === 'subscribers') return Boolean(viewer.isSubscriber);
 	return false;
-}
-
-export function lockReasonFor(visibility: ContentVisibility) {
-	if (visibility === 'subscribers') return 'Subscribe to unlock';
-	return null;
 }
 
 export class ContentFeedService {
@@ -1321,7 +1312,6 @@ export class ArtistPublicContentService {
 					visibility,
 					publishedAt: post.publishedAt,
 					isLocked,
-					lockReason: isLocked ? lockReasonFor(visibility) : null,
 					media: isLocked
 						? []
 						: (mediaByPost.get(post.id) ?? []).map((row) => ({
@@ -1391,7 +1381,6 @@ export class ArtistPublicContentService {
 					visibility,
 					publishedAt: album.publishedAt,
 					isLocked,
-					lockReason: isLocked ? lockReasonFor(visibility) : null,
 					photos: isLocked
 						? []
 						: (photosByAlbum.get(album.id) ?? []).map((row) => ({
@@ -1425,7 +1414,6 @@ export class ArtistPublicContentService {
 					visibility,
 					publishedAt: collection.publishedAt,
 					isLocked,
-					lockReason: isLocked ? lockReasonFor(visibility) : null,
 					videos: isLocked ? [] : collectionVideos
 				};
 			});
@@ -1465,8 +1453,7 @@ export class ArtistPublicContentService {
 			duration: isLocked ? null : video.duration,
 			visibility,
 			publishedAt: video.publishedAt,
-			isLocked,
-			lockReason: isLocked ? lockReasonFor(visibility) : null
+			isLocked
 		};
 	}
 }

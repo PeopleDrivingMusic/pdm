@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { canViewVisibility, lockReasonFor } from './ContentService';
+import { canViewVisibility } from './ContentService';
 
 // Visibility normalization (fail-closed) is now owned by content-visibility.ts and
-// covered by content-visibility.spec.ts.
+// covered by content-visibility.spec.ts. Lock-teaser copy is now client-side.
 
 describe('canViewVisibility', () => {
 	it('owner sees subscribers content', () =>
@@ -12,10 +12,4 @@ describe('canViewVisibility', () => {
 	it('non-subscriber cannot see subscribers content', () =>
 		expect(canViewVisibility('subscribers', { isSubscriber: false })).toBe(false));
 	it('anyone sees public content', () => expect(canViewVisibility('public', {})).toBe(true));
-});
-
-describe('lockReasonFor', () => {
-	it('subscribers → subscribe prompt', () =>
-		expect(lockReasonFor('subscribers')).toBe('Subscribe to unlock'));
-	it('public → null', () => expect(lockReasonFor('public')).toBeNull());
 });

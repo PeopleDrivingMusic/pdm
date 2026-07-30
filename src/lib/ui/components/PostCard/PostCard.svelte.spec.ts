@@ -22,7 +22,6 @@ const basePost = (over: Record<string, unknown> = {}) => ({
 	visibility: 'public' as string,
 	publishedAt: new Date('2026-07-01T00:00:00Z'),
 	isLocked: false,
-	lockReason: null as string | null,
 	media: [] as Array<{
 		id: string;
 		fileUrl: string;
@@ -93,7 +92,6 @@ test('locked post hides media and shows the lock reason', () => {
 	const { container } = render(PostCard, {
 		post: basePost({
 			isLocked: true,
-			lockReason: 'Subscribe to unlock',
 			media: [photo(1), photo(2)],
 			poll: poll()
 		}),

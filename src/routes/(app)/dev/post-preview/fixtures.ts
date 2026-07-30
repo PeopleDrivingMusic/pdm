@@ -28,7 +28,6 @@ export interface PreviewPost {
 	visibility: string;
 	publishedAt: Date | string | null;
 	isLocked: boolean;
-	lockReason: string | null;
 	media: PreviewMedia[];
 	poll: PreviewPoll | null;
 }
@@ -83,7 +82,6 @@ function base(over: Partial<PreviewPost>): PreviewPost {
 		visibility: 'public',
 		publishedAt,
 		isLocked: false,
-		lockReason: null,
 		media: [],
 		poll: null,
 		...over
@@ -174,7 +172,6 @@ export const previewVariations: PreviewVariation[] = [
 			excerpt: 'Just me and a guitar, recorded last night.',
 			visibility: 'subscribers',
 			isLocked: true,
-			lockReason: 'Subscribe to unlock',
 			media: photos(3)
 		})
 	}

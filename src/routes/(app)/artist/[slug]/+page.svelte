@@ -168,7 +168,7 @@
 						{#if item.isLocked}
 							<div class="lock-overlay">
 								<SvgIcon path={mdiLockOutline} size={20} />
-								<span>{item.lockReason}</span>
+								<span>Subscribe to unlock</span>
 							</div>
 						{/if}
 					</article>
@@ -260,7 +260,7 @@
 							{#if album.isLocked}
 								<div class="lock-overlay">
 									<SvgIcon path={mdiLockOutline} size={20} />
-									<span>{album.lockReason}</span>
+									<span>Subscribe to unlock</span>
 								</div>
 							{/if}
 						</div>
@@ -326,7 +326,7 @@
 							{#if item.isLocked}
 								<div class="locked-inline">
 									<SvgIcon path={mdiLockOutline} size={16} />
-									<span>{item.lockReason}</span>
+									<span>Subscribe to unlock</span>
 								</div>
 							{/if}
 						</div>
