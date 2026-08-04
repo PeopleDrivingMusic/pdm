@@ -1,13 +1,41 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1785465251268,
-      "tag": "0000_baseline",
-      "breakpoints": true
-    }
-  ]
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1771830374687,
+			"tag": "0000_mysterious_black_knight",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1771830618609,
+			"tag": "0001_peaceful_post",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1781100000000,
+			"tag": "0002_artist_schema_namespace",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1781101000000,
+			"tag": "0003_logical_schema_namespaces",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "7",
+			"when": 1784803992366,
+			"tag": "0010_finance_subscriptions",
+			"breakpoints": true
+		}
+	]
 }
