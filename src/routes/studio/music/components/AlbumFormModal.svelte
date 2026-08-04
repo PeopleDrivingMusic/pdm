@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { ContentVisibility } from '$lib/db/content-visibility';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import Modal from '$lib/ui/components/Modal/Modal.svelte';
@@ -22,7 +23,7 @@
 	let description = $state('');
 	let releaseDate = $state('');
 	let genres = $state('');
-	let visibility = $state<'public' | 'subscribers'>('public');
+	let visibility = $state<ContentVisibility>('public');
 	let isPublished = $state(false);
 	let coverFile = $state<File | null>(null);
 	let submitting = $state(false);

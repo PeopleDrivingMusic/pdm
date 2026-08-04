@@ -1,9 +1,10 @@
+import type { ContentVisibility } from '$lib/db/content-visibility';
 import { page } from '@vitest/browser/context';
 import { expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import AlbumTile from './AlbumTile.svelte';
 
-const album = (visibility: 'public' | 'subscribers') => ({
+const album = (visibility: ContentVisibility) => ({
 	id: 'al1',
 	artistId: 'a1',
 	title: 'Test Album',

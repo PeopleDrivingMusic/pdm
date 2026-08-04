@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { ContentVisibility } from '$lib/db/content-visibility';
 	import {
 		mdiMusicNote,
 		mdiPencil,
@@ -36,7 +37,7 @@
 		onEdit: (t: TrackDTO) => void;
 		onDelete: (t: TrackDTO) => void;
 		onLink: (t: TrackDTO) => void;
-		onVisibilityChange: (t: TrackDTO, v: 'public' | 'subscribers') => void;
+		onVisibilityChange: (t: TrackDTO, v: ContentVisibility) => void;
 		onRetry: (trackId: string) => void;
 	} = $props();
 

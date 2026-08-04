@@ -6,19 +6,15 @@ import {
 	CONTENT_STATUS_VALUES
 } from './content-visibility';
 
-describe('normalizeContentVisibility (fail closed)', () => {
-	it('keeps explicit public', () => expect(normalizeContentVisibility('public')).toBe('public'));
-	it('keeps subscribers', () =>
+describe('normalizeContentVisibility (public default)', () => {
+	it('keeps explicit subscribers', () =>
 		expect(normalizeContentVisibility('subscribers')).toBe('subscribers'));
-	it('collapses legacy followers to subscribers', () =>
-		expect(normalizeContentVisibility('followers')).toBe('subscribers'));
-	it('collapses legacy investors to subscribers', () =>
-		expect(normalizeContentVisibility('investors')).toBe('subscribers'));
-	it('collapses unknown to subscribers', () =>
-		expect(normalizeContentVisibility('garbage')).toBe('subscribers'));
-	it('collapses non-string (null/undefined) to subscribers', () => {
-		expect(normalizeContentVisibility(null)).toBe('subscribers');
-		expect(normalizeContentVisibility(undefined)).toBe('subscribers');
+	it('keeps public', () => expect(normalizeContentVisibility('public')).toBe('public'));
+	it('defaults unknown values to public', () =>
+		expect(normalizeContentVisibility('garbage')).toBe('public'));
+	it('defaults null/undefined to public', () => {
+		expect(normalizeContentVisibility(null)).toBe('public');
+		expect(normalizeContentVisibility(undefined)).toBe('public');
 	});
 });
 

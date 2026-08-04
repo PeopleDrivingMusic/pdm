@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { ContentVisibility } from '$lib/db/content-visibility';
 	import { mdiMusicNote } from '@mdi/js';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
 	import Button from '$lib/ui/Button.svelte';
@@ -22,12 +23,12 @@
 		tracks: { track: TrackDTO; stats: TrackStatsDTO | null }[];
 		albumTracks?: AlbumTrackDTO[];
 		albumTitles?: Record<string, string>;
-		albumVisibility?: Record<string, 'public' | 'subscribers'>;
+		albumVisibility?: Record<string, ContentVisibility>;
 		jobsById?: Record<string, TrackUploadJob>;
 		onEdit: (t: TrackDTO) => void;
 		onDelete: (t: TrackDTO) => void;
 		onLink: (t: TrackDTO) => void;
-		onVisibilityChange: (t: TrackDTO, v: 'public' | 'subscribers') => void;
+		onVisibilityChange: (t: TrackDTO, v: ContentVisibility) => void;
 		onRetry: (trackId: string) => void;
 		onUpload: () => void;
 	} = $props();

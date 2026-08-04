@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { ContentVisibility } from '$lib/db/content-visibility';
 	import { mdiEarth, mdiLock } from '@mdi/js';
 	import SegmentedControl from './SegmentedControl.svelte';
 
@@ -9,11 +10,11 @@
 		disabled = false,
 		onChange
 	}: {
-		value: 'public' | 'subscribers';
+		value: ContentVisibility;
 		level: 'album' | 'track';
 		inheritedFrom?: 'album' | null;
 		disabled?: boolean;
-		onChange?: (v: 'public' | 'subscribers') => void;
+		onChange?: (v: ContentVisibility) => void;
 	} = $props();
 
 	let overridden = $state(false);
@@ -25,7 +26,7 @@
 	];
 
 	function handleChange(v: string) {
-		value = v as 'public' | 'subscribers';
+		value = v as ContentVisibility;
 		onChange?.(value);
 	}
 </script>

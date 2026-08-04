@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { ContentVisibility } from '$lib/db/content-visibility';
 	import { onDestroy } from 'svelte';
 	import { deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
@@ -94,7 +95,7 @@
 		await invalidateAll();
 	}
 
-	async function changeTrackVisibility(track: TrackDTO, v: 'public' | 'subscribers') {
+	async function changeTrackVisibility(track: TrackDTO, v: ContentVisibility) {
 		try {
 			const fd = new FormData();
 			fd.set('trackId', track.id);

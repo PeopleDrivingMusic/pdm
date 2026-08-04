@@ -1,8 +1,8 @@
 /**
  * Single source of truth for content visibility + status values, their derived
- * types, and fail-closed normalizers. Import these instead of hardcoding the
- * literals in route handlers, services, or components — change a tier in one
- * place and every consumer follows.
+ * types, and normalizers. Import these instead of hardcoding the literals in
+ * route handlers, services, or components — change a tier in one place and every
+ * consumer follows.
  *
  * Pure constants/types only (no server imports), so client components can
  * import the types too.
@@ -17,13 +17,13 @@ export type ContentStatus = (typeof CONTENT_STATUS_VALUES)[number];
 const STATUS_SET = new Set<string>(CONTENT_STATUS_VALUES);
 
 /**
- * Coerce any incoming value to a valid visibility, failing CLOSED: only an
- * explicit `'public'` stays public; anything else (legacy tiers, unknown,
- * missing) collapses to the restricted `'subscribers'` tier so content is
- * never accidentally exposed.
+ * Coerce any incoming value to a valid visibility. Only an explicit
+ * `'subscribers'` is restricted; everything else (including `null`/`undefined`
+ * and any unknown value) defaults to `'public'`. Kept as one shared helper so
+ * the coercion isn't duplicated across every write handler and read mapping.
  */
 export function normalizeContentVisibility(value: unknown): ContentVisibility {
-	return value === 'public' ? 'public' : 'subscribers';
+	return value === 'subscribers' ? 'subscribers' : 'public';
 }
 
 /** Coerce any incoming value to a valid status, falling back to `fallback`. */
