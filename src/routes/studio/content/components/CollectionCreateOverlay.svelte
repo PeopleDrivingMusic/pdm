@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { mdiClose } from '@mdi/js';
 	import { Button, IconButton, Input, Select } from '$lib/ui';
+	import type { ContentStatus, ContentVisibility } from '$lib/db/content-visibility';
 
-	type Visibility = 'public' | 'followers' | 'subscribers' | 'investors';
-	type Status = 'draft' | 'published' | 'scheduled' | 'archived';
+	type Visibility = ContentVisibility;
+	type Status = ContentStatus;
 
 	interface Payload {
 		title: string;
@@ -52,9 +53,7 @@
 
 	const visibilityOptions = [
 		{ label: 'Public', value: 'public' },
-		{ label: 'Followers', value: 'followers' },
-		{ label: 'Subscribers', value: 'subscribers' },
-		{ label: 'Investors', value: 'investors' }
+		{ label: 'Subscribers', value: 'subscribers' }
 	];
 	const statusOptions = [
 		{ label: 'Draft', value: 'draft' },

@@ -57,20 +57,20 @@ describe('createAlbum', () => {
 describe('updateAlbum visibility cascade', () => {
 	it('cascades visibility to linked tracks and emits events', async () => {
 		(AlbumService.getAlbumById as any).mockResolvedValue(album({ visibility: 'public' }));
-		(AlbumService.updateAlbum as any).mockResolvedValue(album({ visibility: 'subscribers_only' }));
+		(AlbumService.updateAlbum as any).mockResolvedValue(album({ visibility: 'subscribers' }));
 		(AlbumTrackService.getAlbumTracks as any).mockResolvedValue([
 			{ track: { id: 't1' }, trackNumber: 1 },
 			{ track: { id: 't2' }, trackNumber: 2 }
 		]);
 		(TrackService.updateTrack as any).mockResolvedValue(null);
 
-		await MusicApplicationService.updateAlbum('a1', 'al1', { visibility: 'subscribers_only' });
+		await MusicApplicationService.updateAlbum('a1', 'al1', { visibility: 'subscribers' });
 
 		expect(TrackService.updateTrack).toHaveBeenCalledWith('t1', {
-			visibility: 'subscribers_only'
+			visibility: 'subscribers'
 		});
 		expect(TrackService.updateTrack).toHaveBeenCalledWith('t2', {
-			visibility: 'subscribers_only'
+			visibility: 'subscribers'
 		});
 		expect(eventPublisher.publish).toHaveBeenCalledWith(
 			expect.objectContaining({ type: 'album.visibility_changed', trackIds: ['t1', 't2'] })

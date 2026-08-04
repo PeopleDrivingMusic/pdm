@@ -66,7 +66,7 @@ export class MusicApplicationService {
 			totalTracks: tracks.length,
 			publishedTracks: tracks.filter((t) => t.track.isPublished).length,
 			draftTracks: tracks.filter((t) => !t.track.isPublished).length,
-			subscribersOnly: tracks.filter((t) => t.track.visibility === 'subscribers_only').length,
+			subscribersOnly: tracks.filter((t) => t.track.visibility === 'subscribers').length,
 			totalPlays: tracks.reduce((acc, t) => acc + (t.stats?.playCount ?? 0), 0),
 			totalLikes: tracks.reduce((acc, t) => acc + (t.stats?.likeCount ?? 0), 0),
 			totalSaves: tracks.reduce((acc, t) => acc + (t.stats?.saveCount ?? 0), 0)

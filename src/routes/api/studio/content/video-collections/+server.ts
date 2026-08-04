@@ -1,15 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import type { ContentVisibility } from '$lib/db/services/ContentService';
 import { getArtistByCookie } from '$lib/server/artist-session';
 import { ContentApplicationService } from '$lib/server/content';
-
-const VISIBILITY_VALUES = new Set(['public', 'followers', 'subscribers', 'investors']);
-
-function normalizeVisibility(value: unknown): ContentVisibility {
-	return typeof value === 'string' && VISIBILITY_VALUES.has(value)
-		? (value as ContentVisibility)
-		: 'public';
-}
+import { normalizeContentVisibility } from '$lib/db/content-visibility';
 
 export const POST: RequestHandler = async (event) => {
 	const artist = await getArtistByCookie(event);
@@ -18,7 +10,7 @@ export const POST: RequestHandler = async (event) => {
 	const body = await event.request.json().catch(() => null);
 	const title = typeof body?.title === 'string' ? body.title.trim() : '';
 	const description = typeof body?.description === 'string' ? body.description.trim() : '';
-	const visibility = normalizeVisibility(body?.visibility);
+	const visibility = normalizeContentVisibility(body?.visibility);
 
 	if (!title) {
 		return json({ error: 'Title is required' }, { status: 400 });

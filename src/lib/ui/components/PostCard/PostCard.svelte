@@ -32,7 +32,6 @@
 		visibility: string;
 		publishedAt: Date | string | null;
 		isLocked: boolean;
-		lockReason: string | null;
 		media: PostMediaItem[];
 		poll: Poll | null;
 	}
@@ -85,7 +84,7 @@
 			{/if}
 			<div class="locked-panel">
 				<SvgIcon path={mdiLockOutline} size={22} />
-				<span>{post.lockReason}</span>
+				<span>Subscribe to unlock</span>
 			</div>
 		{:else}
 			<PostMediaGrid media={post.media} />

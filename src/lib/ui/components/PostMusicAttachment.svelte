@@ -20,12 +20,14 @@
 		attachment,
 		trackEntry,
 		album,
-		artist
+		artist,
+		locked = false
 	}: {
 		attachment: Attachment;
 		trackEntry?: TrackEntry;
 		album?: Album | null;
 		artist?: Artist | null;
+		locked?: boolean;
 	} = $props();
 
 	const isTrack = $derived(attachment.type === 'track');
@@ -34,6 +36,7 @@
 	const isPlaying = $derived(isCurrent && playerStore.isPlaying);
 
 	function playTrack() {
+		if (locked) return; // subscribers-only: playback is gated (stream endpoint also 403s)
 		if (!trackEntry?.track.audioUrl) return;
 
 		const track = trackEntry.track;
@@ -69,9 +72,14 @@
 	class="post-music-attachment"
 	class:is-playing={isPlaying}
 	class:is-disabled={!canPlay}
+	class:is-locked={locked}
 	onclick={playTrack}
-	disabled={!canPlay}
-	aria-label={canPlay ? `${isPlaying ? 'Pause' : 'Play'} ${attachment.title}` : `${attachment.title} is not playable yet`}
+	disabled={!canPlay || locked}
+	aria-label={locked
+		? `${attachment.title} is available to subscribers`
+		: canPlay
+			? `${isPlaying ? 'Pause' : 'Play'} ${attachment.title}`
+			: `${attachment.title} is not playable yet`}
 >
 	<div class="cover">
 		{#if attachment.imageUrl}
@@ -88,7 +96,7 @@
 		<span>{isTrack ? 'Track' : 'Album'}</span>
 		<strong>{attachment.title}</strong>
 		{#if isTrack}
-			<small>{canPlay ? 'Play in PDM' : 'Audio unavailable'}</small>
+			<small>{locked ? 'Subscribers only' : canPlay ? 'Play in PDM' : 'Audio unavailable'}</small>
 		{:else}
 			<small>Release attachment</small>
 		{/if}
@@ -129,7 +137,11 @@
 			transform: translateY(-1px);
 			border-color: color-mix(in srgb, var(--primary) 62%, var(--border-primary));
 			background:
-				linear-gradient(135deg, color-mix(in srgb, var(--primary) 22%, transparent), transparent 52%),
+				linear-gradient(
+					135deg,
+					color-mix(in srgb, var(--primary) 22%, transparent),
+					transparent 52%
+				),
 				color-mix(in srgb, var(--bg-surface) 92%, var(--bg-primary));
 		}
 
@@ -144,6 +156,10 @@
 
 		&.is-disabled {
 			opacity: 0.68;
+		}
+
+		&.is-locked {
+			opacity: 0.5;
 		}
 
 		&.is-playing {

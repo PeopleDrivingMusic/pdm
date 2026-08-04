@@ -35,8 +35,12 @@ import type {
 	VideoCollection
 } from '$lib/db';
 
-export type ContentStatus = 'draft' | 'scheduled' | 'published' | 'archived';
-export type ContentVisibility = 'public' | 'followers' | 'subscribers' | 'investors';
+import {
+	normalizeContentVisibility,
+	type ContentStatus,
+	type ContentVisibility
+} from '../content-visibility';
+export type { ContentStatus, ContentVisibility };
 export type FeedSourceType = 'post' | 'photo_album' | 'video' | 'track' | 'album' | 'merch';
 
 export interface ArtistContentViewer {
@@ -57,7 +61,6 @@ export interface PublicArtistPost {
 	visibility: ContentVisibility;
 	publishedAt: Date | null;
 	isLocked: boolean;
-	lockReason: string | null;
 	media: Array<{
 		id: string;
 		type: string;
@@ -93,7 +96,6 @@ export interface PublicPhotoAlbum {
 	visibility: ContentVisibility;
 	publishedAt: Date | null;
 	isLocked: boolean;
-	lockReason: string | null;
 	photos: Array<{
 		id: string;
 		fileUrl: string;
@@ -114,7 +116,6 @@ export interface PublicArtistVideo {
 	visibility: ContentVisibility;
 	publishedAt: Date | null;
 	isLocked: boolean;
-	lockReason: string | null;
 }
 
 export interface PublicVideoCollection {
@@ -126,7 +127,6 @@ export interface PublicVideoCollection {
 	visibility: ContentVisibility;
 	publishedAt: Date | null;
 	isLocked: boolean;
-	lockReason: string | null;
 	videos: PublicArtistVideo[];
 }
 
@@ -253,25 +253,11 @@ function normalizeSourceUrl(pathOrUrl: string | null | undefined) {
 	return `${PUBLIC_R2_IMAGES_BUCKET.replace(/\/+$/g, '')}/${encodedKey}`;
 }
 
-function canViewVisibility(visibility: ContentVisibility, viewer: ArtistContentViewer) {
+export function canViewVisibility(visibility: ContentVisibility, viewer: ArtistContentViewer) {
 	if (viewer.isOwner) return true;
 	if (visibility === 'public') return true;
-	if (visibility === 'followers') return Boolean(viewer.isFollower || viewer.isSubscriber);
 	if (visibility === 'subscribers') return Boolean(viewer.isSubscriber);
-	if (visibility === 'investors') return Boolean(viewer.isInvestor);
 	return false;
-}
-
-function lockReasonFor(visibility: ContentVisibility) {
-	if (visibility === 'followers') return 'Follow this artist to unlock';
-	if (visibility === 'subscribers') return 'Subscribe to unlock';
-	if (visibility === 'investors') return 'Available to supporters';
-	return null;
-}
-
-function sanitizeVisibility(value: string): ContentVisibility {
-	if (value === 'followers' || value === 'subscribers' || value === 'investors') return value;
-	return 'public';
 }
 
 export class ContentFeedService {
@@ -1144,7 +1130,9 @@ export class ArtistPublicContentService {
 				db
 					.select()
 					.from(videoCollections)
-					.where(and(eq(videoCollections.artistId, artistId), eq(videoCollections.status, 'published')))
+					.where(
+						and(eq(videoCollections.artistId, artistId), eq(videoCollections.status, 'published'))
+					)
 					.orderBy(desc(videoCollections.publishedAt), desc(videoCollections.createdAt))
 			]);
 
@@ -1194,9 +1182,7 @@ export class ArtistPublicContentService {
 							.where(inArray(postMusicAttachments.postId, postIds))
 							.orderBy(asc(postMusicAttachments.sortOrder))
 					: [],
-				postIds.length
-					? db.select().from(postPolls).where(inArray(postPolls.postId, postIds))
-					: [],
+				postIds.length ? db.select().from(postPolls).where(inArray(postPolls.postId, postIds)) : [],
 				postIds.length
 					? db
 							.select({
@@ -1227,7 +1213,9 @@ export class ArtistPublicContentService {
 							})
 							.from(postPollVotes)
 							.innerJoin(postPolls, eq(postPollVotes.pollId, postPolls.id))
-							.where(and(inArray(postPolls.postId, postIds), eq(postPollVotes.userId, viewer.userId)))
+							.where(
+								and(inArray(postPolls.postId, postIds), eq(postPollVotes.userId, viewer.userId))
+							)
 					: [],
 				photoAlbumIds.length
 					? db
@@ -1301,12 +1289,14 @@ export class ArtistPublicContentService {
 			}
 
 			const publicPosts: PublicArtistPost[] = postRows.map((post) => {
-				const visibility = sanitizeVisibility(post.visibility);
+				const visibility = normalizeContentVisibility(post.visibility);
 				const isLocked = !canViewVisibility(visibility, viewer);
 				const document = documentsByPost.get(post.id);
 				const poll = pollByPost.get(post.id);
 				const pollOptions = optionsByPost.get(post.id) ?? [];
-				const selectedOptionIds = poll ? (viewerVotesByPoll.get(poll.id) ?? new Set<string>()) : new Set<string>();
+				const selectedOptionIds = poll
+					? (viewerVotesByPoll.get(poll.id) ?? new Set<string>())
+					: new Set<string>();
 				const totalVotes = pollOptions.reduce(
 					(total, row) => total + (votesByOption.get(row.option.id) ?? 0),
 					0
@@ -1322,7 +1312,6 @@ export class ArtistPublicContentService {
 					visibility,
 					publishedAt: post.publishedAt,
 					isLocked,
-					lockReason: isLocked ? lockReasonFor(visibility) : null,
 					media: isLocked
 						? []
 						: (mediaByPost.get(post.id) ?? []).map((row) => ({
@@ -1355,7 +1344,9 @@ export class ArtistPublicContentService {
 									}
 									return null;
 								})
-								.filter((item): item is PublicArtistPost['musicAttachments'][number] => Boolean(item)),
+								.filter((item): item is PublicArtistPost['musicAttachments'][number] =>
+									Boolean(item)
+								),
 					poll:
 						!isLocked && poll
 							? {
@@ -1378,7 +1369,7 @@ export class ArtistPublicContentService {
 			});
 
 			const publicPhotoAlbums: PublicPhotoAlbum[] = albumRows.map((album) => {
-				const visibility = sanitizeVisibility(album.visibility);
+				const visibility = normalizeContentVisibility(album.visibility);
 				const isLocked = !canViewVisibility(visibility, viewer);
 
 				return {
@@ -1390,7 +1381,6 @@ export class ArtistPublicContentService {
 					visibility,
 					publishedAt: album.publishedAt,
 					isLocked,
-					lockReason: isLocked ? lockReasonFor(visibility) : null,
 					photos: isLocked
 						? []
 						: (photosByAlbum.get(album.id) ?? []).map((row) => ({
@@ -1409,7 +1399,7 @@ export class ArtistPublicContentService {
 			const publicVideoById = new Map(publicVideos.map((video) => [video.id, video]));
 
 			const publicCollections: PublicVideoCollection[] = collectionRows.map((collection) => {
-				const visibility = sanitizeVisibility(collection.visibility);
+				const visibility = normalizeContentVisibility(collection.visibility);
 				const isLocked = !canViewVisibility(visibility, viewer);
 				const collectionVideos = (collectionItemsByCollection.get(collection.id) ?? [])
 					.map((item) => publicVideoById.get(item.videoId))
@@ -1424,7 +1414,6 @@ export class ArtistPublicContentService {
 					visibility,
 					publishedAt: collection.publishedAt,
 					isLocked,
-					lockReason: isLocked ? lockReasonFor(visibility) : null,
 					videos: isLocked ? [] : collectionVideos
 				};
 			});
@@ -1451,7 +1440,7 @@ export class ArtistPublicContentService {
 	}
 
 	private static toPublicVideo(video: Video, viewer: ArtistContentViewer): PublicArtistVideo {
-		const visibility = sanitizeVisibility(video.visibility);
+		const visibility = normalizeContentVisibility(video.visibility);
 		const isLocked = !canViewVisibility(visibility, viewer);
 
 		return {
@@ -1464,8 +1453,7 @@ export class ArtistPublicContentService {
 			duration: isLocked ? null : video.duration,
 			visibility,
 			publishedAt: video.publishedAt,
-			isLocked,
-			lockReason: isLocked ? lockReasonFor(visibility) : null
+			isLocked
 		};
 	}
 }
@@ -1496,7 +1484,9 @@ export class PostPollService {
 			if (pollOption.mode === 'single') {
 				await db
 					.delete(postPollVotes)
-					.where(and(eq(postPollVotes.pollId, input.pollId), eq(postPollVotes.userId, input.userId)));
+					.where(
+						and(eq(postPollVotes.pollId, input.pollId), eq(postPollVotes.userId, input.userId))
+					);
 			} else {
 				const [existingVote] = await db
 					.select({ id: postPollVotes.id })

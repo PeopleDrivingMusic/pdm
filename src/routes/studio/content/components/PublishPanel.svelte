@@ -3,9 +3,7 @@
 
 	const visibilityOptions = [
 		{ label: 'Public', value: 'public' },
-		{ label: 'Followers', value: 'followers' },
-		{ label: 'Subscribers', value: 'subscribers' },
-		{ label: 'Investors', value: 'investors' }
+		{ label: 'Subscribers', value: 'subscribers' }
 	];
 
 	const statusOptions = [

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { ContentVisibility } from '$lib/db/content-visibility';
 	import { mdiEarth, mdiLock } from '@mdi/js';
 	import SegmentedControl from './SegmentedControl.svelte';
 
@@ -9,11 +10,11 @@
 		disabled = false,
 		onChange
 	}: {
-		value: 'public' | 'subscribers_only';
+		value: ContentVisibility;
 		level: 'album' | 'track';
 		inheritedFrom?: 'album' | null;
 		disabled?: boolean;
-		onChange?: (v: 'public' | 'subscribers_only') => void;
+		onChange?: (v: ContentVisibility) => void;
 	} = $props();
 
 	let overridden = $state(false);
@@ -21,11 +22,11 @@
 
 	const options = [
 		{ value: 'public', label: 'Public', icon: mdiEarth },
-		{ value: 'subscribers_only', label: 'Subscribers', icon: mdiLock }
+		{ value: 'subscribers', label: 'Subscribers', icon: mdiLock }
 	];
 
 	function handleChange(v: string) {
-		value = v as 'public' | 'subscribers_only';
+		value = v as ContentVisibility;
 		onChange?.(value);
 	}
 </script>
@@ -43,7 +44,7 @@
 			Subscribers-only (from album)
 			<button type="button" class="override" onclick={() => (overridden = true)}>Override</button>
 		</span>
-	{:else if value === 'subscribers_only'}
+	{:else if value === 'subscribers'}
 		<span class="helper">Only your $1/mo subscribers can play this.</span>
 	{/if}
 </div>

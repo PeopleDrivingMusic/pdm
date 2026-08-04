@@ -10,14 +10,14 @@ test('defaults to public and marks it selected', async () => {
 		.toHaveAttribute('aria-checked', 'true');
 });
 
-test('fires onChange when subscribers_only is selected', async () => {
+test('fires onChange when subscribers is selected', async () => {
 	const onChange = vi.fn();
 	render(VisibilityToggle, { value: 'public', level: 'track', onChange });
 	await page.getByRole('radio', { name: /Subscribers/ }).click();
-	expect(onChange).toHaveBeenCalledWith('subscribers_only');
+	expect(onChange).toHaveBeenCalledWith('subscribers');
 });
 
 test('shows an inherited cue for an inherited track', async () => {
-	render(VisibilityToggle, { value: 'subscribers_only', level: 'track', inheritedFrom: 'album' });
+	render(VisibilityToggle, { value: 'subscribers', level: 'track', inheritedFrom: 'album' });
 	await expect.element(page.getByText(/from album/i)).toBeInTheDocument();
 });

@@ -10,18 +10,21 @@
 		track,
 		album,
 		artist,
-		isLiked
+		isLiked,
+		locked = false
 	}: {
 		track: Track;
 		album?: Album | null;
 		artist?: Artist | null;
 		isLiked?: boolean;
+		locked?: boolean;
 	} = $props();
 
 	let coverSrc = $state<string | null>(null);
 	$inspect(playerStore);
 
 	function trackClick() {
+		if (locked) return;
 		const isInQue = playerStore.que.findIndex((queItem) => queItem.track.id === track.id);
 		if (isInQue >= 0) {
 			const currentIndex = playerStore.currentTrackIndex;
@@ -80,7 +83,7 @@
 	}
 </script>
 
-<button class="music-track" onclick={trackClick}>
+<button class="music-track" class:is-locked={locked} onclick={trackClick} aria-disabled={locked}>
 	<div class="image-wrapper">
 		<Avatar size="lg" src={coverSrc} square={true} />
 		<div class="bg"></div>
@@ -101,6 +104,20 @@
 		display: flex;
 		align-items: start;
 		gap: 1rem;
+
+		&.is-locked {
+			opacity: 0.5;
+			cursor: not-allowed;
+
+			&:hover {
+				.bg {
+					opacity: 0;
+				}
+				.play-icon {
+					opacity: 0;
+				}
+			}
+		}
 		.image-wrapper {
 			flex-shrink: 0;
 			position: relative;

@@ -16,7 +16,7 @@ function normalizeGenres(genresString: string | null | undefined) {
 }
 
 function parseVisibility(value: FormDataEntryValue | null): Visibility {
-	return value === 'subscribers_only' ? 'subscribers_only' : 'public';
+	return value === 'subscribers' ? 'subscribers' : 'public';
 }
 
 function getPositiveNumber(value: FormDataEntryValue | null) {

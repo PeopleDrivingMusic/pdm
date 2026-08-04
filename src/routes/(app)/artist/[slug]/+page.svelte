@@ -1,22 +1,17 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import { page } from '$app/state';
-	import {
-		mdiImageMultipleOutline,
-		mdiLockOutline,
-		mdiPlayCircleOutline,
-		mdiPostOutline,
-		mdiVideoOutline
-	} from '@mdi/js';
-	import { Avatar, Button, SvgIcon, Tabs } from '$lib/ui';
-	import MusicAlbum from '$lib/ui/components/MusicAlbum.svelte';
-	import MusicTrack from '$lib/ui/components/MusicTrack.svelte';
-	import PostMusicAttachment from '$lib/ui/components/PostMusicAttachment.svelte';
-	import PostCard from '$lib/ui/components/PostCard/PostCard.svelte';
+	import { subscribeToArtist, unsubscribeFromArtist } from '$lib/client/subscription';
+	import { Avatar, Button, Tabs } from '$lib/ui';
+	import ArtistTracks from './components/ArtistTracks.svelte';
+	import ArtistAlbums from './components/ArtistAlbums.svelte';
+	import ArtistFeed from './components/ArtistFeed.svelte';
+	import ArtistPosts from './components/ArtistPosts.svelte';
+	import ArtistPhotos from './components/ArtistPhotos.svelte';
+	import ArtistVideos from './components/ArtistVideos.svelte';
+	import ArtistSidebarPhotos from './components/ArtistSidebarPhotos.svelte';
 
-	const { artist, tracks, albums, content } = $derived(page.data as PageData);
-	const albumMap = $derived(new Map(albums.map((album) => [album.id, album])));
-	const trackMap = $derived(new Map(tracks.map((track) => [track.track.id, track])));
+	const { artist, viewer, tracks, albums, content } = $derived(page.data as PageData);
 
 	const tabs = [
 		{ label: 'Feed', id: 'feed' },
@@ -28,29 +23,21 @@
 	];
 
 	let activeTab = $state(tabs[0]);
+	let busy = $state(false);
+	let ctaError = $state('');
 
-	const latestPhotos = $derived(content.photoAlbums.flatMap((album) => album.photos).slice(0, 6));
-	const videoItems = $derived([...content.videoCollections, ...content.videos]);
-
-	function formatDate(value: Date | string | null) {
-		if (!value) return '';
-		const date = new Date(value);
-		if (Number.isNaN(date.getTime())) return '';
-		return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' }).format(date);
+	async function runSubscription(
+		action: (artistId: string) => Promise<{ ok: boolean; error?: string }>
+	) {
+		busy = true;
+		ctaError = '';
+		const result = await action(artist.id);
+		if (!result.ok) ctaError = result.error ?? 'Something went wrong. Please try again.';
+		busy = false;
 	}
 
-	function contentIcon(type: string) {
-		if (type === 'photo_album') return mdiImageMultipleOutline;
-		if (type === 'video' || type === 'video_collection') return mdiVideoOutline;
-		return mdiPostOutline;
-	}
-
-	function contentLabel(type: string) {
-		if (type === 'photo_album') return 'Gallery';
-		if (type === 'video_collection') return 'Video playlist';
-		if (type === 'video') return 'Video';
-		return 'Post';
-	}
+	const subscribe = () => runSubscription(subscribeToArtist);
+	const unsubscribe = () => runSubscription(unsubscribeFromArtist);
 </script>
 
 <div class="artist-page">
@@ -70,7 +57,20 @@
 				</div>
 				<div class="actions">
 					<Button variant="secondary">Follow</Button>
-					<Button>Subscribe</Button>
+					{#if viewer.isOwner}
+						<span class="owner-note">Your page</span>
+					{:else if viewer.isSubscribed}
+						<Button variant="secondary" onClick={unsubscribe} disabled={busy}
+							>Subscribed &check;</Button
+						>
+					{:else if viewer.canSubscribe}
+						<Button onClick={subscribe} disabled={busy}>Subscribe &middot; $1/mo</Button>
+					{:else if !viewer.isLoggedIn}
+						<Button href="/login" variant="secondary">Log in to subscribe</Button>
+					{/if}
+					{#if ctaError}
+						<span class="cta-error" role="alert">{ctaError}</span>
+					{/if}
 				</div>
 			</div>
 		</header>
@@ -86,40 +86,7 @@
 							<h2>Artist feed</h2>
 						</div>
 					</div>
-
-					{#if content.feed.length}
-						<div class="feed-list">
-							{#each content.feed as item}
-								<article class="feed-card" class:is-locked={item.isLocked}>
-									<div class="feed-icon">
-										<SvgIcon path={contentIcon(item.type)} size={22} />
-									</div>
-									<div class="feed-body">
-										<div class="meta-row">
-											<span>{contentLabel(item.type)}</span>
-											{#if item.visibility !== 'public'}
-												<span class="visibility">
-													<SvgIcon path={mdiLockOutline} size={13} />
-													{item.visibility}
-												</span>
-											{/if}
-											<span>{formatDate(item.publishedAt)}</span>
-										</div>
-										<h3>{item.title}</h3>
-										<p>{item.type === 'post' ? item.excerpt : item.description}</p>
-									</div>
-									{#if item.isLocked}
-										<div class="lock-overlay">
-											<SvgIcon path={mdiLockOutline} size={20} />
-											<span>{item.lockReason}</span>
-										</div>
-									{/if}
-								</article>
-							{/each}
-						</div>
-					{:else}
-						<div class="empty-state">No artist updates yet.</div>
-					{/if}
+					<ArtistFeed {content} />
 				</section>
 
 				<section class="section-block">
@@ -129,16 +96,7 @@
 							<h2>Top tracks</h2>
 						</div>
 					</div>
-					<div class="track-wrapper">
-						{#each tracks as track}
-							<MusicTrack
-								track={track.track}
-								isLiked={track.isLiked}
-								{artist}
-								album={albumMap.get(track.track.albumId || '')}
-							/>
-						{/each}
-					</div>
+					<ArtistTracks {artist} {tracks} {albums} />
 				</section>
 			{:else if activeTab.id === 'music'}
 				<section class="section-block">
@@ -148,16 +106,7 @@
 							<h2>Tracks</h2>
 						</div>
 					</div>
-					<div class="track-wrapper">
-						{#each tracks as track}
-							<MusicTrack
-								track={track.track}
-								isLiked={track.isLiked}
-								{artist}
-								album={albumMap.get(track.track.albumId || '')}
-							/>
-						{/each}
-					</div>
+					<ArtistTracks {artist} {tracks} {albums} />
 				</section>
 
 				<section class="section-block">
@@ -167,11 +116,7 @@
 							<h2>Albums</h2>
 						</div>
 					</div>
-					<div class="album-wrapper">
-						{#each albums as album}
-							<MusicAlbum {album} {artist} />
-						{/each}
-					</div>
+					<ArtistAlbums {artist} {albums} />
 				</section>
 			{:else if activeTab.id === 'posts'}
 				<section class="section-block">
@@ -181,33 +126,7 @@
 							<h2>Posts</h2>
 						</div>
 					</div>
-					{#if content.posts.length}
-						<div class="posts-list">
-							{#each content.posts as post (post.id)}
-								{#snippet music()}
-									{#each post.musicAttachments as item}
-										{@const trackEntry =
-											item.type === 'track' ? trackMap.get(item.id) : undefined}
-										<PostMusicAttachment
-											attachment={item}
-											{trackEntry}
-											artist={artist ?? null}
-											album={trackEntry?.track.albumId
-												? albumMap.get(trackEntry.track.albumId)
-												: null}
-										/>
-									{/each}
-								{/snippet}
-								<PostCard
-									{post}
-									author={{ name: artist.name, avatar: artist.avatar }}
-									music={post.musicAttachments.length ? music : undefined}
-								/>
-							{/each}
-						</div>
-					{:else}
-						<div class="empty-state">No posts yet.</div>
-					{/if}
+					<ArtistPosts {artist} {tracks} {albums} {content} />
 				</section>
 			{:else if activeTab.id === 'photos'}
 				<section class="section-block">
@@ -217,49 +136,7 @@
 							<h2>Photo albums</h2>
 						</div>
 					</div>
-					{#if content.photoAlbums.length}
-						<div class="gallery-grid">
-							{#each content.photoAlbums as album}
-								<article class="gallery-card" class:is-locked={album.isLocked}>
-									<div class="gallery-preview">
-										{#if album.photos[0]}
-											<img
-												src={album.photos[0].thumbnailUrl || album.photos[0].fileUrl}
-												alt={album.photos[0].alt || album.title}
-												loading="lazy"
-											/>
-										{:else}
-											<SvgIcon
-												path={album.isLocked ? mdiLockOutline : mdiImageMultipleOutline}
-												size={34}
-											/>
-										{/if}
-										{#if album.isLocked}
-											<div class="lock-overlay">
-												<SvgIcon path={mdiLockOutline} size={20} />
-												<span>{album.lockReason}</span>
-											</div>
-										{/if}
-									</div>
-									<div class="card-copy">
-										<div class="meta-row">
-											<span>{album.photos.length} photos</span>
-											{#if album.visibility !== 'public'}
-												<span class="visibility">
-													<SvgIcon path={mdiLockOutline} size={13} />
-													{album.visibility}
-												</span>
-											{/if}
-										</div>
-										<h3>{album.title}</h3>
-										<p>{album.description}</p>
-									</div>
-								</article>
-							{/each}
-						</div>
-					{:else}
-						<div class="empty-state">No photo albums yet.</div>
-					{/if}
+					<ArtistPhotos {content} />
 				</section>
 			{:else if activeTab.id === 'videos'}
 				<section class="section-block">
@@ -269,48 +146,7 @@
 							<h2>Videos and playlists</h2>
 						</div>
 					</div>
-					{#if videoItems.length}
-						<div class="video-grid">
-							{#each videoItems as item}
-								<article class="video-card" class:is-locked={item.isLocked}>
-									<div class="video-preview">
-										{#if item.type === 'video' && item.thumbnailUrl}
-											<img src={item.thumbnailUrl} alt={item.title} loading="lazy" />
-										{:else}
-											<SvgIcon path={item.isLocked ? mdiLockOutline : mdiVideoOutline} size={36} />
-										{/if}
-										<div class="play-badge">
-											<SvgIcon
-												path={item.isLocked ? mdiLockOutline : mdiPlayCircleOutline}
-												size={28}
-											/>
-										</div>
-									</div>
-									<div class="card-copy">
-										<div class="meta-row">
-											<span>{contentLabel(item.type)}</span>
-											{#if item.visibility !== 'public'}
-												<span class="visibility">
-													<SvgIcon path={mdiLockOutline} size={13} />
-													{item.visibility}
-												</span>
-											{/if}
-										</div>
-										<h3>{item.title}</h3>
-										<p>{item.description}</p>
-										{#if item.isLocked}
-											<div class="locked-inline">
-												<SvgIcon path={mdiLockOutline} size={16} />
-												<span>{item.lockReason}</span>
-											</div>
-										{/if}
-									</div>
-								</article>
-							{/each}
-						</div>
-					{:else}
-						<div class="empty-state">No videos yet.</div>
-					{/if}
+					<ArtistVideos {content} />
 				</section>
 			{:else}
 				<div class="empty-state">Shop is coming soon.</div>
@@ -344,19 +180,7 @@
 					<h2>Latest shots</h2>
 				</div>
 			</div>
-			{#if latestPhotos.length}
-				<div class="mini-photo-grid">
-					{#each latestPhotos as photo}
-						<img
-							src={photo.thumbnailUrl || photo.fileUrl}
-							alt={photo.alt || photo.caption || 'Artist photo'}
-							loading="lazy"
-						/>
-					{/each}
-				</div>
-			{:else}
-				<div class="empty-state compact">No public photos yet.</div>
-			{/if}
+			<ArtistSidebarPhotos {content} />
 		</section>
 	</aside>
 </div>
@@ -456,26 +280,24 @@
 		text-transform: uppercase;
 	}
 
-	.community,
-	.meta-row {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: var(--space-2);
-		color: var(--text-secondary);
-		font-size: var(--font-size-xs);
-	}
-
-	.community strong {
-		color: var(--text-primary);
-	}
-
 	.actions {
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
 		flex-shrink: 0;
 		padding-top: var(--space-5);
+	}
+
+	.owner-note {
+		color: var(--text-secondary);
+		font-size: var(--font-size-sm);
+		font-weight: 600;
+	}
+
+	.cta-error {
+		color: var(--error, #e5484d);
+		font-size: var(--font-size-sm);
+		align-self: center;
 	}
 
 	.content-surface,
@@ -519,173 +341,6 @@
 		}
 	}
 
-	.track-wrapper,
-	.album-wrapper {
-		display: grid;
-		grid-auto-flow: column;
-		gap: var(--space-4);
-		overflow-x: auto;
-		margin-inline: calc(var(--space-2) * -1);
-		padding: var(--space-1) var(--space-2) var(--space-3);
-		border-radius: 0;
-		background: transparent;
-	}
-
-	.track-wrapper {
-		grid-auto-columns: minmax(280px, 1fr);
-		grid-template-rows: repeat(3, auto);
-	}
-
-	.album-wrapper {
-		grid-auto-columns: minmax(180px, 220px);
-	}
-
-	.feed-list,
-	.posts-list {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-4);
-	}
-
-	.feed-card,
-	.gallery-card,
-	.video-card {
-		position: relative;
-		overflow: hidden;
-		border: 1px solid color-mix(in srgb, var(--border-primary) 62%, transparent);
-		border-radius: var(--radius-lg);
-		background:
-			linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 40%),
-			color-mix(in srgb, var(--bg-surface) 74%, var(--bg-primary));
-		box-shadow: 0 14px 40px rgba(0, 0, 0, 0.16);
-		transition:
-			transform var(--duration-normal) var(--easing-ease-out),
-			border-color var(--duration-normal) var(--easing-ease-out),
-			background-color var(--duration-normal) var(--easing-ease-out);
-
-		&:hover {
-			transform: translateY(-2px);
-			border-color: color-mix(in srgb, var(--primary) 45%, var(--border-primary));
-		}
-	}
-
-	.feed-card {
-		display: grid;
-		grid-template-columns: 48px minmax(0, 1fr);
-		gap: var(--space-3);
-		padding: var(--space-4);
-	}
-
-	.feed-icon {
-		width: 48px;
-		height: 48px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: var(--radius-md);
-		background: color-mix(in srgb, var(--primary) 16%, var(--bg-tertiary));
-		color: var(--primary);
-	}
-
-	.feed-body,
-	.card-copy {
-		min-width: 0;
-
-		h3 {
-			margin: var(--space-1) 0;
-			color: var(--text-primary);
-			font-size: var(--font-size-lg);
-			line-height: 1.25;
-		}
-
-		p {
-			margin: 0;
-			color: var(--text-secondary);
-			font-size: var(--font-size-sm);
-			line-height: 1.5;
-		}
-	}
-
-	.visibility {
-		display: inline-flex;
-		align-items: center;
-		gap: var(--space-1);
-		color: var(--primary);
-		text-transform: capitalize;
-	}
-
-	.gallery-grid,
-	.video-grid {
-		display: grid;
-		gap: var(--space-3);
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-	}
-
-	.gallery-preview,
-	.video-preview {
-		position: relative;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		overflow: hidden;
-		aspect-ratio: 16 / 10;
-		background:
-			linear-gradient(135deg, color-mix(in srgb, var(--primary) 22%, transparent), transparent 54%),
-			var(--bg-tertiary);
-		color: var(--text-secondary);
-
-		img {
-			width: 100%;
-			height: 100%;
-			object-fit: cover;
-		}
-	}
-
-	.card-copy {
-		padding: var(--space-3);
-	}
-
-	.play-badge {
-		position: absolute;
-		inset: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: var(--text-primary);
-		background: rgba(0, 0, 0, 0.18);
-	}
-
-	.lock-overlay,
-	.locked-inline {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		color: var(--text-primary);
-	}
-
-	.lock-overlay {
-		position: absolute;
-		inset: 0;
-		justify-content: center;
-		padding: var(--space-4);
-		background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
-		backdrop-filter: blur(16px);
-		text-align: center;
-		font-size: var(--font-size-sm);
-		font-weight: 700;
-	}
-
-	.locked-inline {
-		margin-top: var(--space-3);
-		color: var(--primary);
-		font-size: var(--font-size-sm);
-		font-weight: 700;
-	}
-
-	.is-locked {
-		border-color: color-mix(in srgb, var(--primary) 42%, transparent);
-	}
-
 	.sidebar-card {
 		padding: var(--space-5);
 		background:
@@ -720,20 +375,6 @@
 		font-size: var(--font-size-sm);
 	}
 
-	.mini-photo-grid {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: var(--space-2);
-		margin-top: var(--space-3);
-
-		img {
-			width: 100%;
-			aspect-ratio: 1;
-			object-fit: cover;
-			border-radius: var(--radius-sm);
-		}
-	}
-
 	.empty-state {
 		padding: var(--space-6);
 		border: 1px dashed color-mix(in srgb, var(--border-primary) 58%, transparent);
@@ -742,10 +383,6 @@
 		color: var(--text-secondary);
 		font-size: var(--font-size-sm);
 		text-align: center;
-
-		&.compact {
-			padding: var(--space-4);
-		}
 	}
 
 	@media (max-width: 1100px) {

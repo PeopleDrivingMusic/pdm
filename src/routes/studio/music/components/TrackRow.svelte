@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { ContentVisibility } from '$lib/db/content-visibility';
 	import {
 		mdiMusicNote,
 		mdiPencil,
@@ -36,7 +37,7 @@
 		onEdit: (t: TrackDTO) => void;
 		onDelete: (t: TrackDTO) => void;
 		onLink: (t: TrackDTO) => void;
-		onVisibilityChange: (t: TrackDTO, v: 'public' | 'subscribers_only') => void;
+		onVisibilityChange: (t: TrackDTO, v: ContentVisibility) => void;
 		onRetry: (trackId: string) => void;
 	} = $props();
 
@@ -49,7 +50,7 @@
 	const coverSrc = $derived(
 		job?.coverPreviewUrl ?? (uploading ? null : resolveR2ImageUrl(track.imageKey))
 	);
-	const gated = $derived(track.visibility === 'subscribers_only');
+	const gated = $derived(track.visibility === 'subscribers');
 
 	function fmtDuration(sec: number | null) {
 		if (!sec) return '—';
@@ -123,7 +124,7 @@
 			: gated
 				? 'Subscribers-only — click to make public'
 				: 'Public — click to make subscribers-only'}
-		onclick={() => onVisibilityChange(track, gated ? 'public' : 'subscribers_only')}
+		onclick={() => onVisibilityChange(track, gated ? 'public' : 'subscribers')}
 	>
 		{#if gated}
 			<SvgIcon path={mdiLock} size={13} /> {inheritedFrom ? 'Subscribers*' : 'Subscribers'}
