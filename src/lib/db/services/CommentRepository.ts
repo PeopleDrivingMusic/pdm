@@ -1,0 +1,118 @@
+import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { db, withDbLogging } from '../index';
+import { comments, users, type Comment } from '../schema';
+
+export type CommentTargetType = 'post' | 'track';
+
+export interface CommentWithAuthor {
+	id: string;
+	body: string;
+	createdAt: Date;
+	authorId: string;
+	authorName: string | null;
+	authorUsername: string | null;
+	authorAvatar: string | null;
+}
+
+/**
+ * Thin Drizzle repository over `messages.comments`. Behavior (keyset ordering,
+ * soft-delete filtering, grouped counts) is pinned by the comments E2E against a
+ * real DB; the boundary (`CommentService`) is unit-tested with this mocked.
+ */
+export class CommentRepository {
+	static async create(input: {
+		targetType: CommentTargetType;
+		targetId: string;
+		authorId: string;
+		body: string;
+		parentId?: string | null;
+	}): Promise<Comment> {
+		return withDbLogging('CommentRepository.create', async () => {
+			const [row] = await db
+				.insert(comments)
+				.values({
+					targetType: input.targetType,
+					targetId: input.targetId,
+					authorId: input.authorId,
+					body: input.body,
+					parentId: input.parentId ?? null
+				})
+				.returning();
+			return row;
+		});
+	}
+
+	static async getById(id: string): Promise<Comment | undefined> {
+		return withDbLogging('CommentRepository.getById', async () => {
+			const [row] = await db.select().from(comments).where(eq(comments.id, id)).limit(1);
+			return row;
+		});
+	}
+
+	static async listForTarget(input: {
+		targetType: CommentTargetType;
+		targetId: string;
+		limit?: number;
+		before?: Date;
+	}): Promise<CommentWithAuthor[]> {
+		return withDbLogging('CommentRepository.listForTarget', async () => {
+			const conditions = [
+				eq(comments.targetType, input.targetType),
+				eq(comments.targetId, input.targetId),
+				isNull(comments.deletedAt)
+			];
+			if (input.before) conditions.push(lt(comments.createdAt, input.before));
+
+			return db
+				.select({
+					id: comments.id,
+					body: comments.body,
+					createdAt: comments.createdAt,
+					authorId: comments.authorId,
+					authorName: users.displayName,
+					authorUsername: users.username,
+					authorAvatar: users.avatarUrl
+				})
+				.from(comments)
+				.innerJoin(users, eq(comments.authorId, users.id))
+				.where(and(...conditions))
+				.orderBy(desc(comments.createdAt))
+				.limit(Math.min(input.limit ?? 50, 100));
+		});
+	}
+
+	static async countForTargets(
+		targetType: CommentTargetType,
+		targetIds: string[]
+	): Promise<Map<string, number>> {
+		return withDbLogging('CommentRepository.countForTargets', async () => {
+			if (targetIds.length === 0) return new Map();
+			const rows = await db
+				.select({ targetId: comments.targetId, count: sql<number>`count(*)::int` })
+				.from(comments)
+				.where(
+					and(
+						eq(comments.targetType, targetType),
+						inArray(comments.targetId, targetIds),
+						isNull(comments.deletedAt)
+					)
+				)
+				.groupBy(comments.targetId);
+			return new Map(rows.map((r) => [r.targetId, r.count]));
+		});
+	}
+
+	static async softDelete(id: string): Promise<void> {
+		await withDbLogging('CommentRepository.softDelete', async () => {
+			await db.update(comments).set({ deletedAt: new Date() }).where(eq(comments.id, id));
+		});
+	}
+
+	static async deleteForTarget(targetType: CommentTargetType, targetId: string): Promise<void> {
+		await withDbLogging('CommentRepository.deleteForTarget', async () => {
+			await db
+				.delete(comments)
+				.where(and(eq(comments.targetType, targetType), eq(comments.targetId, targetId)));
+		});
+	}
+}
