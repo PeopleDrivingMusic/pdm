@@ -77,7 +77,9 @@ export class CommentRepository {
 				.innerJoin(users, eq(comments.authorId, users.id))
 				.where(and(...conditions))
 				.orderBy(desc(comments.createdAt))
-				.limit(Math.min(input.limit ?? 50, 100));
+				// Floor at 1: a 0 or negative caller value would yield an empty page or a
+				// Postgres `LIMIT -n` error. Cap at 100 to bound the read.
+				.limit(Math.max(1, Math.min(input.limit ?? 50, 100)));
 		});
 	}
 
