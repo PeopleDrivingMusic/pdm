@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNull, lt } from 'drizzle-orm';
 import { db, withDbLogging } from '../index';
 import { comments, users, type Comment } from '../schema';
 
@@ -90,7 +90,7 @@ export class CommentRepository {
 		return withDbLogging('CommentRepository.countForTargets', async () => {
 			if (targetIds.length === 0) return new Map();
 			const rows = await db
-				.select({ targetId: comments.targetId, count: sql<number>`count(*)::int` })
+				.select({ targetId: comments.targetId, count: count() })
 				.from(comments)
 				.where(
 					and(
