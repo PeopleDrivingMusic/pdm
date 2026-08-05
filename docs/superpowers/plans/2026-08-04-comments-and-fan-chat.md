@@ -1129,6 +1129,96 @@ Stop here for founder review before starting Slice 2 (fan chat).
 
 ---
 
+## Slice 1 · Likes (PR6, after the comments core merges)
+
+**Decision (founder, 2026-08-05):** likes on comments **and posts** (posts are a
+known second target). Modeled as **separate per-entity tables with real FK
+`ON DELETE CASCADE`** — NOT a polymorphic `engagement.likes` — because the founder
+requires DB-guaranteed cleanup (delete a comment/post → its likes vanish
+automatically; a polymorphic `target_id` cannot carry a real FK, so cascade is
+impossible there). DRY is preserved at the **service + UI** layer via one generic
+`LikeService`; only the thin repository has a per-table query. Matches the existing
+`user_favorites` precedent (track likes = own table with FK to tracks). PR1's
+`messages.comments` table is untouched — likes are purely additive.
+
+**Soft-delete nuance:** comments are soft-deleted (`deleted_at`), so FK cascade only
+fires on **hard** delete (e.g. parent post deleted → comments hard-deleted →
+their `comment_likes` cascade). Likes on a *moderated* (soft-deleted) comment linger
+by design; clear them app-side in `CommentService.delete` only if product wants it
+(out of scope now).
+
+### Task 10: `comment_likes` + `post_likes` tables + migration
+
+**Files:** `src/lib/db/schemas/engagement.ts` (extend), `src/lib/db/schema.ts` (aggregate), migration.
+
+```ts
+// in engagement.ts — alongside trackStats
+export const commentLikes = engagementDbSchema.table(
+	'comment_likes',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		commentId: uuid('comment_id')
+			.notNull()
+			.references(() => comments.id, { onDelete: 'cascade' }),
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(t) => [unique('comment_likes_comment_user_unique').on(t.commentId, t.userId)]
+);
+
+export const postLikes = engagementDbSchema.table(
+	'post_likes',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		postId: uuid('post_id')
+			.notNull()
+			.references(() => posts.id, { onDelete: 'cascade' }),
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(t) => [unique('post_likes_post_user_unique').on(t.postId, t.userId)]
+);
+```
+
+Import `comments` (from `./messages`) and `posts` (from `./content`) into `engagement.ts`.
+Aggregate in `schema.ts` (re-export, relations to `users`/`comments`/`posts`, `CommentLike`/`PostLike` type exports, schema object). Migration hand-written per #25 (`0012_engagement_likes.sql`): two tables, both FKs `ON DELETE CASCADE`, both UNIQUE constraints. Verify with `\d engagement.comment_likes` that the cascade FKs exist.
+
+### Task 11: generic `LikeService` (DB layer, TDD-by-E2E)
+
+**Files:** `src/lib/db/services/LikeService.ts`
+
+```ts
+export type LikeTargetType = 'comment' | 'post';
+
+export class LikeService {
+	// toggle → returns the new liked state; insert onConflictDoNothing / delete.
+	static async toggle(targetType: LikeTargetType, targetId: string, userId: string): Promise<boolean>;
+	// grouped count per target — compute-on-read, same shape as CommentRepository.countForTargets.
+	static async countForTargets(targetType: LikeTargetType, targetIds: string[]): Promise<Map<string, number>>;
+	// the subset of targetIds the viewer has liked (mirrors the poll viewerVoteRows pattern).
+	static async likedByUser(userId: string, targetType: LikeTargetType, targetIds: string[]): Promise<Set<string>>;
+}
+```
+
+Internally a small `{ comment: commentLikes, post: postLikes }` table map routes each call; the FK column is `commentId`/`postId` respectively. Wrap ops in `withDbLogging`. Behavior pinned by the PR6 E2E.
+
+### Task 12: wire likes into `CommentService` DTO + toggle endpoint (TDD)
+
+- Extend `CommentDTO` with `likeCount: number` and `likedByViewer: boolean`. In `CommentService.listForTarget`, add `LikeService.countForTargets('comment', ids)` + `LikeService.likedByUser(viewerUserId, 'comment', ids)` into the existing `Promise.all`; map onto each DTO. Unit test (mock `LikeService`): counts/`likedByViewer` attached; anonymous viewer → `likedByViewer:false`, no `likedByUser` call.
+- Endpoint `POST /api/likes` `{ targetType, targetId }` → toggle, guarded (`requireUser` + `requireSameOrigin`) + rate-limited; returns `{ liked, likeCount }`. Unit test: 401 anon, toggles for a user, 429 on flood, 400 on bad target. Accepts `targetType: 'post'` too (backend ready for post likes).
+
+### Task 13: heart UI in `MessageList` + verification + PR6
+
+- Add a like button (`mdiHeart`/`mdiHeartOutline`) + count to each row in `MessageList.svelte`; optimistic toggle → `POST /api/likes`; disabled with a "log in to like" affordance when anonymous. Mobile tap target ≥44px.
+- E2E (`e2e/comment-likes.spec.ts`): a listener likes a comment → count increments, heart fills; unlike → decrements; **delete the comment → its `comment_likes` rows are gone** (assert cascade via a follow-up count/query).
+- `yarn run check` / `yarn lint` / `yarn test:unit --run` / `yarn test:e2e` green. PR6 → integration branch.
+
+---
+
 ## Slice 2 preview — Fan chat (own plan after Slice 1 merges)
 
 - **Table:** `messages.chat` in the same `messages` schema — **separate table, diverging shape**: `id, artist_id (→ artists.id), author_id (→ users.id), body, created_at, deleted_at`; index `(artist_id, created_at desc)`. No `target_type`, no `parent_id` (chat is flat, artist-scoped).
@@ -1147,6 +1237,11 @@ Enable experimental remote functions; upgrade chat `query` → `query.live` fed 
 
 - **Spec coverage (Slice 1):** schema + messages schema/comments table (T1), DB repository (T2), link policy + owner resolver (T3), boundary + DTO (T4), REST endpoints + guards + rate limit (T5), compute-on-read counts (T6), reusable emoji-enabled composer/list (T7), CommentThread + PostCard wiring (T8), E2E + PR (T9). Requirements map: strict TDD (every logic task is red→green; PR gate at T9); links-forbidden-except-artist (T3 `containsUrl` + T4 policy tests, both comment paths); emoji (T7 `emoji-picker-element`); mobile (T7/T8 notes); reusability (T7 context-agnostic components consumed by T8, reused later by chat/player).
 - **Two-table split (founder decision):** `messages.comments` (this slice) and `messages.chat` (Slice 2) are separate tables in a dedicated `messages` schema — distinct business entities, diverging shape (comments: polymorphic + threading-ready; chat: artist-scoped, flat), independent scaling. Chat is gated at every layer (endpoint → boundary → repo-only-via-boundary): subscriber OR owner.
+- **Likes (PR6, founder decision 2026-08-05):** separate per-entity tables `engagement.comment_likes` + `engagement.post_likes` with real FK `ON DELETE CASCADE` (posts are a known second target) — chosen over a polymorphic `engagement.likes` **because** DB-guaranteed cascade cleanup was required and a polymorphic `target_id` cannot carry a real FK. DRY kept at the service/UI layer via one generic `LikeService`; matches the `user_favorites` (track likes) precedent. Counts are compute-on-read (`likeCount`) + a viewer-liked set (`likedByViewer`), mirroring the poll vote pattern. Backend covers comment + post from day one; comment-like UI ships in Slice 1, post-like UI rides when posts are next touched.
 - **Name consistency:** DB `CommentRepository.{create,getById,listForTarget,countForTargets,softDelete,deleteForTarget}`; boundary `CommentService.{listForTarget,create,delete,countsForPosts}`; policy `resolveTargetOwnerUserId` / `containsUrl` / `MAX_MESSAGE_LENGTH` / `MessageTargetType`; DB `CommentTargetType = 'post' | 'track'`; DTO `CommentDTO`; type exports `Comment`/`NewComment`. Endpoints: `GET/POST /api/comments`, `DELETE /api/comments/[id]`.
 - **Risks flagged in-plan:** migration must emit `CREATE SCHEMA "messages"` (add manually if drizzle-kit omits it; #25 → `db:push` fallback); custom-element typing for `emoji-picker-element` (small `.d.ts` shim); `CommentRepository` behavior pinned by E2E not db-mock units (matches `SubscriptionService` precedent).
+- **Independent review follow-ups (PR1 / #26, 2026-08-05):**
+  - **PR5 (pagination):** `CommentRepository.listForTarget` keyset cursor must move from `lt(createdAt)` to a composite `(createdAt, id)` cursor — `created_at` is not unique, so a same-timestamp boundary silently drops rows. Add a `beforeId` param, order by `(createdAt desc, id desc)`, and predicate `(created_at, id) < (before, beforeId)`. Land it with the pagination E2E (test-first). *(The `before` param is currently unused — no caller — so this is latent until pagination is wired.)*
+  - **Content-deletion path (whichever slice touches it):** wire `CommentRepository.deleteForTarget('post'|'track', id)` into `PostService.deletePost` and the track-delete path — polymorphic `target_id` has no FK, so comments orphan on parent delete unless cleaned in app code.
+  - **Applied in PR1:** `limit` floored at 1 (`Math.max(1, Math.min(limit ?? 50, 100))`).
 ```
