@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db, withDbLogging } from '$lib/db';
 import { PUBLIC_R2_IMAGES_BUCKET } from '$env/static/public';
 import {
@@ -367,7 +367,7 @@ export class PostService {
 
 		const [voteCountRow] = existingPoll
 			? await db
-					.select({ count: sql<number>`count(*)::int` })
+					.select({ count: count() })
 					.from(postPollVotes)
 					.where(eq(postPollVotes.pollId, existingPoll.id))
 			: [{ count: 0 }];
@@ -1198,7 +1198,7 @@ export class ArtistPublicContentService {
 					? db
 							.select({
 								optionId: postPollVotes.optionId,
-								votes: sql<number>`count(*)::int`
+								votes: count()
 							})
 							.from(postPollVotes)
 							.innerJoin(postPolls, eq(postPollVotes.pollId, postPolls.id))
