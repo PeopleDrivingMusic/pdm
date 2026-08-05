@@ -20,6 +20,13 @@ type CreateResult =
 
 type DeleteResult = { ok: true } | { ok: false; reason: 'not_found' | 'forbidden' };
 
+// Targets that accept a content comment. Extend this to add a new commentable type.
+const COMMENT_TARGET_TYPES: CommentTargetType[] = ['post', 'track'];
+
+function displayName(name: string | null, username: string | null): string {
+	return name ?? username ?? 'Listener';
+}
+
 /**
  * Application boundary for content comments. Free to write (no entitlement),
  * public to read. Returns only DTOs — no Drizzle rows leak across this seam.
@@ -40,7 +47,7 @@ export class CommentService {
 			createdAt: r.createdAt.toISOString(),
 			author: {
 				id: r.authorId,
-				name: r.authorName ?? r.authorUsername ?? 'Listener',
+				name: displayName(r.authorName, r.authorUsername),
 				avatar: r.authorAvatar
 			},
 			isArtist: !!ownerUserId && r.authorId === ownerUserId,
@@ -54,9 +61,12 @@ export class CommentService {
 		targetType: CommentTargetType;
 		targetId: string;
 		authorId: string;
+		authorName: string | null;
+		authorUsername: string | null;
+		authorAvatar: string | null;
 		body: string;
 	}): Promise<CreateResult> {
-		if (input.targetType !== 'post' && input.targetType !== 'track') {
+		if (!COMMENT_TARGET_TYPES.includes(input.targetType)) {
 			return { ok: false, reason: 'invalid_target' };
 		}
 		const body = input.body.trim();
@@ -80,7 +90,13 @@ export class CommentService {
 				id: row.id,
 				body: row.body,
 				createdAt: row.createdAt.toISOString(),
-				author: { id: row.authorId, name: 'You', avatar: null },
+				// The author is the logged-in creator; use their real session identity
+				// rather than a placeholder so the optimistic-rendered comment is correct.
+				author: {
+					id: input.authorId,
+					name: displayName(input.authorName, input.authorUsername),
+					avatar: input.authorAvatar
+				},
 				isArtist: input.authorId === ownerUserId,
 				canDelete: true
 			}

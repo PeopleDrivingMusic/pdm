@@ -34,22 +34,47 @@ beforeEach(() => {
 	});
 });
 
+// Base author identity the endpoint passes in from the session (locals.user).
+const fan = { authorId: 'u2', authorName: 'Real Fan', authorUsername: 'fan2', authorAvatar: null };
+
 describe('create — comments are free (no entitlement)', () => {
 	it('never calls the entitlement gate', async () => {
-		await CommentService.create({
+		await CommentService.create({ targetType: 'post', targetId: 'p1', ...fan, body: 'nice' });
+		expect(EntitlementService.isSubscriberOf).not.toHaveBeenCalled();
+	});
+
+	it('returns a DTO with the author real name, not a placeholder', async () => {
+		const r = await CommentService.create({
+			targetType: 'post',
+			targetId: 'p1',
+			...fan,
+			body: 'nice'
+		});
+		expect(r.ok).toBe(true);
+		if (r.ok) {
+			expect(r.comment.author.name).toBe('Real Fan');
+			expect(r.comment.author.id).toBe('u2');
+		}
+	});
+
+	it('falls back to username then Listener when the display name is missing', async () => {
+		const r = await CommentService.create({
 			targetType: 'post',
 			targetId: 'p1',
 			authorId: 'u2',
+			authorName: null,
+			authorUsername: 'fan2',
+			authorAvatar: null,
 			body: 'nice'
 		});
-		expect(EntitlementService.isSubscriberOf).not.toHaveBeenCalled();
+		expect(r.ok && r.comment.author.name).toBe('fan2');
 	});
 
 	it('rejects an empty body', async () => {
 		const r = await CommentService.create({
 			targetType: 'post',
 			targetId: 'p1',
-			authorId: 'u2',
+			...fan,
 			body: '   '
 		});
 		expect(r).toEqual({ ok: false, reason: 'empty' });
@@ -60,7 +85,7 @@ describe('create — comments are free (no entitlement)', () => {
 		const r = await CommentService.create({
 			targetType: 'artist' as any,
 			targetId: 'a1',
-			authorId: 'u2',
+			...fan,
 			body: 'hi'
 		});
 		expect(r).toEqual({ ok: false, reason: 'invalid_target' });
@@ -70,7 +95,7 @@ describe('create — comments are free (no entitlement)', () => {
 		const r = await CommentService.create({
 			targetType: 'post',
 			targetId: 'p1',
-			authorId: 'u2',
+			...fan,
 			body: 'x'.repeat(2001)
 		});
 		expect(r).toEqual({ ok: false, reason: 'too_long' });
@@ -84,7 +109,7 @@ describe('create — link policy', () => {
 		const r = await CommentService.create({
 			targetType: 'post',
 			targetId: 'p1',
-			authorId: 'u2',
+			...fan,
 			body: 'see scam.com'
 		});
 		expect(r).toEqual({ ok: false, reason: 'links_not_allowed' });
@@ -97,6 +122,9 @@ describe('create — link policy', () => {
 			targetType: 'post',
 			targetId: 'p1',
 			authorId: 'owner1',
+			authorName: 'The Artist',
+			authorUsername: 'artist',
+			authorAvatar: null,
 			body: 'my tour scam.com'
 		});
 		expect(r.ok).toBe(true);
