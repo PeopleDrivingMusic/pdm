@@ -8,10 +8,20 @@ export type MessageTargetType = 'post' | 'track' | 'artist';
 /** Max stored message length (comments + chat share this default). */
 export const MAX_MESSAGE_LENGTH = 2000;
 
-// Conservative URL sniffing for the link policy. Matches http(s)://, bare www., and
-// bare domain.tld(/path). Deliberately broad: a false positive on a non-owner message
-// is acceptable (they just can't post links); only the artist-owner may include URLs.
-const URL_PATTERN = /(https?:\/\/|www\.)[^\s]+|(?<![\w@.])[a-z0-9-]+(\.[a-z]{2,})+(\/[^\s]*)?/i;
+// URL sniffing for the link policy (only the artist-owner may post links). Flags an
+// explicit signal — a scheme, a `www.` host, or any `domain.tld/path` — plus a bare
+// `domain.tld` whose TLD is a common one. Deliberately biased AWAY from false-positiving
+// on ordinary prose: the "missing space after a period" typo (`amazing.Keep it up`,
+// `Node.js`) must not read as a link, since the rule blocks the very fans writing those.
+// Blatant obfuscation (`example[.]com`, `h t t p`) is out of scope for this soft control.
+const COMMON_TLDS =
+	'com|net|org|io|dev|app|xyz|info|biz|link|site|online|store|shop|blog|tv|fm|gg|ru|ua|uk|de|fr|es|pl|nl|cn|jp|br|eu';
+const URL_PATTERN = new RegExp(
+	`(?:https?:\\/\\/|www\\.)\\S+` + // scheme or www. host
+		`|[a-z0-9-]+\\.[a-z]{2,}\\/\\S*` + // any domain WITH a path (bit.ly/abc, evil.test/promo)
+		`|\\b[a-z0-9-]+\\.(?:${COMMON_TLDS})\\b(?![a-z])`, // bare common-TLD domain (scam.com)
+	'i'
+);
 
 export function containsUrl(body: string): boolean {
 	return URL_PATTERN.test(body);
