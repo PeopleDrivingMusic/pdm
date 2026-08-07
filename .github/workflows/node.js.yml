@@ -1,0 +1,114 @@
+name: CI Pipeline
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+# Отменяем старые прогоны в рамках одного PR при новом пуше
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ----------------------------------------------------
+  # JOB 1: Линтинг, проверка типов и Unit-тесты
+  # ----------------------------------------------------
+  quality-check:
+    name: Code Quality & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run Linter & Formatter
+        run: yarn lint
+
+      - name: Run Svelte & TypeScript Check
+        run: yarn check
+
+      - name: Run Vitest (Unit)
+        run: yarn test:unit --run
+
+  # ----------------------------------------------------
+  # JOB 2: Миграции Drizzle и E2E с Playwright
+  # ----------------------------------------------------
+  e2e-and-db:
+    name: E2E Tests & DB Migrations
+    runs-on: ubuntu-latest
+    needs: quality-check # Запускается только если статический анализ и unit-тесты прошли успешно
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_password
+          POSTGRES_DB: pdm_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      # Кэшируем бинарники браузеров Playwright, чтобы не скачивать их каждый раз (~300MB+)
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('yarn.lock') }}
+
+      - name: Install Playwright Browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: yarn playwright install --with-deps
+
+      - name: Build Application
+        env:
+          DATABASE_URL: postgresql://postgres:postgres_password@localhost:5432/pdm_test_db
+        run: yarn build
+
+      - name: Run Drizzle Migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres_password@localhost:5432/pdm_test_db
+        run: yarn db:migrate
+
+      - name: Run E2E Tests (Playwright)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres_password@localhost:5432/pdm_test_db
+          CI: true
+        run: yarn test:e2e
+
+      # Если тесты упали — сохраняем отчет Playwright со скриншотами/трейсами как Artifact
+      - name: Upload Playwright Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
