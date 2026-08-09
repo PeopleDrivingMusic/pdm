@@ -19,6 +19,7 @@ import {
 	videoCollections
 } from '$lib/db/schema';
 import { postDocumentRepository } from './PostDocumentRepository';
+import { CommentRepository } from './CommentRepository';
 import type {
 	ArtistFeedItem,
 	ContentMedia,
@@ -61,6 +62,7 @@ export interface PublicArtistPost {
 	visibility: ContentVisibility;
 	publishedAt: Date | null;
 	isLocked: boolean;
+	commentCount: number;
 	media: Array<{
 		id: string;
 		type: string;
@@ -1150,7 +1152,8 @@ export class ArtistPublicContentService {
 				pollVoteRows,
 				viewerVoteRows,
 				photoRows,
-				collectionItemRows
+				collectionItemRows,
+				commentCounts
 			] = await Promise.all([
 				postDocumentRepository.getPostDocuments(postIds),
 				postIds.length
@@ -1236,7 +1239,11 @@ export class ArtistPublicContentService {
 							.from(videoCollectionItems)
 							.where(inArray(videoCollectionItems.collectionId, collectionIds))
 							.orderBy(asc(videoCollectionItems.sortOrder))
-					: []
+					: [],
+				// Comment counts are computed on read (no denormalized counter to drift).
+				postIds.length
+					? CommentRepository.countForTargets('post', postIds)
+					: new Map<string, number>()
 			]);
 
 			const mediaByPost = new Map<string, typeof mediaRows>();
@@ -1312,6 +1319,7 @@ export class ArtistPublicContentService {
 					visibility,
 					publishedAt: post.publishedAt,
 					isLocked,
+					commentCount: commentCounts.get(post.id) ?? 0,
 					media: isLocked
 						? []
 						: (mediaByPost.get(post.id) ?? []).map((row) => ({
