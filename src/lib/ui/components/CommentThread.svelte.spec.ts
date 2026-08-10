@@ -1,0 +1,133 @@
+import { page } from '@vitest/browser/context';
+import { expect, test, vi, beforeEach } from 'vitest';
+import { render } from 'vitest-browser-svelte';
+
+const fetchComments = vi.fn();
+const createComment = vi.fn();
+const editComment = vi.fn();
+const deleteComment = vi.fn();
+
+vi.mock('$lib/client/comments', () => ({
+	fetchComments: (...args: unknown[]) => fetchComments(...args),
+	createComment: (...args: unknown[]) => createComment(...args),
+	editComment: (...args: unknown[]) => editComment(...args),
+	deleteComment: (...args: unknown[]) => deleteComment(...args)
+}));
+
+import CommentThread from './CommentThread.svelte';
+
+const TARGET_ID = '11111111-1111-4111-8111-111111111111';
+
+const dto = (over: Record<string, unknown> = {}) => ({
+	id: 'm1',
+	body: 'This track slaps',
+	createdAt: '2026-08-04T00:00:00.000Z',
+	editedAt: null,
+	author: { id: 'u2', name: 'Real Fan', avatar: null },
+	isArtist: false,
+	canDelete: true,
+	canEdit: true,
+	...over
+});
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	fetchComments.mockResolvedValue({ ok: true, comments: [dto()] });
+	createComment.mockResolvedValue({ ok: true, comment: dto({ id: 'm2', body: 'brand new' }) });
+	editComment.mockResolvedValue({
+		ok: true,
+		comment: dto({ body: 'reworded', editedAt: '2026-08-05T00:00:00.000Z' })
+	});
+	deleteComment.mockResolvedValue({ ok: true });
+});
+
+const mount = (over: Record<string, unknown> = {}) =>
+	render(CommentThread, {
+		targetType: 'post',
+		targetId: TARGET_ID,
+		isLoggedIn: true,
+		initialCount: 1,
+		...over
+	});
+
+test('does not fetch until the thread is opened', async () => {
+	mount();
+	await expect.element(page.getByRole('button', { name: /comment/i })).toBeInTheDocument();
+	expect(fetchComments).not.toHaveBeenCalled();
+});
+
+test('loads the comments once when opened', async () => {
+	mount();
+	await page.getByRole('button', { name: /comment/i }).click();
+
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+	expect(fetchComments).toHaveBeenCalledWith('post', TARGET_ID);
+	expect(fetchComments).toHaveBeenCalledTimes(1);
+});
+
+test('posting prepends the new comment', async () => {
+	mount();
+	await page.getByRole('button', { name: /comment/i }).click();
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+
+	await page.getByRole('textbox').fill('brand new');
+	await page.getByRole('button', { name: /send/i }).click();
+
+	expect(createComment).toHaveBeenCalledWith('post', TARGET_ID, 'brand new');
+	await expect.element(page.getByText('brand new')).toBeInTheDocument();
+});
+
+test('surfaces a link-policy refusal inline', async () => {
+	createComment.mockResolvedValue({
+		ok: false,
+		error: 'Links are not allowed here — only the artist can post links.'
+	});
+	mount();
+	await page.getByRole('button', { name: /comment/i }).click();
+
+	await page.getByRole('textbox').fill('see scam.com');
+	await page.getByRole('button', { name: /send/i }).click();
+
+	await expect.element(page.getByText(/only the artist can post links/i)).toBeInTheDocument();
+});
+
+test('deleting removes the comment from the list', async () => {
+	mount();
+	await page.getByRole('button', { name: /comment/i }).click();
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+
+	await page.getByRole('button', { name: /delete comment/i }).click();
+
+	expect(deleteComment).toHaveBeenCalledWith('m1');
+	await expect.element(page.getByText('This track slaps')).not.toBeInTheDocument();
+});
+
+test('editing replaces the body in place', async () => {
+	mount();
+	await page.getByRole('button', { name: /comment/i }).click();
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+
+	await page.getByRole('button', { name: /edit comment/i }).click();
+	await page.getByRole('textbox', { name: /edit comment/i }).fill('reworded');
+	await page.getByRole('button', { name: /save/i }).click();
+
+	expect(editComment).toHaveBeenCalledWith('m1', 'reworded');
+	await expect.element(page.getByText('reworded')).toBeInTheDocument();
+});
+
+test('an anonymous viewer can read but is prompted to log in', async () => {
+	mount({ isLoggedIn: false });
+	await page.getByRole('button', { name: /comment/i }).click();
+
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+	await expect.element(page.getByRole('link', { name: /log in to comment/i })).toBeInTheDocument();
+	await expect.element(page.getByRole('button', { name: /send/i })).not.toBeInTheDocument();
+});
+
+test('shows a load failure without breaking the thread', async () => {
+	fetchComments.mockResolvedValue({ ok: false, error: 'Could not load comments.' });
+	mount();
+	await page.getByRole('button', { name: /comment/i }).click();
+
+	await expect.element(page.getByText('Could not load comments.')).toBeInTheDocument();
+});
