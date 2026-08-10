@@ -13,6 +13,14 @@ export function requireUser(event: Pick<RequestEvent, 'locals'>): { userId: stri
 	return { userId };
 }
 
+/** 429 Response for a caller that exceeded a rate limit, with a Retry-After hint. */
+export function tooManyRequests(retryAfterSeconds = 60): Response {
+	return json(
+		{ error: 'rate_limited' },
+		{ status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
+	);
+}
+
 /** Narrow a guard's result to its short-circuit Response. */
 export function isGuardResponse(value: unknown): value is Response {
 	return value instanceof Response;
