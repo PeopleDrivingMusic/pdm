@@ -5,6 +5,7 @@
 	import SvgIcon from '../../SvgIcon.svelte';
 	import PostPoll from '../PostPoll.svelte';
 	import PostMediaGrid from './PostMediaGrid.svelte';
+	import CommentThread from '../CommentThread.svelte';
 
 	interface PostMediaItem {
 		id: string;
@@ -26,12 +27,14 @@
 	}
 
 	interface PostCardData {
+		id: string;
 		title: string;
 		excerpt: string | null;
 		bodyHtml: string | null;
 		visibility: string;
 		publishedAt: Date | string | null;
 		isLocked: boolean;
+		commentCount: number;
 		media: PostMediaItem[];
 		poll: Poll | null;
 	}
@@ -40,12 +43,14 @@
 		post,
 		author,
 		music,
+		isLoggedIn = false,
 		onLike,
 		onComment
 	}: {
 		post: PostCardData;
 		author: { name: string; avatar?: string | null };
 		music?: Snippet;
+		isLoggedIn?: boolean;
 		onLike?: () => void;
 		onComment?: () => void;
 	} = $props();
@@ -110,9 +115,12 @@
 		<button aria-label="Like post" onclick={onLike}>
 			<SvgIcon path={mdiHeartOutline} size={20} />
 		</button>
-		<button aria-label="Comment on post" onclick={onComment}>
-			<SvgIcon path={mdiChatOutline} size={20} />
-		</button>
+		<CommentThread
+			targetType="post"
+			targetId={post.id}
+			{isLoggedIn}
+			initialCount={post.commentCount}
+		/>
 	</footer>
 </article>
 
@@ -150,8 +158,15 @@
 	.post-header,
 	.post-actions {
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		gap: var(--space-3);
+	}
+
+	// The thread keeps its own full-width layout when reused elsewhere; inside the
+	// card footer it takes the space left of the like button so its panel opens below.
+	.post-actions :global(.comment-thread) {
+		flex: 1 1 auto;
+		min-width: 0;
 	}
 
 	.post-content {

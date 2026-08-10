@@ -10,5 +10,8 @@ export { default as SvgIcon } from './SvgIcon.svelte';
 export { default as IconButton } from './IconButton.svelte';
 export { default as Tabs } from './Tabs.svelte';
 export { default as InfoMessage } from './InfoMessage.svelte';
+export { default as MessageList } from './components/MessageList.svelte';
+export { default as MessageComposer } from './components/MessageComposer.svelte';
+export { default as CommentThread } from './components/CommentThread.svelte';
 export { default as NotificationContainer } from './NotificationContainer.svelte';
 export { notificationStore } from '$lib/stores/notification.svelte';

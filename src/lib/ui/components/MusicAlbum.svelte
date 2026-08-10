@@ -16,7 +16,10 @@
 
 <button class="music-album">
 	<div class="image-wrapper">
-		<div class="album-cover" style:background-image={coverUrl ? `url('${coverUrl}')` : undefined}></div>
+		<div
+			class="album-cover"
+			style:background-image={coverUrl ? `url('${coverUrl}')` : undefined}
+		></div>
 	</div>
 	<div class="album-info">
 		<h3 class="album-title">{album?.title}</h3>

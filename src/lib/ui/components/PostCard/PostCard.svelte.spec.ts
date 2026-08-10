@@ -16,6 +16,7 @@ type Poll = {
 
 const basePost = (over: Record<string, unknown> = {}) => ({
 	id: 'post-1',
+	commentCount: 0,
 	title: 'Studio session',
 	excerpt: 'A quick look behind the scenes.',
 	bodyHtml: null as string | null,
