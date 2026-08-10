@@ -73,7 +73,12 @@ export class CommentService {
 		if (!body) return { ok: false, reason: 'empty' };
 		if (body.length > MAX_MESSAGE_LENGTH) return { ok: false, reason: 'too_long' };
 
+		// A target that resolves to no owner does not exist (or is gone). Reject rather
+		// than writing an orphan row: `target_id` is polymorphic, so there is no FK to
+		// catch it and `deleteForTarget` would never reap it.
 		const ownerUserId = await resolveTargetOwnerUserId(input.targetType, input.targetId);
+		if (!ownerUserId) return { ok: false, reason: 'invalid_target' };
+
 		if (containsUrl(body) && input.authorId !== ownerUserId) {
 			return { ok: false, reason: 'links_not_allowed' };
 		}

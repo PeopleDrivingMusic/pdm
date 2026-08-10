@@ -36,5 +36,5 @@ export function createRateLimiter(opts: {
 		return true;
 	}
 
-	return { check, size: () => windows.size };
+	return { check, size: () => windows.size, reset: () => windows.clear() };
 }

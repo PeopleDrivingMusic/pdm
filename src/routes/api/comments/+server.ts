@@ -1,14 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { CommentService } from '$lib/server/comments';
+import { commentReadLimiter, commentWriteLimiter } from '$lib/server/comments/rateLimits';
 import type { CommentTargetType } from '$lib/db/services/CommentRepository';
 import { requireSameOrigin, requireUser, isGuardResponse } from '$lib/server/security/guards';
-import { createRateLimiter } from '$lib/server/security/rateLimiter';
+import { isUuid } from '$lib/server/security/uuid';
 import type { RequestHandler } from './$types';
 
-const writeLimiter = createRateLimiter({ limit: 10, windowMs: 60_000 });
-
 const COMMENT_TARGET_TYPES: CommentTargetType[] = ['post', 'track'];
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Validate the target before it reaches the service: `target_id` maps to a uuid
@@ -19,19 +17,29 @@ function parseTarget(
 	targetType: unknown,
 	targetId: unknown
 ): { targetType: CommentTargetType; targetId: string } | null {
-	if (typeof targetType !== 'string' || typeof targetId !== 'string') return null;
+	if (typeof targetType !== 'string' || !isUuid(targetId)) return null;
 	if (!COMMENT_TARGET_TYPES.includes(targetType as CommentTargetType)) return null;
-	if (!UUID_PATTERN.test(targetId)) return null;
 	return { targetType: targetType as CommentTargetType, targetId };
 }
 
-export const GET: RequestHandler = async ({ url, locals }) => {
-	const target = parseTarget(url.searchParams.get('targetType'), url.searchParams.get('targetId'));
-	if (!target) return json({ error: 'Invalid target' }, { status: 400 });
+function tooManyRequests() {
+	return json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': '60' } });
+}
+
+export const GET: RequestHandler = async (event) => {
+	// Reads are public and unauthenticated, so meter them per client address —
+	// otherwise an anonymous loop can monopolise the DB pool.
+	if (!commentReadLimiter.check(event.getClientAddress())) return tooManyRequests();
+
+	const target = parseTarget(
+		event.url.searchParams.get('targetType'),
+		event.url.searchParams.get('targetId')
+	);
+	if (!target) return json({ error: 'invalid_target' }, { status: 400 });
 
 	const comments = await CommentService.listForTarget({
 		...target,
-		viewerUserId: locals.user?.id ?? null
+		viewerUserId: event.locals.user?.id ?? null
 	});
 	return json({ comments });
 };
@@ -42,14 +50,12 @@ export const POST: RequestHandler = async (event) => {
 	const auth = requireUser(event);
 	if (isGuardResponse(auth)) return auth;
 
-	if (!writeLimiter.check(auth.userId)) {
-		return json({ error: 'Slow down a moment' }, { status: 429 });
-	}
+	if (!commentWriteLimiter.check(auth.userId)) return tooManyRequests();
 
 	const payload = await event.request.json().catch(() => null);
 	const target = parseTarget(payload?.targetType, payload?.targetId);
 	if (!target || typeof payload?.body !== 'string') {
-		return json({ error: 'Invalid request' }, { status: 400 });
+		return json({ error: 'invalid_request' }, { status: 400 });
 	}
 
 	// The author is the logged-in user — pass their session identity straight through
@@ -64,6 +70,11 @@ export const POST: RequestHandler = async (event) => {
 		body: payload.body
 	});
 
-	if (!result.ok) return json({ error: result.reason }, { status: 422 });
-	return json({ comment: result.comment }, { status: 201 });
+	if (result.ok) return json({ comment: result.comment }, { status: 201 });
+
+	// invalid_target = the post/track does not exist (or is gone) → 404;
+	// a policy refusal stays 422; empty/too_long are malformed input → 400.
+	const status =
+		result.reason === 'invalid_target' ? 404 : result.reason === 'links_not_allowed' ? 422 : 400;
+	return json({ error: result.reason }, { status });
 };

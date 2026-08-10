@@ -91,6 +91,18 @@ describe('create — comments are free (no entitlement)', () => {
 		expect(r).toEqual({ ok: false, reason: 'invalid_target' });
 	});
 
+	it('rejects a target that does not resolve to an owner (missing/draft/deleted)', async () => {
+		(resolveTargetOwnerUserId as any).mockResolvedValue(null);
+		const r = await CommentService.create({
+			targetType: 'post',
+			targetId: 'p-does-not-exist',
+			...fan,
+			body: 'hi'
+		});
+		expect(r).toEqual({ ok: false, reason: 'invalid_target' });
+		expect(CommentRepository.create).not.toHaveBeenCalled();
+	});
+
 	it('rejects an over-long body', async () => {
 		const r = await CommentService.create({
 			targetType: 'post',

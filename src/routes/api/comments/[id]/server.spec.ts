@@ -5,6 +5,7 @@ vi.mock('$lib/server/comments', () => ({
 }));
 
 import { CommentService } from '$lib/server/comments';
+import { commentWriteLimiter } from '$lib/server/comments/rateLimits';
 import { DELETE } from './+server';
 
 const COMMENT_ID = '22222222-2222-4222-8222-222222222222';
@@ -13,13 +14,17 @@ const evt = (locals: any, id = COMMENT_ID, origin = 'http://localhost') => ({
 	params: { id },
 	locals,
 	url: new URL(`http://localhost/api/comments/${id}`),
+	getClientAddress: () => '1.2.3.4',
 	request: new Request(`http://localhost/api/comments/${id}`, {
 		method: 'DELETE',
 		headers: { origin }
 	})
 });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+	vi.clearAllMocks();
+	commentWriteLimiter.reset();
+});
 
 describe('DELETE /api/comments/[id]', () => {
 	it('401s when not logged in', async () => {
@@ -57,5 +62,15 @@ describe('DELETE /api/comments/[id]', () => {
 		const res = await (DELETE as any)(evt({ user: { id: 'u2' } }, 'not-a-uuid'));
 		expect(res.status).toBe(400);
 		expect(CommentService.delete).not.toHaveBeenCalled();
+	});
+
+	it('429s once the per-user write limit is exceeded', async () => {
+		(CommentService.delete as any).mockResolvedValue({ ok: true });
+		const statuses: number[] = [];
+		for (let i = 0; i < 12; i++) {
+			statuses.push((await (DELETE as any)(evt({ user: { id: 'u2' } }))).status);
+		}
+		expect(statuses.filter((s) => s === 200)).toHaveLength(10);
+		expect(statuses.slice(10)).toEqual([429, 429]);
 	});
 });
