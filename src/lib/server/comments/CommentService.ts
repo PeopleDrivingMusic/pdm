@@ -9,14 +9,22 @@ export interface CommentDTO {
 	id: string;
 	body: string;
 	createdAt: string;
+	editedAt: string | null;
 	author: { id: string; name: string; avatar: string | null };
 	isArtist: boolean;
 	canDelete: boolean;
+	canEdit: boolean;
 }
+
+type WriteRejection = 'empty' | 'too_long' | 'links_not_allowed';
 
 type CreateResult =
 	| { ok: true; comment: CommentDTO }
-	| { ok: false; reason: 'empty' | 'too_long' | 'links_not_allowed' | 'invalid_target' };
+	| { ok: false; reason: WriteRejection | 'invalid_target' };
+
+type EditResult =
+	| { ok: true; comment: CommentDTO }
+	| { ok: false; reason: WriteRejection | 'not_found' | 'forbidden' };
 
 type DeleteResult = { ok: true } | { ok: false; reason: 'not_found' | 'forbidden' };
 
@@ -50,10 +58,14 @@ export class CommentService {
 				name: displayName(r.authorName, r.authorUsername),
 				avatar: r.authorAvatar
 			},
+			editedAt: r.editedAt?.toISOString() ?? null,
 			isArtist: !!ownerUserId && r.authorId === ownerUserId,
+			// The artist-owner may remove a comment (moderation) but never rewrite it —
+			// only the author edits their own words.
 			canDelete:
 				!!input.viewerUserId &&
-				(input.viewerUserId === r.authorId || input.viewerUserId === ownerUserId)
+				(input.viewerUserId === r.authorId || input.viewerUserId === ownerUserId),
+			canEdit: !!input.viewerUserId && input.viewerUserId === r.authorId
 		}));
 	}
 
@@ -102,8 +114,62 @@ export class CommentService {
 					name: displayName(input.authorName, input.authorUsername),
 					avatar: input.authorAvatar
 				},
+				editedAt: null,
 				isArtist: input.authorId === ownerUserId,
-				canDelete: true
+				canDelete: true,
+				canEdit: true
+			}
+		};
+	}
+
+	/**
+	 * Edit a comment's body. Author-only by design: the artist-owner may delete a
+	 * comment (moderation) but must never be able to rewrite someone else's words.
+	 * The link rule is re-applied, since an edit can introduce a URL.
+	 */
+	static async edit(input: {
+		commentId: string;
+		userId: string;
+		authorName: string | null;
+		authorUsername: string | null;
+		authorAvatar: string | null;
+		body: string;
+	}): Promise<EditResult> {
+		const row = await CommentRepository.getById(input.commentId);
+		if (!row || row.deletedAt) return { ok: false, reason: 'not_found' };
+		if (row.authorId !== input.userId) return { ok: false, reason: 'forbidden' };
+
+		const body = input.body.trim();
+		if (!body) return { ok: false, reason: 'empty' };
+		if (body.length > MAX_MESSAGE_LENGTH) return { ok: false, reason: 'too_long' };
+
+		const ownerUserId = await resolveTargetOwnerUserId(
+			row.targetType as CommentTargetType,
+			row.targetId
+		);
+		if (containsUrl(body) && input.userId !== ownerUserId) {
+			return { ok: false, reason: 'links_not_allowed' };
+		}
+
+		const updated = await CommentRepository.updateBody(input.commentId, body);
+		if (!updated) return { ok: false, reason: 'not_found' };
+
+		return {
+			ok: true,
+			comment: {
+				id: updated.id,
+				body: updated.body,
+				createdAt: updated.createdAt.toISOString(),
+				editedAt: updated.editedAt?.toISOString() ?? null,
+				// The editor is the author — use their session identity, same as create.
+				author: {
+					id: updated.authorId,
+					name: displayName(input.authorName, input.authorUsername),
+					avatar: input.authorAvatar
+				},
+				isArtist: updated.authorId === ownerUserId,
+				canDelete: true,
+				canEdit: true
 			}
 		};
 	}

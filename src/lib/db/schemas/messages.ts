@@ -17,6 +17,8 @@ export const comments = messagesDbSchema.table(
 		// Plain uuid (no self-FK yet): threading is deferred; the app owns integrity.
 		parentId: uuid('parent_id'),
 		createdAt: timestamp('created_at').defaultNow().notNull(),
+		// Set on every author edit; null means never edited (drives the "(edited)" mark).
+		editedAt: timestamp('edited_at'),
 		deletedAt: timestamp('deleted_at')
 	},
 	(t) => [

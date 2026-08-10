@@ -6,7 +6,8 @@ vi.mock('$lib/db/services/CommentRepository', () => ({
 		getById: vi.fn(),
 		listForTarget: vi.fn(),
 		countForTargets: vi.fn(),
-		softDelete: vi.fn()
+		softDelete: vi.fn(),
+		updateBody: vi.fn()
 	}
 }));
 // Partial mock: stub only the DB-touching resolver, keep the real containsUrl.
@@ -198,6 +199,135 @@ describe('delete — authz', () => {
 		});
 		const r = await CommentService.delete({ commentId: 'm1', userId: 'u2' });
 		expect(r).toEqual({ ok: false, reason: 'not_found' });
+	});
+});
+
+describe('edit — author only', () => {
+	// Identity comes from the session, exactly like create — never a placeholder.
+	const editorIdentity = { authorName: 'Real Fan', authorUsername: 'fan2', authorAvatar: null };
+	const existing = {
+		id: 'm1',
+		authorId: 'u2',
+		targetType: 'post',
+		targetId: 'p1',
+		body: 'old',
+		createdAt: new Date('2026-08-04T00:00:00Z'),
+		deletedAt: null
+	};
+
+	beforeEach(() => {
+		(CommentRepository.getById as any).mockResolvedValue(existing);
+		(CommentRepository.updateBody as any).mockResolvedValue({
+			...existing,
+			body: 'new text',
+			editedAt: new Date('2026-08-05T00:00:00Z')
+		});
+	});
+
+	it('lets the author edit their own comment and stamps editedAt', async () => {
+		const r = await CommentService.edit({
+			commentId: 'm1',
+			userId: 'u2',
+			...editorIdentity,
+			body: 'new text'
+		});
+		expect(r.ok).toBe(true);
+		if (r.ok) {
+			expect(r.comment.body).toBe('new text');
+			expect(r.comment.editedAt).toBe('2026-08-05T00:00:00.000Z');
+			expect(r.comment.author.name).toBe('Real Fan');
+		}
+		expect(CommentRepository.updateBody).toHaveBeenCalledWith('m1', 'new text');
+	});
+
+	it('forbids the artist-owner from rewriting someone else words', async () => {
+		(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
+		const r = await CommentService.edit({
+			commentId: 'm1',
+			userId: 'owner1',
+			...editorIdentity,
+			body: 'nope'
+		});
+		expect(r).toEqual({ ok: false, reason: 'forbidden' });
+		expect(CommentRepository.updateBody).not.toHaveBeenCalled();
+	});
+
+	it('forbids a stranger', async () => {
+		const r = await CommentService.edit({
+			commentId: 'm1',
+			userId: 'stranger',
+			...editorIdentity,
+			body: 'nope'
+		});
+		expect(r).toEqual({ ok: false, reason: 'forbidden' });
+		expect(CommentRepository.updateBody).not.toHaveBeenCalled();
+	});
+
+	it('reports not_found for a missing comment', async () => {
+		(CommentRepository.getById as any).mockResolvedValue(undefined);
+		const r = await CommentService.edit({
+			commentId: 'gone',
+			userId: 'u2',
+			...editorIdentity,
+			body: 'hi'
+		});
+		expect(r).toEqual({ ok: false, reason: 'not_found' });
+	});
+
+	it('reports not_found for a soft-deleted comment', async () => {
+		(CommentRepository.getById as any).mockResolvedValue({ ...existing, deletedAt: new Date() });
+		const r = await CommentService.edit({
+			commentId: 'm1',
+			userId: 'u2',
+			...editorIdentity,
+			body: 'hi'
+		});
+		expect(r).toEqual({ ok: false, reason: 'not_found' });
+	});
+
+	it('rejects an empty body', async () => {
+		const r = await CommentService.edit({
+			commentId: 'm1',
+			userId: 'u2',
+			...editorIdentity,
+			body: '   '
+		});
+		expect(r).toEqual({ ok: false, reason: 'empty' });
+		expect(CommentRepository.updateBody).not.toHaveBeenCalled();
+	});
+
+	it('rejects an over-long body', async () => {
+		const r = await CommentService.edit({
+			commentId: 'm1',
+			userId: 'u2',
+			...editorIdentity,
+			body: 'x'.repeat(2001)
+		});
+		expect(r).toEqual({ ok: false, reason: 'too_long' });
+	});
+
+	it('re-applies the link rule on edit for a non-owner author', async () => {
+		(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
+		const r = await CommentService.edit({
+			commentId: 'm1',
+			userId: 'u2',
+			...editorIdentity,
+			body: 'now scam.com'
+		});
+		expect(r).toEqual({ ok: false, reason: 'links_not_allowed' });
+		expect(CommentRepository.updateBody).not.toHaveBeenCalled();
+	});
+
+	it('allows a link when the author is the artist-owner', async () => {
+		(CommentRepository.getById as any).mockResolvedValue({ ...existing, authorId: 'owner1' });
+		(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
+		const r = await CommentService.edit({
+			commentId: 'm1',
+			userId: 'owner1',
+			...editorIdentity,
+			body: 'tour scam.com'
+		});
+		expect(r.ok).toBe(true);
 	});
 });
 

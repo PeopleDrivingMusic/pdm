@@ -2,7 +2,12 @@ import { json } from '@sveltejs/kit';
 import { CommentService } from '$lib/server/comments';
 import { commentReadLimiter, commentWriteLimiter } from '$lib/server/comments/rateLimits';
 import type { CommentTargetType } from '$lib/db/services/CommentRepository';
-import { requireSameOrigin, requireUser, isGuardResponse } from '$lib/server/security/guards';
+import {
+	requireSameOrigin,
+	requireUser,
+	isGuardResponse,
+	tooManyRequests
+} from '$lib/server/security/guards';
 import { isUuid } from '$lib/server/security/uuid';
 import type { RequestHandler } from './$types';
 
@@ -20,10 +25,6 @@ function parseTarget(
 	if (typeof targetType !== 'string' || !isUuid(targetId)) return null;
 	if (!COMMENT_TARGET_TYPES.includes(targetType as CommentTargetType)) return null;
 	return { targetType: targetType as CommentTargetType, targetId };
-}
-
-function tooManyRequests() {
-	return json({ error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': '60' } });
 }
 
 export const GET: RequestHandler = async (event) => {

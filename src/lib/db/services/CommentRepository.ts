@@ -8,6 +8,7 @@ export interface CommentWithAuthor {
 	id: string;
 	body: string;
 	createdAt: Date;
+	editedAt: Date | null;
 	authorId: string;
 	authorName: string | null;
 	authorUsername: string | null;
@@ -63,23 +64,26 @@ export class CommentRepository {
 			];
 			if (input.before) conditions.push(lt(comments.createdAt, input.before));
 
-			return db
-				.select({
-					id: comments.id,
-					body: comments.body,
-					createdAt: comments.createdAt,
-					authorId: comments.authorId,
-					authorName: users.displayName,
-					authorUsername: users.username,
-					authorAvatar: users.avatarUrl
-				})
-				.from(comments)
-				.innerJoin(users, eq(comments.authorId, users.id))
-				.where(and(...conditions))
-				.orderBy(desc(comments.createdAt))
-				// Floor at 1: a 0 or negative caller value would yield an empty page or a
-				// Postgres `LIMIT -n` error. Cap at 100 to bound the read.
-				.limit(Math.max(1, Math.min(input.limit ?? 50, 100)));
+			return (
+				db
+					.select({
+						id: comments.id,
+						body: comments.body,
+						createdAt: comments.createdAt,
+						editedAt: comments.editedAt,
+						authorId: comments.authorId,
+						authorName: users.displayName,
+						authorUsername: users.username,
+						authorAvatar: users.avatarUrl
+					})
+					.from(comments)
+					.innerJoin(users, eq(comments.authorId, users.id))
+					.where(and(...conditions))
+					.orderBy(desc(comments.createdAt))
+					// Floor at 1: a 0 or negative caller value would yield an empty page or a
+					// Postgres `LIMIT -n` error. Cap at 100 to bound the read.
+					.limit(Math.max(1, Math.min(input.limit ?? 50, 100)))
+			);
 		});
 	}
 
@@ -101,6 +105,18 @@ export class CommentRepository {
 				)
 				.groupBy(comments.targetId);
 			return new Map(rows.map((r) => [r.targetId, r.count]));
+		});
+	}
+
+	/** Replace a comment's body and stamp `edited_at`. Returns the updated row. */
+	static async updateBody(id: string, body: string): Promise<Comment | undefined> {
+		return withDbLogging('CommentRepository.updateBody', async () => {
+			const [row] = await db
+				.update(comments)
+				.set({ body, editedAt: new Date() })
+				.where(eq(comments.id, id))
+				.returning();
+			return row;
 		});
 	}
 
