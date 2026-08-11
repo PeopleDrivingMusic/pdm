@@ -7,6 +7,15 @@
 /** Content a comment can hang off. Extend this to add a commentable type. */
 export type CommentTargetType = 'post' | 'track';
 
+/** Things a listener can like. Each has its own table with an FK cascade. */
+export type LikeTargetType = 'comment' | 'post';
+
+/** Like state for one target, as the UI renders it. */
+export interface LikeSummary {
+	likeCount: number;
+	likedByViewer: boolean;
+}
+
 /** Author identity as rendered — resolved per read, never stored on the row. */
 export interface MessageAuthor {
 	id: string;
