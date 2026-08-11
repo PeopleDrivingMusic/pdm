@@ -164,7 +164,7 @@ number is what triggers promotion.
 <!-- Maintained by /retro. Hard cap: 60 lines. -->
 
 ## Active rules (promoted)
-- Strict TDD, sliced PRs → memory/strict-tdd-workflow.md
+- Strict TDD, sliced PRs → memory/strict-tdd-workflow.md (survived x7)
 
 ## Recurring — promotion candidates
 - x3 Starts writing code before the slice scope is agreed
@@ -224,10 +224,23 @@ prioritisation that makes the layer useful.
 
 Modelled on the existing wiki lint pass, run periodically:
 
-- A rule not violated for 30 days → move to Retired.
+- **Nothing in this layer is driven by wall-clock time.** PDM is a side project
+  with irregular activity; a month-long gap is normal. A rule that went unbroken
+  because nobody worked on the project has not been tested, and treating elapsed
+  time as evidence would quietly retire exactly the rules a returning session
+  needs most. Every threshold below counts events instead.
+- Each active rule carries a **`survived`** counter: the number of retros written
+  since its promotion in which it did **not** appear under WHAT WAS BAD. It
+  measures opportunities, not calendar. A three-month hiatus advances nothing.
+- **Retirement is never scheduled.** It happens only under pressure on the
+  ten-rule cap (§11): when an eleventh rule is approved, the model presents the
+  active rules ranked by `survived` and proposes retiring the highest. The
+  founder decides. There is no background cleanup.
 - A rule violated **despite** promotion → the formulation is defective; rewrite
-  it. Adding a second rule about the same thing is forbidden.
-- Detail retros older than six months with no link to an active rule → `archive/`.
+  it and reset `survived`. Adding a second rule about the same thing is
+  forbidden.
+- Detail retros beyond the most recent 40 → `archive/`, oldest first. By count,
+  not by age, for the same reason.
 - Digest over 60 lines → compress the oldest entries.
 - Contradictions between an active rule and `CLAUDE.md` → report, do not
   silently resolve.
