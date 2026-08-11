@@ -44,6 +44,7 @@
 								post={variation.post}
 								author={previewAuthor}
 								music={variation.hasMusic ? musicChip : undefined}
+								commentsEnabled={false}
 							/>
 						</div>
 					</div>

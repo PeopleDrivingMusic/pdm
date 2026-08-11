@@ -95,6 +95,21 @@ test('lets the author edit inline and saves the new body', async () => {
 	expect(onEdit).toHaveBeenCalledWith('m1', 'reworded');
 });
 
+test('keeps the editor open with the draft when the edit is refused', async () => {
+	const onEdit = vi.fn().mockResolvedValue(false);
+	render(MessageList, { messages: [comment({ canEdit: true })], onEdit });
+
+	await page.getByRole('button', { name: /more actions/i }).click();
+	await page.getByRole('button', { name: /edit comment/i }).click();
+	const field = page.getByRole('textbox', { name: /edit comment/i });
+	await field.fill('now with scam.com');
+	await page.getByRole('button', { name: /save/i }).click();
+
+	expect(onEdit).toHaveBeenCalledWith('m1', 'now with scam.com');
+	// Still editing, draft intact — the author can correct it instead of retyping.
+	await expect.element(field).toHaveValue('now with scam.com');
+});
+
 test('hides edit when the viewer is not the author', async () => {
 	render(MessageList, { messages: [comment({ canDelete: true })] });
 

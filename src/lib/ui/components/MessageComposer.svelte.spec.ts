@@ -15,6 +15,19 @@ test('submits the trimmed draft and clears the field', async () => {
 	await expect.element(field).toHaveValue('');
 });
 
+test('keeps the draft when the submit is refused, so it can be fixed and resent', async () => {
+	// A refusal (link policy, rate limit, network blip) must not destroy typed text.
+	const onSubmit = vi.fn().mockResolvedValue(false);
+	render(MessageComposer, { onSubmit });
+
+	const field = page.getByRole('textbox');
+	await field.fill('check scam.com out');
+	await page.getByRole('button', { name: /send/i }).click();
+
+	expect(onSubmit).toHaveBeenCalledWith('check scam.com out');
+	await expect.element(field).toHaveValue('check scam.com out');
+});
+
 test('cannot submit an empty or whitespace-only draft', async () => {
 	const onSubmit = vi.fn();
 	render(MessageComposer, { onSubmit });

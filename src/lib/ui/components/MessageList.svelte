@@ -27,7 +27,8 @@
 		onDelete
 	}: {
 		messages: Message[];
-		onEdit?: (id: string, body: string) => Promise<void> | void;
+		/** Resolve `false` to reject the edit — the row stays open with the draft. */
+		onEdit?: (id: string, body: string) => Promise<boolean | void> | boolean | void;
 		onDelete?: (id: string) => Promise<void> | void;
 	} = $props();
 
@@ -37,6 +38,21 @@
 	let busy = $state(false);
 	// Which row has its overflow menu open (only ever one).
 	let menuId = $state<string | null>(null);
+	// Kept so focus can go back where it came from when the menu closes.
+	let triggers: Record<string, HTMLButtonElement | undefined> = {};
+	let editField = $state<HTMLTextAreaElement | null>(null);
+
+	function closeMenu(restoreFocus = false) {
+		const id = menuId;
+		menuId = null;
+		if (restoreFocus && id) triggers[id]?.focus();
+	}
+
+	// Focus the editor as it opens — otherwise a keyboard user has to tab back from
+	// the top of the document to reach the field they just asked for.
+	$effect(() => {
+		if (editingId && editField) editField.focus();
+	});
 
 	// Close the overflow menu on an outside click or Escape. The click handler tests
 	// the target rather than relying on stopPropagation, so the very click that opens
@@ -48,7 +64,7 @@
 			if (!target?.closest?.('.menu-wrap')) menuId = null;
 		};
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') menuId = null;
+			if (event.key === 'Escape') closeMenu(true);
 		};
 		document.addEventListener('click', onClick);
 		document.addEventListener('keydown', onKey);
@@ -78,8 +94,10 @@
 		if (!next || busy) return;
 		busy = true;
 		try {
-			await onEdit?.(id, next);
-			cancelEdit();
+			// Close only on success; a refusal keeps the editor and the draft so the
+			// author can correct it instead of retyping from the original body.
+			const accepted = await onEdit?.(id, next);
+			if (accepted !== false) cancelEdit();
 		} finally {
 			busy = false;
 		}
@@ -119,8 +137,9 @@
 							<button
 								type="button"
 								class="menu-trigger"
+								bind:this={triggers[message.id]}
 								aria-label="More actions"
-								aria-haspopup="true"
+								aria-haspopup="dialog"
 								aria-expanded={menuId === message.id}
 								onclick={() => toggleMenu(message.id)}
 							>
@@ -156,7 +175,12 @@
 
 				{#if editingId === message.id}
 					<div class="edit-row">
-						<textarea bind:value={draft} rows="2" aria-label="Edit comment"></textarea>
+						<textarea
+								bind:this={editField}
+								bind:value={draft}
+								rows="2"
+								aria-label="Edit comment"
+							></textarea>
 						<div class="edit-actions">
 							<Button
 								size="sm"

@@ -21,7 +21,7 @@
 <button
 	type="button"
 	class="comment-toggle"
-	aria-label="Comments"
+	aria-label="Comments ({count})"
 	aria-expanded={expanded}
 	onclick={onToggle}
 >

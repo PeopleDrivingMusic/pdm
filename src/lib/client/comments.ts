@@ -24,7 +24,8 @@ const COMMENT_ERROR_COPY = {
 	forbidden: "You can't do that.",
 	rate_limited: "You're posting too fast — try again in a minute.",
 	invalid_request: 'That comment could not be sent.',
-	invalid_comment_id: 'That comment is no longer available.'
+	invalid_comment_id: 'That comment is no longer available.',
+	unauthorized: 'Sign in to join the conversation.'
 } satisfies Record<CommentErrorCode, string>;
 
 /** Public read: list the comments on a post or track. */
@@ -33,9 +34,8 @@ export async function fetchComments(
 	targetId: string
 ): Promise<CommentsResult> {
 	try {
-		const response = await fetch(`/api/comments?targetType=${targetType}&targetId=${targetId}`, {
-			method: 'GET'
-		});
+		const query = new URLSearchParams({ targetType, targetId });
+		const response = await fetch(`/api/comments?${query}`, { method: 'GET' });
 		if (!response.ok) {
 			return {
 				ok: false,
@@ -43,7 +43,8 @@ export async function fetchComments(
 			};
 		}
 		const body = await response.json();
-		return { ok: true, comments: body.comments ?? [] };
+		// Don't trust the shape: a malformed 200 should read as "no comments", not crash.
+		return { ok: true, comments: Array.isArray(body?.comments) ? body.comments : [] };
 	} catch {
 		return { ok: false, error: 'Could not load comments.' };
 	}
@@ -77,7 +78,7 @@ export async function createComment(
 /** Edit one of your own comments. */
 export async function editComment(commentId: string, body: string): Promise<CommentResult> {
 	try {
-		const response = await fetch(`/api/comments/${commentId}`, {
+		const response = await fetch(`/api/comments/${encodeURIComponent(commentId)}`, {
 			method: 'PUT',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({ body })
@@ -98,7 +99,7 @@ export async function editComment(commentId: string, body: string): Promise<Comm
 /** Delete a comment you authored, or any comment on content you own. */
 export async function deleteComment(commentId: string): Promise<DeleteResult> {
 	try {
-		const response = await fetch(`/api/comments/${commentId}`, { method: 'DELETE' });
+		const response = await fetch(`/api/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' });
 		if (!response.ok) {
 			return {
 				ok: false,

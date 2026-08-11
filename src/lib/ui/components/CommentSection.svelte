@@ -25,16 +25,17 @@
 		targetType: CommentTargetType;
 		targetId: string;
 		isLoggedIn: boolean;
-		onCountChange?: (count: number) => void;
+		/**
+		 * Signed change to the target's comment count. A delta, not a total: the
+		 * list is a capped page while the count is a real `COUNT(*)`, so publishing
+		 * `comments.length` would shrink a thread of 80 down to the page size.
+		 */
+		onCountChange?: (delta: number) => void;
 	} = $props();
 
 	let loading = $state(true);
 	let comments = $state<MessageDTO[]>([]);
 	let error = $state('');
-
-	function publishCount() {
-		onCountChange?.(comments.length);
-	}
 
 	// Load as soon as the panel exists — the parent decides when to mount it.
 	$effect(() => {
@@ -52,28 +53,29 @@
 			return;
 		}
 		comments = result.comments;
-		publishCount();
 	}
 
-	async function post(body: string) {
+	async function post(body: string): Promise<boolean> {
 		error = '';
 		const result = await createComment(targetType, targetId, body);
 		if (!result.ok) {
 			error = result.error;
-			return;
+			return false;
 		}
 		comments = [result.comment, ...comments];
-		publishCount();
+		onCountChange?.(1);
+		return true;
 	}
 
-	async function saveEdit(id: string, body: string) {
+	async function saveEdit(id: string, body: string): Promise<boolean> {
 		error = '';
 		const result = await editComment(id, body);
 		if (!result.ok) {
 			error = result.error;
-			return;
+			return false;
 		}
 		comments = comments.map((entry) => (entry.id === id ? result.comment : entry));
+		return true;
 	}
 
 	async function remove(id: string) {
@@ -84,7 +86,7 @@
 			return;
 		}
 		comments = comments.filter((entry) => entry.id !== id);
-		publishCount();
+		onCountChange?.(-1);
 	}
 </script>
 

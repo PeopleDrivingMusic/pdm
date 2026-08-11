@@ -24,7 +24,10 @@
 	} = $props();
 
 	let expanded = $state(open);
-	let count = $state(initialCount);
+	// Track the viewer's own additions/removals separately so a fresh `initialCount`
+	// from the server still flows through instead of being shadowed by stale state.
+	let countDelta = $state(0);
+	const count = $derived(Math.max(0, initialCount + countDelta));
 </script>
 
 <div class="comment-thread">
@@ -32,7 +35,12 @@
 
 	{#if expanded}
 		<div class="thread-panel">
-			<CommentSection {targetType} {targetId} {isLoggedIn} onCountChange={(n) => (count = n)} />
+			<CommentSection
+				{targetType}
+				{targetId}
+				{isLoggedIn}
+				onCountChange={(delta) => (countDelta += delta)}
+			/>
 		</div>
 	{/if}
 </div>

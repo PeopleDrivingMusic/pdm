@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { mdiChatOutline, mdiHeartOutline, mdiLockOutline } from '@mdi/js';
+	import { mdiHeartOutline, mdiLockOutline } from '@mdi/js';
 	import Avatar from '../../Avatar.svelte';
 	import SvgIcon from '../../SvgIcon.svelte';
 	import PostPoll from '../PostPoll.svelte';
@@ -45,21 +45,23 @@
 		author,
 		music,
 		isLoggedIn = false,
-		onLike,
-		onComment
+		commentsEnabled = true,
+		onLike
 	}: {
 		post: PostCardData;
 		author: { name: string; avatar?: string | null };
 		music?: Snippet;
 		isLoggedIn?: boolean;
+		/** Set false where the post id isn't real (e.g. the design preview fixtures). */
+		commentsEnabled?: boolean;
 		onLike?: () => void;
-		onComment?: () => void;
 	} = $props();
 
 	let showComments = $state(false);
-	// Seeded from the server load, then kept live by the section as the viewer
-	// posts or deletes.
-	let commentCount = $state(post.commentCount);
+	// The server count stays the source of truth (a re-load updates it); the delta
+	// layers the viewer's own posts/deletes on top without shadowing it.
+	let countDelta = $state(0);
+	const commentCount = $derived(Math.max(0, post.commentCount + countDelta));
 
 	function formatDate(value: Date | string | null) {
 		if (!value) return '';
@@ -124,18 +126,18 @@
 		<CommentToggle
 			count={commentCount}
 			expanded={showComments}
-			onToggle={() => (showComments = !showComments)}
+			onToggle={commentsEnabled ? () => (showComments = !showComments) : undefined}
 		/>
 	</footer>
 
 	<!-- Outside the action row on purpose: the panel spans the card's full width. -->
-	{#if showComments}
+	{#if showComments && commentsEnabled}
 		<div class="post-comments">
 			<CommentSection
 				targetType="post"
 				targetId={post.id}
 				{isLoggedIn}
-				onCountChange={(next) => (commentCount = next)}
+				onCountChange={(delta) => (countDelta += delta)}
 			/>
 		</div>
 	{/if}
@@ -144,7 +146,8 @@
 <style lang="scss">
 	.post-card {
 		position: relative;
-		overflow: hidden;
+		// No overflow clip: the comment overflow menu and the emoji picker are
+		// descendants and would be cut off. Media clips itself in PostMediaGrid.
 		width: 100%;
 		max-width: 700px;
 		margin-inline: auto;
@@ -172,7 +175,12 @@
 		}
 	}
 
-	.post-header,
+	.post-header {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+	}
+
 	.post-actions {
 		display: flex;
 		align-items: center;

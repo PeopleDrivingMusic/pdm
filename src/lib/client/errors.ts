@@ -26,7 +26,9 @@ export function messageForCode(
 	copy: Record<string, string>,
 	fallback = GENERIC_ERROR
 ): string {
-	return (code && copy[code]) || fallback;
+	// hasOwn, not `copy[code]`: a code like `constructor` would otherwise resolve to
+	// an inherited Object member instead of falling back.
+	return code && Object.hasOwn(copy, code) ? copy[code] : fallback;
 }
 
 /** Read a failed response and resolve it to user-facing copy in one step. */

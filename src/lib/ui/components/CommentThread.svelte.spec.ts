@@ -50,6 +50,35 @@ const mount = (over: Record<string, unknown> = {}) =>
 		...over
 	});
 
+test('keeps the server count when the loaded page is only part of the thread', async () => {
+	// The list is capped (50 rows); the count is a real COUNT(*). Overwriting the
+	// count with the page length would silently shrink 80 comments to 50.
+	fetchComments.mockResolvedValue({ ok: true, comments: [dto()] });
+	mount({ initialCount: 80 });
+
+	const toggle = page.getByRole('button', { name: /comment/i });
+	await toggle.click();
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+
+	await expect.element(toggle).toHaveTextContent('80');
+});
+
+test('moves the count by one as the viewer posts and deletes', async () => {
+	mount({ initialCount: 80 });
+	const toggle = page.getByRole('button', { name: /comment/i });
+	await toggle.click();
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+
+	await page.getByRole('textbox', { name: /add a comment/i }).fill('brand new');
+	await page.getByRole('button', { name: /send/i }).click();
+	await expect.element(page.getByText('brand new')).toBeInTheDocument();
+	await expect.element(toggle).toHaveTextContent('81');
+
+	await page.getByRole('button', { name: /more actions/i }).first().click();
+	await page.getByRole('button', { name: /delete comment/i }).click();
+	await expect.element(toggle).toHaveTextContent('80');
+});
+
 test('puts the composer above the list so acting needs no scrolling', async () => {
 	mount();
 	await page.getByRole('button', { name: /comment/i }).click();

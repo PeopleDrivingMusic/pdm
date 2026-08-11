@@ -13,7 +13,8 @@
 		disabled?: boolean;
 		placeholder?: string;
 		submitLabel?: string;
-		onSubmit: (body: string) => Promise<void> | void;
+		/** Resolve `false` to reject the draft — the field keeps it so it can be fixed. */
+		onSubmit: (body: string) => Promise<boolean | void> | boolean | void;
 	} = $props();
 
 	let draft = $state('');
@@ -50,6 +51,27 @@
 		}
 	});
 
+	// Same dismissal contract as the message overflow menu: an outside click or
+	// Escape closes it, and focus returns to the toggle rather than being dropped.
+	$effect(() => {
+		if (!showPicker) return;
+		const onClick = (event: MouseEvent) => {
+			const target = event.target as Element | null;
+			if (!target?.closest?.('.picker-anchor, .composer-actions')) showPicker = false;
+		};
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape') return;
+			showPicker = false;
+			field?.focus();
+		};
+		document.addEventListener('click', onClick);
+		document.addEventListener('keydown', onKey);
+		return () => {
+			document.removeEventListener('click', onClick);
+			document.removeEventListener('keydown', onKey);
+		};
+	});
+
 	function addEmoji(event: Event) {
 		const detail = (event as CustomEvent<{ unicode?: string }>).detail;
 		if (detail?.unicode) draft += detail.unicode;
@@ -61,8 +83,10 @@
 		if (!body || busy || disabled) return;
 		busy = true;
 		try {
-			await onSubmit(body);
-			draft = '';
+			// Only clear on an explicit success — a refusal (link policy, rate limit,
+			// network blip) must leave the text in place to correct and resend.
+			const accepted = await onSubmit(body);
+			if (accepted !== false) draft = '';
 		} finally {
 			busy = false;
 		}

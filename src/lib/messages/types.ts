@@ -45,4 +45,5 @@ export type CommentErrorCode =
 	| 'forbidden'
 	| 'rate_limited'
 	| 'invalid_request'
-	| 'invalid_comment_id';
+	| 'invalid_comment_id'
+	| 'unauthorized';

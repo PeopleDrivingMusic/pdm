@@ -35,7 +35,7 @@
 	title={label}
 	onclick={onClick}
 >
-	<SvgIcon {path} size={size === 'sm' ? 18 : 18} />
+	<SvgIcon {path} size={size === 'sm' ? 16 : 18} />
 </button>
 
 <style lang="scss">
@@ -50,34 +50,6 @@
 		border-radius: var(--radius-md);
 		background: var(--bg-surface);
 		color: var(--text-secondary);
-	}
-
-	// Chrome-free: for inline rows where a boxed control would out-weigh its
-	// neighbours (e.g. next to a small Button).
-	.icon-button--ghost {
-		border-color: transparent;
-		background: transparent;
-
-		&:hover:not(:disabled),
-		&:focus-visible {
-			border-color: transparent;
-			background: color-mix(in srgb, var(--bg-tertiary) 70%, transparent);
-		}
-	}
-
-	.icon-button--sm {
-		width: 32px;
-		height: 32px;
-
-		// Stays a 44px target on touch without taking 44px of layout.
-		&::after {
-			content: '';
-			position: absolute;
-			inset: -6px;
-		}
-	}
-
-	.icon-button {
 		cursor: pointer;
 		transition:
 			background-color var(--duration-fast) var(--easing-ease-out),
@@ -98,6 +70,31 @@
 		&:disabled {
 			opacity: 0.5;
 			cursor: not-allowed;
+		}
+	}
+
+	// Declared after the base rule so its transparent border wins the hover state —
+	// same specificity, so order is what decides.
+	.icon-button--ghost {
+		border-color: transparent;
+		background: transparent;
+
+		&:hover:not(:disabled),
+		&:focus-visible {
+			border-color: transparent;
+			background: color-mix(in srgb, var(--bg-tertiary) 70%, transparent);
+		}
+	}
+
+	.icon-button--sm {
+		width: 32px;
+		height: 32px;
+
+		// Stays a 44px target on touch without taking 44px of layout.
+		&::after {
+			content: '';
+			position: absolute;
+			inset: -6px;
 		}
 	}
 

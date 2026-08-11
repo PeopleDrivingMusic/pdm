@@ -1,32 +1,31 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { Renderer, Program, Mesh, Color, Triangle } from 'ogl';
+    import { onMount } from 'svelte';
+    import { Renderer, Program, Mesh, Color, Triangle } from 'ogl';
 
-	interface Props {
-		colorStops?: string[];
-		amplitude?: number;
-		blend?: number;
-		speed?: number;
-	}
-	let {
-		colorStops = ['#5227FF', '#7cff67', '#5227FF'],
-		amplitude = 1.0,
-		blend = 0.5,
-		speed = 10.0
-	}: Props = $props();
+interface Props {
+    colorStops?: string[];
+    amplitude?: number;
+    blend?: number;
+    speed?: number;
+}    let {
+        colorStops = ['#5227FF', '#7cff67', '#5227FF'],
+        amplitude = 1.0,
+        blend = 0.5,
+        speed = 10.0
+    }: Props = $props();
 
-	let containerEl: HTMLDivElement;
-	let animateId = 0;
-	let internalTime = $state(0);
+    let containerEl: HTMLDivElement;
+    let animateId = 0;
+    let internalTime = $state(0);
 
-	const VERT = `#version 300 es
+    const VERT = `#version 300 es
 in vec2 position;
 void main() {
   gl_Position = vec4(position, 0.0, 1.0);
 }
 `;
 
-	const FRAG = `#version 300 es
+    const FRAG = `#version 300 es
 precision highp float;
 
 uniform float uTime;
@@ -125,139 +124,136 @@ void main() {
 }
 `;
 
-	onMount(() => {
-		if (!containerEl) return;
+    onMount(() => {
+        if (!containerEl) return;
 
-		const renderer = new Renderer({
-			alpha: true,
-			premultipliedAlpha: true,
-			antialias: true
-		});
+        const renderer = new Renderer({
+            alpha: true,
+            premultipliedAlpha: true,
+            antialias: true
+        });
 
-		const gl = renderer.gl;
-		gl.clearColor(0, 0, 0, 0);
-		gl.enable(gl.BLEND);
-		gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-		gl.canvas.style.backgroundColor = 'transparent';
+        const gl = renderer.gl;
+        gl.clearColor(0, 0, 0, 0);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.canvas.style.backgroundColor = 'transparent';
 
-		let program: Program | undefined;
-		let resizeObserver: ResizeObserver | undefined;
+        let program: Program | undefined;
+        let resizeObserver: ResizeObserver | undefined;
 
-		let currentWidth = 0;
-		let currentHeight = 0;
-		let targetWidth = 0;
-		let targetHeight = 0;
+        let currentWidth = 0;
+        let currentHeight = 0;
+        let targetWidth = 0;
+        let targetHeight = 0;
 
-		function applySize(width: number, height: number) {
-			renderer.setSize(width, height);
-			if (program) {
-				program.uniforms.uResolution.value = [width, height];
-			}
-		}
+        function applySize(width: number, height: number) {
+            renderer.setSize(width, height);
+            if (program) {
+                program.uniforms.uResolution.value = [width, height];
+            }
+        }
 
-		const geometry = new Triangle(gl);
-		if (geometry.attributes.uv) {
-			delete geometry.attributes.uv;
-		}
+        const geometry = new Triangle(gl);
+        if (geometry.attributes.uv) {
+            delete geometry.attributes.uv;
+        }
 
-		const colorStopsArray = colorStops.map((hex) => {
-			const c = new Color(hex);
-			return [c.r, c.g, c.b];
-		});
+        const colorStopsArray = colorStops.map(hex => {
+            const c = new Color(hex);
+            return [c.r, c.g, c.b];
+        });
 
-		program = new Program(gl, {
-			vertex: VERT,
-			fragment: FRAG,
-			uniforms: {
-				uTime: { value: 0 },
-				uAmplitude: { value: amplitude },
-				uColorStops: { value: colorStopsArray },
-				uResolution: { value: [containerEl.offsetWidth, containerEl.offsetHeight] },
-				uBlend: { value: blend }
-			}
-		});
+        program = new Program(gl, {
+            vertex: VERT,
+            fragment: FRAG,
+            uniforms: {
+                uTime: { value: 0 },
+                uAmplitude: { value: amplitude },
+                uColorStops: { value: colorStopsArray },
+                uResolution: { value: [containerEl.offsetWidth, containerEl.offsetHeight] },
+                uBlend: { value: blend }
+            }
+        });
 
-		const mesh = new Mesh(gl, { geometry, program });
-		containerEl.appendChild(gl.canvas);
+        const mesh = new Mesh(gl, { geometry, program });
+        containerEl.appendChild(gl.canvas);
 
-		let lastTime = 0;
-		const update = (t: number) => {
-			animateId = requestAnimationFrame(update);
+        let lastTime = 0;
+        const update = (t: number) => {
+            animateId = requestAnimationFrame(update);
 
-			if (program) {
-				if (currentWidth === 0 || currentHeight === 0) {
-					currentWidth = targetWidth;
-					currentHeight = targetHeight;
-					applySize(currentWidth, currentHeight);
-				} else if (targetWidth > 0 && targetHeight > 0) {
-					const dt = Math.min((t - lastTime) / 1000, 0.05);
-					const lerp = 1 - Math.pow(0.001, dt);
-					currentWidth += (targetWidth - currentWidth) * lerp;
-					currentHeight += (targetHeight - currentHeight) * lerp;
-					if (
-						Math.abs(targetWidth - currentWidth) > 0.25 ||
-						Math.abs(targetHeight - currentHeight) > 0.25
-					) {
-						applySize(currentWidth, currentHeight);
-					}
-				}
+            if (program) {
+                if (currentWidth === 0 || currentHeight === 0) {
+                    currentWidth = targetWidth;
+                    currentHeight = targetHeight;
+                    applySize(currentWidth, currentHeight);
+                } else if (targetWidth > 0 && targetHeight > 0) {
+                    const dt = Math.min((t - lastTime) / 1000, 0.05);
+                    const lerp = 1 - Math.pow(0.001, dt);
+                    currentWidth += (targetWidth - currentWidth) * lerp;
+                    currentHeight += (targetHeight - currentHeight) * lerp;
+                    if (Math.abs(targetWidth - currentWidth) > 0.25 || Math.abs(targetHeight - currentHeight) > 0.25) {
+                        applySize(currentWidth, currentHeight);
+                    }
+                }
 
-				internalTime = t * 0.001;
-				program.uniforms.uTime.value = internalTime * speed * 0.1;
-				program.uniforms.uAmplitude.value = amplitude;
-				program.uniforms.uBlend.value = blend;
+                internalTime = t * 0.001;
+                program.uniforms.uTime.value = internalTime * speed * 0.1;
+                program.uniforms.uAmplitude.value = amplitude;
+                program.uniforms.uBlend.value = blend;
 
-				const stops = colorStops.map((hex: string) => {
-					const c = new Color(hex);
-					return [c.r, c.g, c.b];
-				});
+                const stops = colorStops.map((hex: string) => {
+                    const c = new Color(hex);
+                    return [c.r, c.g, c.b];
+                });
 
-				program.uniforms.uColorStops.value = stops;
-				renderer.render({ scene: mesh });
-			}
-			lastTime = t;
-		};
+                program.uniforms.uColorStops.value = stops;
+                renderer.render({ scene: mesh });
+            }
+            lastTime = t;
+        };
 
-		resizeObserver = new ResizeObserver((entries) => {
-			const entry = entries[0];
-			if (!entry) return;
-			const { width, height } = entry.contentRect;
-			targetWidth = width;
-			targetHeight = height;
-		});
+        resizeObserver = new ResizeObserver(entries => {
+            const entry = entries[0];
+            if (!entry) return;
+            const { width, height } = entry.contentRect;
+            targetWidth = width;
+            targetHeight = height;
+        });
 
-		resizeObserver.observe(containerEl);
-		animateId = requestAnimationFrame(update);
-		targetWidth = containerEl.offsetWidth;
-		targetHeight = containerEl.offsetHeight;
-		currentWidth = targetWidth;
-		currentHeight = targetHeight;
-		applySize(currentWidth, currentHeight);
+        resizeObserver.observe(containerEl);
+        animateId = requestAnimationFrame(update);
+        targetWidth = containerEl.offsetWidth;
+        targetHeight = containerEl.offsetHeight;
+        currentWidth = targetWidth;
+        currentHeight = targetHeight;
+        applySize(currentWidth, currentHeight);
 
-		return () => {
-			cancelAnimationFrame(animateId);
-			resizeObserver?.disconnect();
-			if (containerEl && gl.canvas.parentNode === containerEl) {
-				containerEl.removeChild(gl.canvas);
-			}
-			gl.getExtension('WEBGL_lose_context')?.loseContext();
-		};
-	});
+        return () => {
+            cancelAnimationFrame(animateId);
+            resizeObserver?.disconnect();
+            if (containerEl && gl.canvas.parentNode === containerEl) {
+                containerEl.removeChild(gl.canvas);
+            }
+            gl.getExtension('WEBGL_lose_context')?.loseContext();
+        };
+    });
 </script>
 
 <div bind:this={containerEl} class="aurora-container"></div>
 
 <style>
-	.aurora-container {
-		width: 100%;
-		height: 100%;
-		position: relative;
-		overflow: hidden;
-	}
+    .aurora-container {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
 
-	.aurora-container :global(canvas) {
-		display: block;
-		width: 100%;
-		height: 100%;
-	}
+    .aurora-container :global(canvas) {
+        display: block;
+        width: 100%;
+        height: 100%;
+    }
 </style>

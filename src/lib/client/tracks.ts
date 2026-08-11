@@ -1,59 +1,65 @@
+
 export class TrackClient {
-	static async toggleLike(trackId: string): Promise<boolean> {
-		try {
-			const response = await fetch(`/api/track/${trackId}/toggle-like`, {
-				method: 'POST'
-			});
+  static async toggleLike(trackId: string): Promise<boolean> {
+    try {
 
-			if (!response.ok) {
-				return false;
-			}
+      const response = await fetch(`/api/track/${trackId}/toggle-like`, {
+        method: 'POST'
+      });
 
-			const data = await response.json();
+      if (!response.ok) {
+        return false;
+      }
 
-			return data.success;
-		} catch (error) {
-			return false;
-		}
-	}
+      const data = await response.json();
 
-	static async saveToPlaylist(trackId: string, playlistId: string): Promise<boolean> {
-		try {
-			const response = await fetch(`/api/track/${trackId}/save`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ playlistId })
-			});
 
-			if (!response.ok) {
-				return false;
-			}
+      return data.success;
+    } catch (error) {
+      return false;
+    }
+  }
 
-			const data = await response.json();
+  static async saveToPlaylist(trackId: string, playlistId: string): Promise<boolean> {
+    try {
 
-			return data.success;
-		} catch (error) {
-			return false;
-		}
-	}
+      const response = await fetch(`/api/track/${trackId}/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playlistId })
+      });
 
-	static async removeFromPlaylist(playlistTrackId: string): Promise<boolean> {
-		try {
-			const response = await fetch(`/api/track/remove-from-playlist`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ playlistTrackId })
-			});
+      if (!response.ok) {
+        return false;
+      }
 
-			if (!response.ok) {
-				return false;
-			}
+      const data = await response.json();
 
-			const data = await response.json();
+      return data.success;
+    } catch (error) {
+      return false;
+    }
+  }
 
-			return data.success;
-		} catch (error) {
-			return false;
-		}
-	}
+  static async removeFromPlaylist(playlistTrackId: string): Promise<boolean> {
+    try {
+
+      const response = await fetch(`/api/track/remove-from-playlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playlistTrackId })
+      });
+
+      if (!response.ok) {
+        
+        return false;
+      }
+
+      const data = await response.json();
+
+      return data.success;
+    } catch (error) {
+      return false;
+    }
+  }
 }
