@@ -23,13 +23,9 @@
 
 	const { poll }: { poll: Poll } = $props();
 
-	const isClosed = $derived(
-		poll.closesAt ? new Date(poll.closesAt).getTime() <= Date.now() : false
-	);
+	const isClosed = $derived(poll.closesAt ? new Date(poll.closesAt).getTime() <= Date.now() : false);
 	const canShowResults = $derived(
-		poll.showResults === 'always' ||
-			poll.hasVoted ||
-			(poll.showResults === 'after_close' && isClosed)
+		poll.showResults === 'always' || poll.hasVoted || (poll.showResults === 'after_close' && isClosed)
 	);
 
 	function percent(votes: number) {
@@ -47,9 +43,7 @@
 			{#if poll.question}
 				<h4>{poll.question}</h4>
 			{/if}
-			<p>
-				{poll.mode === 'multiple' ? 'Multiple choice' : 'Single choice'} · {poll.totalVotes} votes
-			</p>
+			<p>{poll.mode === 'multiple' ? 'Multiple choice' : 'Single choice'} · {poll.totalVotes} votes</p>
 		</div>
 	</div>
 

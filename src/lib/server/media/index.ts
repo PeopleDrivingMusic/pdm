@@ -1,5 +1,1 @@
-export {
-	MediaUploadService,
-	type MediaUploadTarget,
-	type StoredUploadTarget
-} from './MediaUploadService';
+export { MediaUploadService, type MediaUploadTarget, type StoredUploadTarget } from './MediaUploadService';

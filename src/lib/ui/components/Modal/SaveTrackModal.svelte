@@ -132,8 +132,7 @@
 								<div class="playlist-content">
 									<div class="playlist-name">{playlist.name}</div>
 									<div class="playlist-meta">
-										{playlist.trackCount}
-										{playlist.trackCount === 1 ? 'track' : 'tracks'}
+										{playlist.trackCount} {playlist.trackCount === 1 ? 'track' : 'tracks'}
 									</div>
 								</div>
 								<div class="playlist-action">

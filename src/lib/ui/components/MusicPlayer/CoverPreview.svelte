@@ -27,16 +27,17 @@
 		playerStore.que[playerStore.currentTrackIndex]
 	);
 	let showSaveModal = $state(false);
-	let saveTrackId = $state('');
-	const coverUrl = $derived(
-		resolveR2ImageUrl(track.imageUrl || album?.coverImageUrl || artist?.avatar)
-	);
+	let saveTrackId = $state("")
+	const coverUrl = $derived(resolveR2ImageUrl(track.imageUrl || album?.coverImageUrl || artist?.avatar));
 </script>
 
 <SaveTrackModal trackId={saveTrackId} bind:show={showSaveModal}></SaveTrackModal>
 
 <div class="preview">
-	<div class="track-bg" style:background-image={coverUrl ? `url('${coverUrl}')` : undefined}></div>
+	<div
+		class="track-bg"
+		style:background-image={coverUrl ? `url('${coverUrl}')` : undefined}
+	></div>
 	<div class="info-box">
 		<Tabs type="underline" showTrack={true} tabs={views} activeTab={views[0]} />
 		<div class="artist-wrapper">
@@ -77,13 +78,10 @@
 				</button><button class="action-button icon-button">
 					<SvgIcon path={mdiRocketLaunchOutline} size={24} />
 				</button>
-				<button
-					class="action-button icon-button"
-					onclick={() => {
+				<button class="action-button icon-button"  onclick={() => {
 						saveTrackId = track.id;
 						showSaveModal = true;
-					}}
-				>
+					}} >
 					<SvgIcon path={mdiBookmarkOutline} size={24} />
 				</button>
 				<button class="action-button icon-button">

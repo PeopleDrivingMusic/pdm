@@ -25,9 +25,7 @@
 	const track = $derived(currentTrack?.track);
 	const artist = $derived(currentTrack?.artist);
 	const album = $derived(currentTrack?.album);
-	const coverUrl = $derived(
-		resolveR2ImageUrl(track?.imageUrl || album?.coverImageUrl || artist?.avatar)
-	);
+	const coverUrl = $derived(resolveR2ImageUrl(track?.imageUrl || album?.coverImageUrl || artist?.avatar));
 	const isLiked = $derived(currentTrack?.isLiked ?? false);
 	const socialTabs = [
 		{ id: 'lyrics', label: 'Lyrics' },
