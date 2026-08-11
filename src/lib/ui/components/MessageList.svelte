@@ -379,19 +379,22 @@
 		margin-top: var(--space-2);
 	}
 
-	// Reply and other per-message actions join this row later.
+	// Reply and other per-message actions join this row later. The negative inset
+	// cancels the first button's padding so the row lines up with the body text
+	// instead of sitting indented under it.
 	.row-actions {
 		display: flex;
 		align-items: center;
-		gap: var(--space-2);
-		margin-top: var(--space-1);
+		gap: var(--space-1);
+		margin-top: 2px;
+		margin-left: calc(var(--space-1) * -1);
 	}
 
 	.like {
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-1);
-		height: 28px;
+		height: 26px;
 		padding: 0 var(--space-1);
 		border: none;
 		border-radius: var(--radius-md);

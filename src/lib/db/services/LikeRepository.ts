@@ -21,19 +21,28 @@ export class LikeRepository {
 		userId: string
 	): Promise<boolean> {
 		return withDbLogging('LikeRepository.toggle', async () => {
-			const { table, targetColumn } = TABLES[targetType];
+			// Written per table on purpose: `values()` takes the TS property name
+			// (`commentId`), not the column name, so a computed key silently produced an
+			// invalid row. Explicit branches keep it type-checked instead of casting.
+			if (targetType === 'comment') {
+				const deleted = await db
+					.delete(commentLikes)
+					.where(and(eq(commentLikes.commentId, targetId), eq(commentLikes.userId, userId)))
+					.returning({ id: commentLikes.id });
+				if (deleted.length > 0) return false;
+
+				// The unique constraint makes a double-click a no-op, not a duplicate.
+				await db.insert(commentLikes).values({ commentId: targetId, userId }).onConflictDoNothing();
+				return true;
+			}
 
 			const deleted = await db
-				.delete(table)
-				.where(and(eq(targetColumn, targetId), eq(table.userId, userId)))
-				.returning({ id: table.id });
+				.delete(postLikes)
+				.where(and(eq(postLikes.postId, targetId), eq(postLikes.userId, userId)))
+				.returning({ id: postLikes.id });
 			if (deleted.length > 0) return false;
 
-			// The unique constraint makes a double-click a no-op rather than a duplicate.
-			await db
-				.insert(table)
-				.values({ [targetColumn.name]: targetId, userId } as never)
-				.onConflictDoNothing();
+			await db.insert(postLikes).values({ postId: targetId, userId }).onConflictDoNothing();
 			return true;
 		});
 	}
