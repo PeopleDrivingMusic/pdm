@@ -43,10 +43,17 @@
 		load();
 	});
 
+	// Guards against a slow response for an earlier target landing after a newer one
+	// and rendering the wrong thread.
+	let loadToken = 0;
+
 	async function load() {
+		const token = ++loadToken;
 		loading = true;
 		error = '';
 		const result = await fetchComments(targetType, targetId);
+		if (token !== loadToken) return;
+
 		loading = false;
 		if (!result.ok) {
 			error = result.error;
@@ -90,7 +97,7 @@
 	}
 </script>
 
-<div class="comment-section">
+<div class="comment-section" aria-busy={loading}>
 	<!-- Composer first: acting shouldn't require scrolling past the whole thread. -->
 	{#if isLoggedIn}
 		<MessageComposer onSubmit={post} />

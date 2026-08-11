@@ -1,5 +1,5 @@
 import type { CommentDTO, CommentErrorCode, CommentTargetType } from '$lib/messages/types';
-import { errorMessage } from './errors';
+import { errorMessage, GENERIC_ERROR } from './errors';
 
 export type { CommentTargetType };
 
@@ -69,6 +69,7 @@ export async function createComment(
 			};
 		}
 		const payload = await response.json();
+		if (!payload?.comment?.id) return { ok: false, error: GENERIC_ERROR };
 		return { ok: true, comment: payload.comment };
 	} catch {
 		return { ok: false, error: 'Could not post your comment.' };
@@ -90,6 +91,7 @@ export async function editComment(commentId: string, body: string): Promise<Comm
 			};
 		}
 		const payload = await response.json();
+		if (!payload?.comment?.id) return { ok: false, error: GENERIC_ERROR };
 		return { ok: true, comment: payload.comment };
 	} catch {
 		return { ok: false, error: 'Could not save your edit.' };

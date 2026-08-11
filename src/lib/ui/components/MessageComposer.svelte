@@ -25,7 +25,8 @@
 
 	// Grow with the content instead of reserving space up front: reset to one row,
 	// then take the scroll height, capped so a long draft scrolls rather than
-	// pushing the page around.
+	// pushing the page around. The cap is applied here and mirrored to CSS from the
+	// same constant so the two can't drift.
 	const MAX_HEIGHT = 200;
 	function autoGrow() {
 		if (!field) return;
@@ -73,9 +74,22 @@
 	});
 
 	function addEmoji(event: Event) {
-		const detail = (event as CustomEvent<{ unicode?: string }>).detail;
-		if (detail?.unicode) draft += detail.unicode;
+		const emoji = (event as CustomEvent<{ unicode?: string }>).detail?.unicode;
 		showPicker = false;
+		if (!emoji) return;
+
+		// Insert at the caret rather than appending — picking an emoji mid-sentence
+		// should not jump it to the end of the draft.
+		const start = field?.selectionStart ?? draft.length;
+		const end = field?.selectionEnd ?? draft.length;
+		draft = draft.slice(0, start) + emoji + draft.slice(end);
+
+		const caret = start + emoji.length;
+		// Restore focus and caret after Svelte has written the new value.
+		requestAnimationFrame(() => {
+			field?.focus();
+			field?.setSelectionRange(caret, caret);
+		});
 	}
 
 	async function submit() {
@@ -102,12 +116,13 @@
 
 <div class="composer">
 	<textarea
+		style:max-height="{MAX_HEIGHT}px"
 		bind:this={field}
 		bind:value={draft}
 		{placeholder}
 		{disabled}
 		rows="1"
-		aria-label={placeholder}
+		aria-label={placeholder || 'Write a message'}
 		onkeydown={onKeydown}
 	></textarea>
 
@@ -155,7 +170,6 @@
 		// Height is driven by the content (autoGrow); manual resize would fight it.
 		resize: none;
 		overflow-y: auto;
-		max-height: 200px;
 
 		&:disabled {
 			opacity: 0.6;
