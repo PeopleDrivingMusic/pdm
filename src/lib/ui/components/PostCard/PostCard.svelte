@@ -176,7 +176,9 @@
 	.post-actions {
 		display: flex;
 		align-items: center;
-		gap: var(--space-3);
+		// Each control already carries its own tap padding, so they read as a group
+		// with only a hairline gap — a larger one leaves them floating apart.
+		gap: var(--space-1);
 	}
 
 	.post-comments {

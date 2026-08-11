@@ -211,14 +211,17 @@
 		color: var(--text-secondary);
 	}
 
-	// Pushes the overflow trigger to the right edge of the row (YouTube-style).
+	// Pinned to the row's top-right and taken out of the flow: in-flow it would
+	// stretch `.message-meta` to the trigger's height, so rows with actions sat
+	// taller than rows without and the author/body baselines drifted between them.
 	.menu-wrap {
-		position: relative;
-		margin-left: auto;
+		position: absolute;
+		top: 0;
+		right: 0;
 	}
 
 	.menu-trigger {
-		display: inline-flex;
+		display: flex;
 		align-items: center;
 		justify-content: center;
 		width: 28px;

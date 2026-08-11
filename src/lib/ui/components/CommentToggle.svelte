@@ -33,10 +33,10 @@
 	.comment-toggle {
 		display: inline-flex;
 		align-items: center;
-		gap: var(--space-2);
+		gap: var(--space-1);
 		// Comfortable tap target on touch screens.
 		min-height: 44px;
-		padding: 0 var(--space-2);
+		padding: 0 var(--space-1);
 		border: none;
 		border-radius: var(--radius-md);
 		background: transparent;

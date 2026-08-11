@@ -91,6 +91,8 @@
 		<IconButton
 			path={mdiEmoticonOutline}
 			label="Add emoji"
+			variant="ghost"
+			size="sm"
 			active={showPicker}
 			disabled={disabled || !pickerReady}
 			onClick={() => (showPicker = !showPicker)}
