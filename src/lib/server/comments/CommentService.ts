@@ -5,16 +5,9 @@ import {
 	MAX_MESSAGE_LENGTH
 } from '$lib/server/messages/policy';
 
-export interface CommentDTO {
-	id: string;
-	body: string;
-	createdAt: string;
-	editedAt: string | null;
-	author: { id: string; name: string; avatar: string | null };
-	isArtist: boolean;
-	canDelete: boolean;
-	canEdit: boolean;
-}
+import type { CommentDTO } from '$lib/messages/types';
+
+export type { CommentDTO };
 
 type WriteRejection = 'empty' | 'too_long' | 'links_not_allowed';
 

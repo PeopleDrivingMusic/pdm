@@ -126,7 +126,7 @@
 							<h2>Posts</h2>
 						</div>
 					</div>
-					<ArtistPosts {artist} {tracks} {albums} {content} />
+					<ArtistPosts {artist} {tracks} {albums} {content} isLoggedIn={viewer.isLoggedIn} />
 				</section>
 			{:else if activeTab.id === 'photos'}
 				<section class="section-block">

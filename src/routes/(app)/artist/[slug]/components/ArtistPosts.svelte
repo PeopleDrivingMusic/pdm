@@ -9,12 +9,14 @@
 		artist,
 		tracks,
 		albums,
-		content
+		content,
+		isLoggedIn = false
 	}: {
 		artist: PageData['artist'];
 		tracks: PageData['tracks'];
 		albums: PageData['albums'];
 		content: PageData['content'];
+		isLoggedIn?: boolean;
 	} = $props();
 </script>
 
@@ -54,6 +56,7 @@
 							{post}
 							author={{ name: artist.name, avatar: artist.avatar }}
 							music={post.musicAttachments.length ? music : undefined}
+							{isLoggedIn}
 						/>
 					{/each}
 				</div>

@@ -1,10 +1,12 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { mdiChatOutline, mdiHeartOutline, mdiLockOutline } from '@mdi/js';
+	import { mdiHeartOutline, mdiLockOutline } from '@mdi/js';
 	import Avatar from '../../Avatar.svelte';
 	import SvgIcon from '../../SvgIcon.svelte';
 	import PostPoll from '../PostPoll.svelte';
 	import PostMediaGrid from './PostMediaGrid.svelte';
+	import CommentToggle from '../CommentToggle.svelte';
+	import CommentSection from '../CommentSection.svelte';
 
 	interface PostMediaItem {
 		id: string;
@@ -26,12 +28,14 @@
 	}
 
 	interface PostCardData {
+		id: string;
 		title: string;
 		excerpt: string | null;
 		bodyHtml: string | null;
 		visibility: string;
 		publishedAt: Date | string | null;
 		isLocked: boolean;
+		commentCount: number;
 		media: PostMediaItem[];
 		poll: Poll | null;
 	}
@@ -40,15 +44,24 @@
 		post,
 		author,
 		music,
-		onLike,
-		onComment
+		isLoggedIn = false,
+		commentsEnabled = true,
+		onLike
 	}: {
 		post: PostCardData;
 		author: { name: string; avatar?: string | null };
 		music?: Snippet;
+		isLoggedIn?: boolean;
+		/** Set false where the post id isn't real (e.g. the design preview fixtures). */
+		commentsEnabled?: boolean;
 		onLike?: () => void;
-		onComment?: () => void;
 	} = $props();
+
+	let showComments = $state(false);
+	// The server count stays the source of truth (a re-load updates it); the delta
+	// layers the viewer's own posts/deletes on top without shadowing it.
+	let countDelta = $state(0);
+	const commentCount = $derived(Math.max(0, post.commentCount + countDelta));
 
 	function formatDate(value: Date | string | null) {
 		if (!value) return '';
@@ -110,16 +123,31 @@
 		<button aria-label="Like post" onclick={onLike}>
 			<SvgIcon path={mdiHeartOutline} size={20} />
 		</button>
-		<button aria-label="Comment on post" onclick={onComment}>
-			<SvgIcon path={mdiChatOutline} size={20} />
-		</button>
+		<CommentToggle
+			count={commentCount}
+			expanded={showComments}
+			onToggle={commentsEnabled ? () => (showComments = !showComments) : undefined}
+		/>
 	</footer>
+
+	<!-- Outside the action row on purpose: the panel spans the card's full width. -->
+	{#if showComments && commentsEnabled}
+		<div class="post-comments">
+			<CommentSection
+				targetType="post"
+				targetId={post.id}
+				{isLoggedIn}
+				onCountChange={(delta) => (countDelta += delta)}
+			/>
+		</div>
+	{/if}
 </article>
 
 <style lang="scss">
 	.post-card {
 		position: relative;
-		overflow: hidden;
+		// No overflow clip: the comment overflow menu and the emoji picker are
+		// descendants and would be cut off. Media clips itself in PostMediaGrid.
 		width: 100%;
 		max-width: 700px;
 		margin-inline: auto;
@@ -147,11 +175,24 @@
 		}
 	}
 
-	.post-header,
-	.post-actions {
+	.post-header {
 		display: flex;
 		align-items: center;
 		gap: var(--space-3);
+	}
+
+	.post-actions {
+		display: flex;
+		align-items: center;
+		// Each control already carries its own tap padding, so they read as a group
+		// with only a hairline gap — a larger one leaves them floating apart.
+		gap: var(--space-1);
+	}
+
+	.post-comments {
+		margin-top: var(--space-3);
+		padding-top: var(--space-4);
+		border-top: 1px solid color-mix(in srgb, var(--border-primary) 55%, transparent);
 	}
 
 	.post-content {

@@ -53,11 +53,13 @@
 ### Task 1: `messages` schema + `messages.comments` table + migration
 
 **Files:**
+
 - Create: `src/lib/db/schemas/messages.ts`
 - Modify: `src/lib/db/schema.ts`
 - Create: migration under `drizzle/migrations/`
 
 **Interfaces:**
+
 - Produces: schema `messages`; table `comments` (`id, targetType, targetId, authorId, body, parentId, createdAt, deletedAt`); type exports `Comment` (`$inferSelect`), `NewComment` (`$inferInsert`).
 
 - [ ] **Step 1: Create `src/lib/db/schemas/messages.ts`**
@@ -139,9 +141,11 @@ git commit -m "feat(messages): add messages schema + comments table"
 ### Task 2: `CommentRepository` (DB layer)
 
 **Files:**
+
 - Create: `src/lib/db/services/CommentRepository.ts`
 
 **Interfaces:**
+
 - Consumes: `db`, `withDbLogging` from `src/lib/db/index.ts`; `comments`, `users`, `Comment` from `src/lib/db/schema`.
 - Produces: `CommentTargetType`, `CommentWithAuthor`, and `CommentRepository` with:
   - `create(input: { targetType: CommentTargetType; targetId: string; authorId: string; body: string; parentId?: string | null }): Promise<Comment>`
@@ -285,10 +289,12 @@ git commit -m "feat(comments): add CommentRepository DB layer"
 ### Task 3: Message write policy — link rule + target-owner resolver (TDD)
 
 **Files:**
+
 - Create: `src/lib/server/messages/policy.ts`
 - Test: `src/lib/server/messages/policy.spec.ts`
 
 **Interfaces:**
+
 - Produces: `MessageTargetType`, `MAX_MESSAGE_LENGTH`, `containsUrl(body: string): boolean`, `resolveTargetOwnerUserId(targetType: MessageTargetType, targetId: string): Promise<string | null>`.
 - Consumes: `ArtistService`, `TrackService` from `$lib/db/queries`; `db` + `posts` for the post branch.
 
@@ -312,10 +318,13 @@ import { containsUrl, resolveTargetOwnerUserId } from './policy';
 beforeEach(() => vi.clearAllMocks());
 
 describe('containsUrl', () => {
-	it('detects an http(s) url', () => expect(containsUrl('check https://evil.test/x out')).toBe(true));
+	it('detects an http(s) url', () =>
+		expect(containsUrl('check https://evil.test/x out')).toBe(true));
 	it('detects a bare www domain', () => expect(containsUrl('go to www.evil.test now')).toBe(true));
-	it('detects a bare domain with a path', () => expect(containsUrl('evil.test/promo is great')).toBe(true));
-	it('passes plain prose', () => expect(containsUrl('this track absolutely slaps, well done')).toBe(false));
+	it('detects a bare domain with a path', () =>
+		expect(containsUrl('evil.test/promo is great')).toBe(true));
+	it('passes plain prose', () =>
+		expect(containsUrl('this track absolutely slaps, well done')).toBe(false));
 	it('passes emoji + text', () => expect(containsUrl('🔥🔥 love this 🎸')).toBe(false));
 });
 
@@ -357,8 +366,7 @@ export const MAX_MESSAGE_LENGTH = 2000;
 // Conservative URL sniffing for the link policy. Matches http(s)://, bare www., and
 // bare domain.tld(/path). Deliberately broad: a false positive on a non-owner message
 // is acceptable (they just can't post links); only the artist-owner may include URLs.
-const URL_PATTERN =
-	/(https?:\/\/|www\.)[^\s]+|(?<![\w@.])[a-z0-9-]+(\.[a-z]{2,})+(\/[^\s]*)?/i;
+const URL_PATTERN = /(https?:\/\/|www\.)[^\s]+|(?<![\w@.])[a-z0-9-]+(\.[a-z]{2,})+(\/[^\s]*)?/i;
 
 export function containsUrl(body: string): boolean {
 	return URL_PATTERN.test(body);
@@ -411,11 +419,13 @@ git commit -m "feat(messages): write policy — link rule + target-owner resolve
 ### Task 4: `CommentService` boundary + DTO (TDD)
 
 **Files:**
+
 - Create: `src/lib/server/comments/CommentService.ts`
 - Create: `src/lib/server/comments/index.ts`
 - Test: `src/lib/server/comments/CommentService.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `CommentRepository` (Task 2), `containsUrl` + `resolveTargetOwnerUserId` + `MAX_MESSAGE_LENGTH` (Task 3).
 - Produces: `CommentDTO`, and `CommentService` with:
   - `listForTarget(input: { targetType: CommentTargetType; targetId: string; viewerUserId: string | null }): Promise<CommentDTO[]>`
@@ -464,18 +474,33 @@ beforeEach(() => {
 
 describe('create — comments are free (no entitlement)', () => {
 	it('never calls the entitlement gate', async () => {
-		await CommentService.create({ targetType: 'post', targetId: 'p1', authorId: 'u2', body: 'nice' });
+		await CommentService.create({
+			targetType: 'post',
+			targetId: 'p1',
+			authorId: 'u2',
+			body: 'nice'
+		});
 		expect(EntitlementService.isSubscriberOf).not.toHaveBeenCalled();
 	});
 
 	it('rejects an empty body', async () => {
-		const r = await CommentService.create({ targetType: 'post', targetId: 'p1', authorId: 'u2', body: '   ' });
+		const r = await CommentService.create({
+			targetType: 'post',
+			targetId: 'p1',
+			authorId: 'u2',
+			body: '   '
+		});
 		expect(r).toEqual({ ok: false, reason: 'empty' });
 		expect(CommentRepository.create).not.toHaveBeenCalled();
 	});
 
 	it('rejects a non-content target type', async () => {
-		const r = await CommentService.create({ targetType: 'artist' as any, targetId: 'a1', authorId: 'u2', body: 'hi' });
+		const r = await CommentService.create({
+			targetType: 'artist' as any,
+			targetId: 'a1',
+			authorId: 'u2',
+			body: 'hi'
+		});
 		expect(r).toEqual({ ok: false, reason: 'invalid_target' });
 	});
 });
@@ -483,14 +508,24 @@ describe('create — comments are free (no entitlement)', () => {
 describe('create — link policy', () => {
 	it('rejects a URL from a non-owner', async () => {
 		(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
-		const r = await CommentService.create({ targetType: 'post', targetId: 'p1', authorId: 'u2', body: 'see https://x.test' });
+		const r = await CommentService.create({
+			targetType: 'post',
+			targetId: 'p1',
+			authorId: 'u2',
+			body: 'see https://x.test'
+		});
 		expect(r).toEqual({ ok: false, reason: 'links_not_allowed' });
 		expect(CommentRepository.create).not.toHaveBeenCalled();
 	});
 
 	it('allows a URL from the artist-owner', async () => {
 		(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
-		const r = await CommentService.create({ targetType: 'post', targetId: 'p1', authorId: 'owner1', body: 'my tour https://x.test' });
+		const r = await CommentService.create({
+			targetType: 'post',
+			targetId: 'p1',
+			authorId: 'owner1',
+			body: 'my tour https://x.test'
+		});
 		expect(r.ok).toBe(true);
 		expect(CommentRepository.create).toHaveBeenCalled();
 	});
@@ -498,21 +533,36 @@ describe('create — link policy', () => {
 
 describe('delete — authz', () => {
 	it('allows the author', async () => {
-		(CommentRepository.getById as any).mockResolvedValue({ id: 'm1', authorId: 'u2', targetType: 'post', targetId: 'p1' });
+		(CommentRepository.getById as any).mockResolvedValue({
+			id: 'm1',
+			authorId: 'u2',
+			targetType: 'post',
+			targetId: 'p1'
+		});
 		const r = await CommentService.delete({ commentId: 'm1', userId: 'u2' });
 		expect(r).toEqual({ ok: true });
 		expect(CommentRepository.softDelete).toHaveBeenCalledWith('m1');
 	});
 
 	it('allows the artist-owner of the target', async () => {
-		(CommentRepository.getById as any).mockResolvedValue({ id: 'm1', authorId: 'u2', targetType: 'post', targetId: 'p1' });
+		(CommentRepository.getById as any).mockResolvedValue({
+			id: 'm1',
+			authorId: 'u2',
+			targetType: 'post',
+			targetId: 'p1'
+		});
 		(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
 		const r = await CommentService.delete({ commentId: 'm1', userId: 'owner1' });
 		expect(r).toEqual({ ok: true });
 	});
 
 	it('forbids a stranger', async () => {
-		(CommentRepository.getById as any).mockResolvedValue({ id: 'm1', authorId: 'u2', targetType: 'post', targetId: 'p1' });
+		(CommentRepository.getById as any).mockResolvedValue({
+			id: 'm1',
+			authorId: 'u2',
+			targetType: 'post',
+			targetId: 'p1'
+		});
 		(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
 		const r = await CommentService.delete({ commentId: 'm1', userId: 'stranger' });
 		expect(r).toEqual({ ok: false, reason: 'forbidden' });
@@ -530,9 +580,21 @@ describe('listForTarget — DTO shape', () => {
 	it('marks the artist-owner and computes canDelete', async () => {
 		(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
 		(CommentRepository.listForTarget as any).mockResolvedValue([
-			{ id: 'm1', body: 'hi', createdAt: new Date('2026-08-04T00:00:00Z'), authorId: 'owner1', authorName: 'The Artist', authorUsername: 'artist', authorAvatar: null }
+			{
+				id: 'm1',
+				body: 'hi',
+				createdAt: new Date('2026-08-04T00:00:00Z'),
+				authorId: 'owner1',
+				authorName: 'The Artist',
+				authorUsername: 'artist',
+				authorAvatar: null
+			}
 		]);
-		const [dto] = await CommentService.listForTarget({ targetType: 'post', targetId: 'p1', viewerUserId: 'u2' });
+		const [dto] = await CommentService.listForTarget({
+			targetType: 'post',
+			targetId: 'p1',
+			viewerUserId: 'u2'
+		});
 		expect(dto.isArtist).toBe(true);
 		expect(dto.author.name).toBe('The Artist');
 		expect(dto.canDelete).toBe(false);
@@ -582,7 +644,11 @@ export class CommentService {
 			id: r.id,
 			body: r.body,
 			createdAt: r.createdAt.toISOString(),
-			author: { id: r.authorId, name: r.authorName ?? r.authorUsername ?? 'Listener', avatar: r.authorAvatar },
+			author: {
+				id: r.authorId,
+				name: r.authorName ?? r.authorUsername ?? 'Listener',
+				avatar: r.authorAvatar
+			},
 			isArtist: !!ownerUserId && r.authorId === ownerUserId,
 			canDelete:
 				!!input.viewerUserId &&
@@ -676,12 +742,14 @@ git commit -m "feat(comments): CommentService boundary + DTO with policy tests"
 ### Task 5: `/api/comments` endpoints (TDD)
 
 **Files:**
+
 - Create: `src/routes/api/comments/+server.ts`
 - Test: `src/routes/api/comments/server.spec.ts`
 - Create: `src/routes/api/comments/[id]/+server.ts`
 - Test: `src/routes/api/comments/[id]/server.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `CommentService` (Task 4); `requireSameOrigin`, `requireUser`, `isGuardResponse` from `src/lib/server/security/guards.ts`; `createRateLimiter` from `src/lib/server/security/rateLimiter.ts`.
 - Produces: `GET /api/comments?targetType=&targetId=` (public list); `POST /api/comments` (create, guarded, rate-limited → 429); `DELETE /api/comments/[id]` (guarded, authz).
 
@@ -748,7 +816,12 @@ describe('POST', () => {
 			})
 		});
 		expect(res.status).toBe(201);
-		expect(CommentService.create).toHaveBeenCalledWith({ targetType: 'post', targetId: 'p1', authorId: 'u2', body: 'hi' });
+		expect(CommentService.create).toHaveBeenCalledWith({
+			targetType: 'post',
+			targetId: 'p1',
+			authorId: 'u2',
+			body: 'hi'
+		});
 	});
 
 	it('422s a rejected comment (e.g. links)', async () => {
@@ -810,7 +883,12 @@ export const POST: RequestHandler = async (event) => {
 
 	const payload = await event.request.json().catch(() => null);
 	const targetType = payload?.targetType as CommentTargetType;
-	if (!payload || (targetType !== 'post' && targetType !== 'track') || typeof payload.targetId !== 'string' || typeof payload.body !== 'string') {
+	if (
+		!payload ||
+		(targetType !== 'post' && targetType !== 'track') ||
+		typeof payload.targetId !== 'string' ||
+		typeof payload.body !== 'string'
+	) {
 		return json({ error: 'Invalid request' }, { status: 400 });
 	}
 
@@ -920,9 +998,11 @@ git commit -m "feat(comments): /api/comments GET/POST/DELETE with guards + rate 
 ### Task 6: Wire `commentCount` into the artist page load (compute-on-read)
 
 **Files:**
+
 - Modify: `src/lib/db/services/ContentService.ts` (`ArtistPublicContentService.getArtistContent`, ~1108-1460)
 
 **Interfaces:**
+
 - Consumes: `CommentRepository.countForTargets` (Task 2).
 - Produces: each returned post DTO carries `commentCount: number`.
 
@@ -958,11 +1038,13 @@ git commit -m "feat(comments): compute-on-read commentCount on artist posts"
 ### Task 7: Shared `MessageList` + `MessageComposer` UI (emoji picker)
 
 **Files:**
+
 - Create: `src/lib/ui/components/MessageList.svelte`
 - Create: `src/lib/ui/components/MessageComposer.svelte`
 - Modify: `package.json` (add `emoji-picker-element`)
 
 **Interfaces:**
+
 - `MessageList` props: `messages: CommentDTO[]`, `onDelete?: (id: string) => void`.
 - `MessageComposer` props: `disabled?: boolean`, `placeholder?: string`, `onSubmit: (body: string) => Promise<void> | void`.
 - These are **context-agnostic** — reused by `CommentThread` (this slice) and the fan chat / player later (requirement #5).
@@ -983,8 +1065,15 @@ Render each message: `Avatar` (existing `$lib/ui/Avatar.svelte`), author name, a
 	import { onMount } from 'svelte';
 	import { Button } from '$lib/ui';
 
-	let { disabled = false, placeholder = 'Add a comment…', onSubmit }:
-		{ disabled?: boolean; placeholder?: string; onSubmit: (body: string) => Promise<void> | void } = $props();
+	let {
+		disabled = false,
+		placeholder = 'Add a comment…',
+		onSubmit
+	}: {
+		disabled?: boolean;
+		placeholder?: string;
+		onSubmit: (body: string) => Promise<void> | void;
+	} = $props();
 
 	let body = $state('');
 	let showPicker = $state(false);
@@ -1016,10 +1105,23 @@ Render each message: `Avatar` (existing `$lib/ui/Avatar.svelte`), author name, a
 </script>
 
 <div class="composer">
-	<textarea bind:value={body} {placeholder} {disabled} rows="2"
-		onkeydown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(); }}></textarea>
+	<textarea
+		bind:value={body}
+		{placeholder}
+		{disabled}
+		rows="2"
+		onkeydown={(e) => {
+			if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit();
+		}}
+	></textarea>
 	<div class="composer-actions">
-		<button type="button" class="emoji-btn" onclick={() => (showPicker = !showPicker)} disabled={disabled || !pickerLoaded} aria-label="Add emoji">🙂</button>
+		<button
+			type="button"
+			class="emoji-btn"
+			onclick={() => (showPicker = !showPicker)}
+			disabled={disabled || !pickerLoaded}
+			aria-label="Add emoji">🙂</button
+		>
 		<Button onClick={submit} disabled={disabled || busy || !body.trim()}>Send</Button>
 	</div>
 	{#if showPicker && pickerLoaded}
@@ -1044,11 +1146,13 @@ git commit -m "feat(ui): reusable MessageList + MessageComposer with emoji picke
 ### Task 8: `CommentThread` + `PostCard` wiring
 
 **Files:**
+
 - Create: `src/lib/ui/components/CommentThread.svelte`
 - Modify: `src/lib/ui/components/PostCard/PostCard.svelte`
 - Modify: `src/routes/(app)/artist/[slug]/components/ArtistPosts.svelte`
 
 **Interfaces:**
+
 - `CommentThread` props: `targetType: 'post' | 'track'`, `targetId: string`, `isLoggedIn: boolean`, `initialCount?: number`.
 - Consumes: `/api/comments` (Task 5), `MessageList` + `MessageComposer` (Task 7).
 
@@ -1088,11 +1192,13 @@ git commit -m "feat(comments): CommentThread + post comment UI on the artist pag
 ### Task 9: E2E + full verification + PR
 
 **Files:**
+
 - Create: `e2e/comments.spec.ts`
 
 - [ ] **Step 1: Write the E2E spec** (real DB via the ephemeral `pdm_e2e` pattern, screenshots per the #21 convention using `testInfo.outputPath(...)`)
 
 Drive the artist page and assert:
+
 1. **Anonymous** — opening a post's comments shows existing comments (read is public) and a "Log in to comment" prompt (no composer).
 2. **Logged-in listener** — posts a comment → it appears at the top, the post's comment count increments.
 3. **Link policy** — the same listener posting a body containing `https://…` gets the inline "links aren't allowed" error and no new comment.
@@ -1143,7 +1249,7 @@ impossible there). DRY is preserved at the **service + UI** layer via one generi
 
 **Soft-delete nuance:** comments are soft-deleted (`deleted_at`), so FK cascade only
 fires on **hard** delete (e.g. parent post deleted → comments hard-deleted →
-their `comment_likes` cascade). Likes on a *moderated* (soft-deleted) comment linger
+their `comment_likes` cascade). Likes on a _moderated_ (soft-deleted) comment linger
 by design; clear them app-side in `CommentService.delete` only if product wants it
 (out of scope now).
 
@@ -1196,11 +1302,22 @@ export type LikeTargetType = 'comment' | 'post';
 
 export class LikeService {
 	// toggle → returns the new liked state; insert onConflictDoNothing / delete.
-	static async toggle(targetType: LikeTargetType, targetId: string, userId: string): Promise<boolean>;
+	static async toggle(
+		targetType: LikeTargetType,
+		targetId: string,
+		userId: string
+	): Promise<boolean>;
 	// grouped count per target — compute-on-read, same shape as CommentRepository.countForTargets.
-	static async countForTargets(targetType: LikeTargetType, targetIds: string[]): Promise<Map<string, number>>;
+	static async countForTargets(
+		targetType: LikeTargetType,
+		targetIds: string[]
+	): Promise<Map<string, number>>;
 	// the subset of targetIds the viewer has liked (mirrors the poll viewerVoteRows pattern).
-	static async likedByUser(userId: string, targetType: LikeTargetType, targetIds: string[]): Promise<Set<string>>;
+	static async likedByUser(
+		userId: string,
+		targetType: LikeTargetType,
+		targetIds: string[]
+	): Promise<Set<string>>;
 }
 ```
 
@@ -1241,10 +1358,18 @@ Enable experimental remote functions; upgrade chat `query` → `query.live` fed 
 - **Name consistency:** DB `CommentRepository.{create,getById,listForTarget,countForTargets,softDelete,deleteForTarget}`; boundary `CommentService.{listForTarget,create,delete,countsForPosts}`; policy `resolveTargetOwnerUserId` / `containsUrl` / `MAX_MESSAGE_LENGTH` / `MessageTargetType`; DB `CommentTargetType = 'post' | 'track'`; DTO `CommentDTO`; type exports `Comment`/`NewComment`. Endpoints: `GET/POST /api/comments`, `DELETE /api/comments/[id]`.
 - **Risks flagged in-plan:** migration must emit `CREATE SCHEMA "messages"` (add manually if drizzle-kit omits it; #25 → `db:push` fallback); custom-element typing for `emoji-picker-element` (small `.d.ts` shim); `CommentRepository` behavior pinned by E2E not db-mock units (matches `SubscriptionService` precedent).
 - **Independent review follow-ups (PR1 / #26, 2026-08-05):**
-  - **PR5 (pagination):** `CommentRepository.listForTarget` keyset cursor must move from `lt(createdAt)` to a composite `(createdAt, id)` cursor — `created_at` is not unique, so a same-timestamp boundary silently drops rows. Add a `beforeId` param, order by `(createdAt desc, id desc)`, and predicate `(created_at, id) < (before, beforeId)`. Land it with the pagination E2E (test-first). *(The `before` param is currently unused — no caller — so this is latent until pagination is wired.)*
+  - **PR5 (pagination):** `CommentRepository.listForTarget` keyset cursor must move from `lt(createdAt)` to a composite `(createdAt, id)` cursor — `created_at` is not unique, so a same-timestamp boundary silently drops rows. Add a `beforeId` param, order by `(createdAt desc, id desc)`, and predicate `(created_at, id) < (before, beforeId)`. Land it with the pagination E2E (test-first). _(The `before` param is currently unused — no caller — so this is latent until pagination is wired.)_
   - **Content-deletion path (whichever slice touches it):** wire `CommentRepository.deleteForTarget('post'|'track', id)` into `PostService.deletePost` and the track-delete path — polymorphic `target_id` has no FK, so comments orphan on parent delete unless cleaned in app code.
   - **Soft-delete garbage collection (same deletion slice):** add `CommentRepository.purgeSoftDeleted(olderThan: Date, batch = 1000): Promise<number>` — batched hard-delete of rows where `deleted_at IS NOT NULL AND deleted_at < olderThan` (loops until 0 affected; hard-delete cascades `comment_likes` via FK). TDD: purge removes rows older than the window, leaves fresh soft-deleted + all non-deleted untouched. Expose via a thin **authenticated** `POST /api/admin/purge-comments` (shared-secret guard). **Trigger deferred** — no scheduler exists yet; pattern + job registry recorded in wiki `[[scheduled-jobs]]` (option A: logic-in-service + external cron via Vercel Cron / pg_cron / system cron per deploy target). Default retention 30 days, configurable.
   - **Applied in PR1:** `limit` floored at 1 (`Math.max(1, Math.min(limit ?? 50, 100))`).
   - **PR4 (endpoints):** validate `targetId` is a UUID before it reaches `resolveTargetOwnerUserId` / the repository — a malformed id otherwise triggers Postgres `invalid input syntax for type uuid` (→ 500); return 400 instead. (Independent review of PR2 / #27, finding #3.)
   - **Applied in PR2:** `containsUrl` tightened so missing-space prose typos (`amazing.Keep`, `Node.js`) no longer read as links (finding #1); `post`-branch query + obfuscation limits remain E2E-pinned / out-of-scope as documented.
+
+- **Tech debt deferred out of PR5 (founder review, 2026-08-11):**
+  - **E2E should seed through production code, not raw SQL.** `e2e/comments.spec.ts` arranges fixtures with direct `insert into messages.comments …`. Act+assert already run the full production stack (browser → endpoint → `CommentService` → repository), so the risk is narrow: SQL could write a row shape the service would never produce, and the test would pass on impossible data. Two ways out — (a) seed comments via `POST /api/comments` with a session cookie (no env plumbing, every seeded row takes the real write path), or (b) call `CommentService` directly, which needs `TEST_DATABASE_URL` injected into the Playwright process because `$lib/server/db` reads `DATABASE_URL` (the dev DB). Prefer (a). Note `e2e/artist-subscription.spec.ts` has the same SQL-seeding shape, so fix both together.
+  - **`/login` cannot return the user to where they were.** It only reads `?error` today. Until it supports `?redirectTo=`, the comment thread keeps a plain "Log in to comment" **link** rather than redirecting on composer focus: an auto-redirect would drop the reader out of the artist page, losing scroll position and the open thread, and strand them on the home page after signing in. When `redirectTo` lands, switch to focus-to-login (let them start typing, then prompt) and return them to the same post with the thread open.
+  - **Pagination on the read path** — the repository already supports keyset (`limit`/`before`) but `GET /api/comments` does not expose them, so a target with thousands of comments loads the newest 50 with no way to page. Ship together with the `(createdAt, id)` cursor fix above; if the first page ever moves into `load` for SSR, that is where SvelteKit's `event.fetch` becomes the right call (the current browser-event-handler calls correctly use global `fetch`).
+
+```
+
 ```

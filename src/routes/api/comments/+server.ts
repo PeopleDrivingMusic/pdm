@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { CommentService } from '$lib/server/comments';
 import { commentReadLimiter, commentWriteLimiter } from '$lib/server/comments/rateLimits';
-import type { CommentTargetType } from '$lib/db/services/CommentRepository';
+import type { CommentTargetType } from '$lib/messages/types';
 import {
 	requireSameOrigin,
 	requireUser,
