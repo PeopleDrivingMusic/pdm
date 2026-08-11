@@ -115,3 +115,29 @@ export async function deleteComment(commentId: string): Promise<DeleteResult> {
 		return { ok: false, error: 'Could not delete that comment.' };
 	}
 }
+
+export type LikeResult = Ok<{ liked: boolean; likeCount: number }> | Fail;
+
+/** Toggle the current user's like on a comment or a post. */
+export async function toggleLike(
+	targetType: 'comment' | 'post',
+	targetId: string
+): Promise<LikeResult> {
+	try {
+		const response = await fetch('/api/likes', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ targetType, targetId })
+		});
+		if (!response.ok) {
+			return {
+				ok: false,
+				error: await errorMessage(response, COMMENT_ERROR_COPY, 'Could not register your like.')
+			};
+		}
+		const payload = await response.json();
+		return { ok: true, liked: Boolean(payload?.liked), likeCount: Number(payload?.likeCount ?? 0) };
+	} catch {
+		return { ok: false, error: 'Could not register your like.' };
+	}
+}

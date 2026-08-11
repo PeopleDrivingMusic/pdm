@@ -7,6 +7,7 @@
 		createComment,
 		editComment,
 		deleteComment,
+		toggleLike,
 		type CommentTargetType
 	} from '$lib/client/comments';
 	import type { MessageDTO } from '$lib/messages/types';
@@ -85,6 +86,22 @@
 		return true;
 	}
 
+	async function toggleCommentLike(id: string) {
+		error = '';
+		const result = await toggleLike('comment', id);
+		if (!result.ok) {
+			error = result.error;
+			return;
+		}
+		// Take the server's count rather than incrementing: another reader may have
+		// liked the same comment since this page loaded.
+		comments = comments.map((entry) =>
+			entry.id === id
+				? { ...entry, likeCount: result.likeCount, likedByViewer: result.liked }
+				: entry
+		);
+	}
+
 	async function remove(id: string) {
 		error = '';
 		const result = await deleteComment(id);
@@ -119,7 +136,12 @@
 			{/each}
 		</div>
 	{:else if comments.length}
-		<MessageList messages={comments} onEdit={saveEdit} onDelete={remove} />
+		<MessageList
+			messages={comments}
+			onEdit={saveEdit}
+			onDelete={remove}
+			onToggleLike={isLoggedIn ? toggleCommentLike : undefined}
+		/>
 	{:else if !error}
 		<p class="section-note">No comments yet. Be the first.</p>
 	{/if}

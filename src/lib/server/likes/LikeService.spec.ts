@@ -8,10 +8,18 @@ vi.mock('$lib/db/services/LikeRepository', () => ({
 	}
 }));
 
+vi.mock('$lib/server/messages/access', () => ({
+	resolveTargetAccess: vi.fn()
+}));
+
 import { LikeRepository } from '$lib/db/services/LikeRepository';
+import { resolveTargetAccess } from '$lib/server/messages/access';
 import { LikeService } from './LikeService';
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+	vi.clearAllMocks();
+	(resolveTargetAccess as any).mockResolvedValue({ ok: true, ownerUserId: 'owner1' });
+});
 
 describe('toggle', () => {
 	it('likes a comment and reports the new state', async () => {
@@ -46,6 +54,26 @@ describe('toggle', () => {
 
 		await LikeService.toggle('post', 'p1', 'u1');
 		expect(LikeRepository.toggle).toHaveBeenCalledWith('post', 'p1', 'u1');
+	});
+
+	it('refuses a target the viewer cannot see, without writing a like', async () => {
+		// Liking must not be easier than reading: a draft or gated post is off limits,
+		// and no count comes back to leak activity on it.
+		(resolveTargetAccess as any).mockResolvedValue({ ok: false });
+
+		const result = await LikeService.toggle('post', 'p1', 'u1');
+
+		expect(result).toEqual({ ok: false, reason: 'invalid_target' });
+		expect(LikeRepository.toggle).not.toHaveBeenCalled();
+		expect(LikeRepository.countForTargets).not.toHaveBeenCalled();
+	});
+
+	it('checks access before touching the like table', async () => {
+		(LikeRepository.toggle as any).mockResolvedValue(true);
+		(LikeRepository.countForTargets as any).mockResolvedValue(new Map([['c1', 1]]));
+
+		await LikeService.toggle('comment', 'c1', 'u1');
+		expect(resolveTargetAccess).toHaveBeenCalledWith('comment', 'c1', 'u1');
 	});
 
 	it('rejects an unknown target type without touching the DB', async () => {

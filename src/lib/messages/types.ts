@@ -36,6 +36,8 @@ export interface MessageDTO {
 	isArtist: boolean;
 	canDelete: boolean;
 	canEdit: boolean;
+	likeCount: number;
+	likedByViewer: boolean;
 }
 
 export type CommentDTO = MessageDTO;

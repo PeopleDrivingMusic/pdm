@@ -1,4 +1,5 @@
 import { LikeRepository } from '$lib/db/services/LikeRepository';
+import { resolveTargetAccess } from '$lib/server/messages/access';
 import type { LikeSummary, LikeTargetType } from '$lib/messages/types';
 
 const LIKE_TARGET_TYPES: LikeTargetType[] = ['comment', 'post'];
@@ -22,6 +23,13 @@ export class LikeService {
 		if (!LIKE_TARGET_TYPES.includes(targetType)) {
 			return { ok: false, reason: 'invalid_target' };
 		}
+
+		// Writing must not be easier than reading. Without this, a caller could like
+		// an unpublished draft or a subscribers-only post they can't see, and the
+		// returned count would leak engagement on gated content. It also keeps a
+		// nonexistent id from reaching the FK and surfacing as a 500.
+		const access = await resolveTargetAccess(targetType, targetId, userId);
+		if (!access.ok) return { ok: false, reason: 'invalid_target' };
 
 		const liked = await LikeRepository.toggle(targetType, targetId, userId);
 		// Re-read rather than trusting an increment: two tabs can race the same row.

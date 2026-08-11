@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { mdiPencilOutline, mdiTrashCanOutline, mdiDotsVertical } from '@mdi/js';
+	import {
+		mdiPencilOutline,
+		mdiTrashCanOutline,
+		mdiDotsVertical,
+		mdiHeart,
+		mdiHeartOutline
+	} from '@mdi/js';
 	import Avatar from '../Avatar.svelte';
 	import SvgIcon from '../SvgIcon.svelte';
 	import Button from '../Button.svelte';
@@ -19,17 +25,21 @@
 		isArtist: boolean;
 		canDelete: boolean;
 		canEdit: boolean;
+		likeCount: number;
+		likedByViewer: boolean;
 	}
 
 	let {
 		messages,
 		onEdit,
-		onDelete
+		onDelete,
+		onToggleLike
 	}: {
 		messages: Message[];
 		/** Resolve `false` to reject the edit — the row stays open with the draft. */
 		onEdit?: (id: string, body: string) => Promise<boolean | void> | boolean | void;
 		onDelete?: (id: string) => Promise<void> | void;
+		onToggleLike?: (id: string) => Promise<void> | void;
 	} = $props();
 
 	// Which row is currently in edit mode, plus its draft.
@@ -193,6 +203,23 @@
 				{:else}
 					<!-- Plain text on purpose: never {@html} user input. -->
 					<p class="text">{message.body}</p>
+
+					<!-- Row actions. Reply slots in here next to the like. -->
+					<div class="row-actions">
+						<button
+							type="button"
+							class="like"
+							class:is-liked={message.likedByViewer}
+							aria-label={message.likedByViewer ? 'Unlike comment' : 'Like comment'}
+							aria-pressed={message.likedByViewer}
+							onclick={() => onToggleLike?.(message.id)}
+						>
+							<SvgIcon path={message.likedByViewer ? mdiHeart : mdiHeartOutline} size={16} />
+							{#if message.likeCount > 0}
+								<span>{message.likeCount}</span>
+							{/if}
+						</button>
+					</div>
 				{/if}
 			</div>
 		</li>
@@ -350,5 +377,42 @@
 		display: flex;
 		gap: var(--space-2);
 		margin-top: var(--space-2);
+	}
+
+	// Reply and other per-message actions join this row later.
+	.row-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		margin-top: var(--space-1);
+	}
+
+	.like {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-1);
+		height: 28px;
+		padding: 0 var(--space-1);
+		border: none;
+		border-radius: var(--radius-md);
+		background: transparent;
+		color: var(--text-secondary);
+		font-size: var(--font-size-xs);
+		cursor: pointer;
+		// Compact visually, still a 44px tap target.
+		position: relative;
+		&::after {
+			content: '';
+			position: absolute;
+			inset: -8px;
+		}
+
+		&:hover {
+			color: var(--text-primary);
+		}
+
+		&.is-liked {
+			color: var(--primary);
+		}
 	}
 </style>
