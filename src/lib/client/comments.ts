@@ -99,7 +99,9 @@ export async function editComment(commentId: string, body: string): Promise<Comm
 /** Delete a comment you authored, or any comment on content you own. */
 export async function deleteComment(commentId: string): Promise<DeleteResult> {
 	try {
-		const response = await fetch(`/api/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' });
+		const response = await fetch(`/api/comments/${encodeURIComponent(commentId)}`, {
+			method: 'DELETE'
+		});
 		if (!response.ok) {
 			return {
 				ok: false,

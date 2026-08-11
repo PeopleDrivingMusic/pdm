@@ -175,12 +175,8 @@
 
 				{#if editingId === message.id}
 					<div class="edit-row">
-						<textarea
-								bind:this={editField}
-								bind:value={draft}
-								rows="2"
-								aria-label="Edit comment"
-							></textarea>
+						<textarea bind:this={editField} bind:value={draft} rows="2" aria-label="Edit comment"
+						></textarea>
 						<div class="edit-actions">
 							<Button
 								size="sm"
