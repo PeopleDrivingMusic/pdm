@@ -13,5 +13,7 @@ export { default as InfoMessage } from './InfoMessage.svelte';
 export { default as MessageList } from './components/MessageList.svelte';
 export { default as MessageComposer } from './components/MessageComposer.svelte';
 export { default as CommentThread } from './components/CommentThread.svelte';
+export { default as CommentToggle } from './components/CommentToggle.svelte';
+export { default as CommentSection } from './components/CommentSection.svelte';
 export { default as NotificationContainer } from './NotificationContainer.svelte';
 export { notificationStore } from '$lib/stores/notification.svelte';

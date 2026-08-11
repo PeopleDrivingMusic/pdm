@@ -50,6 +50,33 @@ const mount = (over: Record<string, unknown> = {}) =>
 		...over
 	});
 
+test('puts the composer above the list so acting needs no scrolling', async () => {
+	mount();
+	await page.getByRole('button', { name: /comment/i }).click();
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+
+	const composer = page.getByRole('textbox', { name: /add a comment/i }).element();
+	const list = page.getByText('This track slaps').element();
+
+	// DOCUMENT_POSITION_FOLLOWING === the list comes after the composer.
+	expect(composer.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test('shows a skeleton while the comments load, not a text placeholder', async () => {
+	let release: (value: unknown) => void = () => {};
+	fetchComments.mockReturnValue(new Promise((resolve) => (release = resolve)));
+
+	mount();
+	await page.getByRole('button', { name: /comment/i }).click();
+
+	await expect.element(page.getByTestId('comment-skeleton')).toBeInTheDocument();
+	await expect.element(page.getByText('Loading comments…')).not.toBeInTheDocument();
+
+	release({ ok: true, comments: [dto()] });
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+	await expect.element(page.getByTestId('comment-skeleton')).not.toBeInTheDocument();
+});
+
 test('does not fetch until the thread is opened', async () => {
 	mount();
 	await expect.element(page.getByRole('button', { name: /comment/i })).toBeInTheDocument();
@@ -96,6 +123,7 @@ test('deleting removes the comment from the list', async () => {
 	await page.getByRole('button', { name: /comment/i }).click();
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 
+	await page.getByRole('button', { name: /more actions/i }).click();
 	await page.getByRole('button', { name: /delete comment/i }).click();
 
 	expect(deleteComment).toHaveBeenCalledWith('m1');
@@ -107,6 +135,7 @@ test('editing replaces the body in place', async () => {
 	await page.getByRole('button', { name: /comment/i }).click();
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 
+	await page.getByRole('button', { name: /more actions/i }).click();
 	await page.getByRole('button', { name: /edit comment/i }).click();
 	await page.getByRole('textbox', { name: /edit comment/i }).fill('reworded');
 	await page.getByRole('button', { name: /save/i }).click();

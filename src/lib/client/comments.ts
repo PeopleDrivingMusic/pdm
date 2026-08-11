@@ -1,6 +1,7 @@
-import type { CommentDTO } from '$lib/server/comments';
+import type { CommentDTO, CommentErrorCode, CommentTargetType } from '$lib/messages/types';
+import { errorMessage } from './errors';
 
-export type CommentTargetType = 'post' | 'track';
+export type { CommentTargetType };
 
 type Ok<T> = { ok: true } & T;
 type Fail = { ok: false; error: string };
@@ -9,42 +10,22 @@ export type CommentsResult = Ok<{ comments: CommentDTO[] }> | Fail;
 export type CommentResult = Ok<{ comment: CommentDTO }> | Fail;
 export type DeleteResult = { ok: true } | Fail;
 
-const GENERIC = 'Something went wrong. Please try again.';
-
-/** Map a server error code to copy a listener can act on. */
-function messageFor(code: unknown, fallback = GENERIC): string {
-	switch (code) {
-		case 'links_not_allowed':
-			return 'Links are not allowed here — only the artist can post links.';
-		case 'rate_limited':
-			return "You're posting too fast — try again in a minute.";
-		case 'empty':
-			return 'Write something first.';
-		case 'too_long':
-			return 'That comment is too long.';
-		case 'not_found':
-			return 'That comment is no longer available.';
-		case 'forbidden':
-			return "You can't do that.";
-		default:
-			return fallback;
-	}
-}
-
-async function readError(response: Response, fallback = GENERIC): Promise<string> {
-	try {
-		const body = await response.json();
-		return messageFor(body?.error, fallback);
-	} catch {
-		return fallback;
-	}
-}
-
-const jsonRequest = (method: 'POST' | 'PUT', body: unknown): RequestInit => ({
-	method,
-	headers: { 'content-type': 'application/json' },
-	body: JSON.stringify(body)
-});
+/**
+ * Copy for every code the comment endpoints can return. `satisfies` makes this
+ * exhaustive: add a `CommentErrorCode` without copy here and the build fails,
+ * so a new server error can't silently degrade to the generic message.
+ */
+const COMMENT_ERROR_COPY = {
+	empty: 'Write something first.',
+	too_long: 'That comment is too long.',
+	links_not_allowed: 'Links are not allowed here — only the artist can post links.',
+	invalid_target: 'That post is no longer available.',
+	not_found: 'That comment is no longer available.',
+	forbidden: "You can't do that.",
+	rate_limited: "You're posting too fast — try again in a minute.",
+	invalid_request: 'That comment could not be sent.',
+	invalid_comment_id: 'That comment is no longer available.'
+} satisfies Record<CommentErrorCode, string>;
 
 /** Public read: list the comments on a post or track. */
 export async function fetchComments(
@@ -55,8 +36,12 @@ export async function fetchComments(
 		const response = await fetch(`/api/comments?targetType=${targetType}&targetId=${targetId}`, {
 			method: 'GET'
 		});
-		if (!response.ok)
-			return { ok: false, error: await readError(response, 'Could not load comments.') };
+		if (!response.ok) {
+			return {
+				ok: false,
+				error: await errorMessage(response, COMMENT_ERROR_COPY, 'Could not load comments.')
+			};
+		}
 		const body = await response.json();
 		return { ok: true, comments: body.comments ?? [] };
 	} catch {
@@ -71,12 +56,17 @@ export async function createComment(
 	body: string
 ): Promise<CommentResult> {
 	try {
-		const response = await fetch(
-			'/api/comments',
-			jsonRequest('POST', { targetType, targetId, body })
-		);
-		if (!response.ok)
-			return { ok: false, error: await readError(response, 'Could not post your comment.') };
+		const response = await fetch('/api/comments', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ targetType, targetId, body })
+		});
+		if (!response.ok) {
+			return {
+				ok: false,
+				error: await errorMessage(response, COMMENT_ERROR_COPY, 'Could not post your comment.')
+			};
+		}
 		const payload = await response.json();
 		return { ok: true, comment: payload.comment };
 	} catch {
@@ -87,9 +77,17 @@ export async function createComment(
 /** Edit one of your own comments. */
 export async function editComment(commentId: string, body: string): Promise<CommentResult> {
 	try {
-		const response = await fetch(`/api/comments/${commentId}`, jsonRequest('PUT', { body }));
-		if (!response.ok)
-			return { ok: false, error: await readError(response, 'Could not save your edit.') };
+		const response = await fetch(`/api/comments/${commentId}`, {
+			method: 'PUT',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ body })
+		});
+		if (!response.ok) {
+			return {
+				ok: false,
+				error: await errorMessage(response, COMMENT_ERROR_COPY, 'Could not save your edit.')
+			};
+		}
 		const payload = await response.json();
 		return { ok: true, comment: payload.comment };
 	} catch {
@@ -101,8 +99,12 @@ export async function editComment(commentId: string, body: string): Promise<Comm
 export async function deleteComment(commentId: string): Promise<DeleteResult> {
 	try {
 		const response = await fetch(`/api/comments/${commentId}`, { method: 'DELETE' });
-		if (!response.ok)
-			return { ok: false, error: await readError(response, 'Could not delete that comment.') };
+		if (!response.ok) {
+			return {
+				ok: false,
+				error: await errorMessage(response, COMMENT_ERROR_COPY, 'Could not delete that comment.')
+			};
+		}
 		return { ok: true };
 	} catch {
 		return { ok: false, error: 'Could not delete that comment.' };

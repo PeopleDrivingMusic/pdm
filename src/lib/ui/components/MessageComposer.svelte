@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { mdiEmoticonOutline } from '@mdi/js';
 	import Button from '../Button.svelte';
-	import SvgIcon from '../SvgIcon.svelte';
+	import IconButton from '../IconButton.svelte';
 
 	let {
 		disabled = false,
@@ -20,6 +20,23 @@
 	let busy = $state(false);
 	let showPicker = $state(false);
 	let pickerReady = $state(false);
+	let field = $state<HTMLTextAreaElement | null>(null);
+
+	// Grow with the content instead of reserving space up front: reset to one row,
+	// then take the scroll height, capped so a long draft scrolls rather than
+	// pushing the page around.
+	const MAX_HEIGHT = 200;
+	function autoGrow() {
+		if (!field) return;
+		field.style.height = 'auto';
+		field.style.height = `${Math.min(field.scrollHeight, MAX_HEIGHT)}px`;
+	}
+
+	// Re-measure whenever the draft changes — typing, emoji insert, or a reset.
+	$effect(() => {
+		void draft;
+		autoGrow();
+	});
 
 	// `emoji-picker-element` is a custom element built on IndexedDB — it only exists in
 	// the browser, so load it after mount to keep this component SSR-safe.
@@ -61,24 +78,23 @@
 
 <div class="composer">
 	<textarea
+		bind:this={field}
 		bind:value={draft}
 		{placeholder}
 		{disabled}
-		rows="2"
+		rows="1"
 		aria-label={placeholder}
 		onkeydown={onKeydown}
 	></textarea>
 
 	<div class="composer-actions">
-		<button
-			type="button"
-			class="emoji-toggle"
-			aria-label="Add emoji"
+		<IconButton
+			path={mdiEmoticonOutline}
+			label="Add emoji"
+			active={showPicker}
 			disabled={disabled || !pickerReady}
-			onclick={() => (showPicker = !showPicker)}
-		>
-			<SvgIcon path={mdiEmoticonOutline} size={20} />
-		</button>
+			onClick={() => (showPicker = !showPicker)}
+		/>
 
 		<Button size="sm" onClick={submit} disabled={disabled || busy || !draft.trim()}>
 			{submitLabel}
@@ -87,7 +103,6 @@
 
 	{#if showPicker && pickerReady}
 		<div class="picker-anchor">
-			<!-- svelte-ignore element_invalid_self_closing_tag -->
 			<emoji-picker onemoji-click={addEmoji}></emoji-picker>
 		</div>
 	{/if}
@@ -111,7 +126,10 @@
 		color: var(--text-primary);
 		font: inherit;
 		font-size: var(--font-size-sm);
-		resize: vertical;
+		// Height is driven by the content (autoGrow); manual resize would fight it.
+		resize: none;
+		overflow-y: auto;
+		max-height: 200px;
 
 		&:disabled {
 			opacity: 0.6;
@@ -123,29 +141,6 @@
 		align-items: center;
 		justify-content: flex-end;
 		gap: var(--space-2);
-	}
-
-	.emoji-toggle {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		// Comfortable tap target on touch screens.
-		min-width: 44px;
-		min-height: 44px;
-		border: none;
-		border-radius: var(--radius-md);
-		background: transparent;
-		color: var(--text-secondary);
-		cursor: pointer;
-
-		&:hover:not(:disabled) {
-			color: var(--text-primary);
-		}
-
-		&:disabled {
-			opacity: 0.5;
-			cursor: default;
-		}
 	}
 
 	.picker-anchor {

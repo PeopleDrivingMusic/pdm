@@ -5,7 +5,8 @@
 	import SvgIcon from '../../SvgIcon.svelte';
 	import PostPoll from '../PostPoll.svelte';
 	import PostMediaGrid from './PostMediaGrid.svelte';
-	import CommentThread from '../CommentThread.svelte';
+	import CommentToggle from '../CommentToggle.svelte';
+	import CommentSection from '../CommentSection.svelte';
 
 	interface PostMediaItem {
 		id: string;
@@ -54,6 +55,11 @@
 		onLike?: () => void;
 		onComment?: () => void;
 	} = $props();
+
+	let showComments = $state(false);
+	// Seeded from the server load, then kept live by the section as the viewer
+	// posts or deletes.
+	let commentCount = $state(post.commentCount);
 
 	function formatDate(value: Date | string | null) {
 		if (!value) return '';
@@ -115,13 +121,24 @@
 		<button aria-label="Like post" onclick={onLike}>
 			<SvgIcon path={mdiHeartOutline} size={20} />
 		</button>
-		<CommentThread
-			targetType="post"
-			targetId={post.id}
-			{isLoggedIn}
-			initialCount={post.commentCount}
+		<CommentToggle
+			count={commentCount}
+			expanded={showComments}
+			onToggle={() => (showComments = !showComments)}
 		/>
 	</footer>
+
+	<!-- Outside the action row on purpose: the panel spans the card's full width. -->
+	{#if showComments}
+		<div class="post-comments">
+			<CommentSection
+				targetType="post"
+				targetId={post.id}
+				{isLoggedIn}
+				onCountChange={(next) => (commentCount = next)}
+			/>
+		</div>
+	{/if}
 </article>
 
 <style lang="scss">
@@ -158,15 +175,14 @@
 	.post-header,
 	.post-actions {
 		display: flex;
-		align-items: flex-start;
+		align-items: center;
 		gap: var(--space-3);
 	}
 
-	// The thread keeps its own full-width layout when reused elsewhere; inside the
-	// card footer it takes the space left of the like button so its panel opens below.
-	.post-actions :global(.comment-thread) {
-		flex: 1 1 auto;
-		min-width: 0;
+	.post-comments {
+		margin-top: var(--space-3);
+		padding-top: var(--space-4);
+		border-top: 1px solid color-mix(in srgb, var(--border-primary) 55%, transparent);
 	}
 
 	.post-content {

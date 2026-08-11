@@ -55,25 +55,40 @@ test('renders a body containing markup as plain text', async () => {
 	await expect.element(page.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
 });
 
+test('keeps row actions behind a single overflow menu', async () => {
+	render(MessageList, { messages: [comment({ canEdit: true, canDelete: true })] });
+
+	// Collapsed by default — one compact trigger instead of a row of icons.
+	await expect.element(page.getByRole('button', { name: /more actions/i })).toBeInTheDocument();
+	await expect
+		.element(page.getByRole('button', { name: /delete comment/i }))
+		.not.toBeInTheDocument();
+
+	await page.getByRole('button', { name: /more actions/i }).click();
+	await expect.element(page.getByRole('button', { name: /delete comment/i })).toBeInTheDocument();
+});
+
 test('offers delete only when the viewer may delete', async () => {
 	const onDelete = vi.fn();
 	render(MessageList, { messages: [comment({ canDelete: true })], onDelete });
 
-	await page.getByRole('button', { name: /delete/i }).click();
+	await page.getByRole('button', { name: /more actions/i }).click();
+	await page.getByRole('button', { name: /delete comment/i }).click();
 	expect(onDelete).toHaveBeenCalledWith('m1');
 });
 
-test('hides delete when the viewer may not delete', async () => {
+test('hides the overflow menu entirely when the viewer can do nothing', async () => {
 	render(MessageList, { messages: [comment()] });
-	await expect.element(page.getByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+	await expect.element(page.getByRole('button', { name: /more actions/i })).not.toBeInTheDocument();
 });
 
 test('lets the author edit inline and saves the new body', async () => {
 	const onEdit = vi.fn().mockResolvedValue(undefined);
 	render(MessageList, { messages: [comment({ canEdit: true })], onEdit });
 
-	await page.getByRole('button', { name: /edit/i }).click();
-	const field = page.getByRole('textbox');
+	await page.getByRole('button', { name: /more actions/i }).click();
+	await page.getByRole('button', { name: /edit comment/i }).click();
+	const field = page.getByRole('textbox', { name: /edit comment/i });
 	await field.fill('reworded');
 	await page.getByRole('button', { name: /save/i }).click();
 
@@ -82,5 +97,7 @@ test('lets the author edit inline and saves the new body', async () => {
 
 test('hides edit when the viewer is not the author', async () => {
 	render(MessageList, { messages: [comment({ canDelete: true })] });
-	await expect.element(page.getByRole('button', { name: /edit/i })).not.toBeInTheDocument();
+
+	await page.getByRole('button', { name: /more actions/i }).click();
+	await expect.element(page.getByRole('button', { name: /edit comment/i })).not.toBeInTheDocument();
 });

@@ -42,6 +42,33 @@ test('uses a custom submit label when provided', async () => {
 	await expect.element(page.getByRole('button', { name: 'Post' })).toBeInTheDocument();
 });
 
+test('starts as a single line and grows as the draft wraps', async () => {
+	render(MessageComposer, { onSubmit: vi.fn() });
+	const field = page.getByRole('textbox');
+
+	const element = field.element() as HTMLTextAreaElement;
+	expect(element.rows).toBe(1);
+	const initialHeight = element.clientHeight;
+
+	await field.fill('a long draft\nspanning\nseveral\nlines');
+	expect(element.clientHeight).toBeGreaterThan(initialHeight);
+});
+
+test('shrinks back after the draft is submitted', async () => {
+	const onSubmit = vi.fn().mockResolvedValue(undefined);
+	render(MessageComposer, { onSubmit });
+	const field = page.getByRole('textbox');
+	const element = field.element() as HTMLTextAreaElement;
+
+	const initialHeight = element.clientHeight;
+	await field.fill('one\ntwo\nthree\nfour');
+	expect(element.clientHeight).toBeGreaterThan(initialHeight);
+
+	await page.getByRole('button', { name: /send/i }).click();
+	await expect.element(field).toHaveValue('');
+	expect(element.clientHeight).toBe(initialHeight);
+});
+
 test('offers an emoji toggle', async () => {
 	render(MessageComposer, { onSubmit: vi.fn() });
 	await expect.element(page.getByRole('button', { name: /emoji/i })).toBeInTheDocument();

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { mdiPencilOutline, mdiTrashCanOutline } from '@mdi/js';
+	import { mdiPencilOutline, mdiTrashCanOutline, mdiDotsVertical } from '@mdi/js';
 	import Avatar from '../Avatar.svelte';
 	import SvgIcon from '../SvgIcon.svelte';
 	import Button from '../Button.svelte';
@@ -35,10 +35,37 @@
 	let editingId = $state<string | null>(null);
 	let draft = $state('');
 	let busy = $state(false);
+	// Which row has its overflow menu open (only ever one).
+	let menuId = $state<string | null>(null);
+
+	// Close the overflow menu on an outside click or Escape. The click handler tests
+	// the target rather than relying on stopPropagation, so the very click that opens
+	// the menu (and clicks on its own items) can't race it shut.
+	$effect(() => {
+		if (!menuId) return;
+		const onClick = (event: MouseEvent) => {
+			const target = event.target as Element | null;
+			if (!target?.closest?.('.menu-wrap')) menuId = null;
+		};
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') menuId = null;
+		};
+		document.addEventListener('click', onClick);
+		document.addEventListener('keydown', onKey);
+		return () => {
+			document.removeEventListener('click', onClick);
+			document.removeEventListener('keydown', onKey);
+		};
+	});
+
+	function toggleMenu(id: string) {
+		menuId = menuId === id ? null : id;
+	}
 
 	function startEdit(message: Message) {
 		editingId = message.id;
 		draft = message.body;
+		menuId = null;
 	}
 
 	function cancelEdit() {
@@ -86,6 +113,45 @@
 					{#if message.editedAt}
 						<span class="edited">(edited)</span>
 					{/if}
+
+					{#if (message.canEdit || message.canDelete) && editingId !== message.id}
+						<div class="menu-wrap">
+							<button
+								type="button"
+								class="menu-trigger"
+								aria-label="More actions"
+								aria-haspopup="true"
+								aria-expanded={menuId === message.id}
+								onclick={() => toggleMenu(message.id)}
+							>
+								<SvgIcon path={mdiDotsVertical} size={16} />
+							</button>
+
+							{#if menuId === message.id}
+								<div class="menu">
+									{#if message.canEdit}
+										<button type="button" onclick={() => startEdit(message)}>
+											<SvgIcon path={mdiPencilOutline} size={16} />
+											<span>Edit comment</span>
+										</button>
+									{/if}
+									{#if message.canDelete}
+										<button
+											type="button"
+											class="danger"
+											onclick={() => {
+												menuId = null;
+												onDelete?.(message.id);
+											}}
+										>
+											<SvgIcon path={mdiTrashCanOutline} size={16} />
+											<span>Delete comment</span>
+										</button>
+									{/if}
+								</div>
+							{/if}
+						</div>
+					{/if}
 				</div>
 
 				{#if editingId === message.id}
@@ -109,25 +175,6 @@
 					<p class="text">{message.body}</p>
 				{/if}
 			</div>
-
-			{#if (message.canEdit || message.canDelete) && editingId !== message.id}
-				<div class="row-actions">
-					{#if message.canEdit}
-						<button type="button" aria-label="Edit comment" onclick={() => startEdit(message)}>
-							<SvgIcon path={mdiPencilOutline} size={16} />
-						</button>
-					{/if}
-					{#if message.canDelete}
-						<button
-							type="button"
-							aria-label="Delete comment"
-							onclick={() => onDelete?.(message.id)}
-						>
-							<SvgIcon path={mdiTrashCanOutline} size={16} />
-						</button>
-					{/if}
-				</div>
-			{/if}
 		</li>
 	{/each}
 </ul>
@@ -143,6 +190,7 @@
 	}
 
 	.message {
+		position: relative;
 		display: flex;
 		align-items: flex-start;
 		gap: var(--space-2);
@@ -151,15 +199,87 @@
 	.message-body {
 		min-width: 0;
 		flex: 1;
+		// Reserve the overflow trigger's lane so long names/text never slide under it.
+		padding-right: 32px;
 	}
 
 	.message-meta {
 		display: flex;
 		align-items: center;
-		flex-wrap: wrap;
 		gap: var(--space-2);
 		font-size: var(--font-size-xs);
 		color: var(--text-secondary);
+	}
+
+	// Pushes the overflow trigger to the right edge of the row (YouTube-style).
+	.menu-wrap {
+		position: relative;
+		margin-left: auto;
+	}
+
+	.menu-trigger {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		border: none;
+		border-radius: var(--radius-md);
+		background: transparent;
+		color: var(--text-secondary);
+		cursor: pointer;
+		// The visual button stays compact; the tap area is extended to 44px.
+		&::after {
+			content: '';
+			position: absolute;
+			inset: -8px;
+		}
+
+		&:hover,
+		&[aria-expanded='true'] {
+			color: var(--text-primary);
+			background: color-mix(in srgb, var(--bg-surface) 78%, transparent);
+		}
+	}
+
+	.menu {
+		position: absolute;
+		top: calc(100% + 4px);
+		right: 0;
+		z-index: 30;
+		min-width: 170px;
+		padding: var(--space-1);
+		display: flex;
+		flex-direction: column;
+		border: 1px solid color-mix(in srgb, var(--border-primary) 62%, transparent);
+		border-radius: var(--radius-md);
+		background: var(--bg-surface);
+		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+
+		button {
+			display: flex;
+			align-items: center;
+			gap: var(--space-2);
+			width: 100%;
+			min-height: 40px;
+			padding: 0 var(--space-2);
+			border: none;
+			border-radius: var(--radius-sm, 6px);
+			background: transparent;
+			color: var(--text-primary);
+			font: inherit;
+			font-size: var(--font-size-sm);
+			text-align: left;
+			cursor: pointer;
+
+			&:hover {
+				background: color-mix(in srgb, var(--bg-primary) 60%, transparent);
+			}
+
+			&.danger {
+				color: var(--error, #e5484d);
+			}
+		}
 	}
 
 	.author {
@@ -207,30 +327,5 @@
 		display: flex;
 		gap: var(--space-2);
 		margin-top: var(--space-2);
-	}
-
-	.row-actions {
-		display: flex;
-		gap: var(--space-1);
-		flex-shrink: 0;
-
-		button {
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
-			// Comfortable tap target on touch screens.
-			min-width: 44px;
-			min-height: 44px;
-			border: none;
-			border-radius: var(--radius-md);
-			background: transparent;
-			color: var(--text-secondary);
-			cursor: pointer;
-
-			&:hover {
-				color: var(--text-primary);
-				background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
-			}
-		}
 	}
 </style>

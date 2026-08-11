@@ -141,7 +141,8 @@ test.describe.serial('post comments', () => {
 		await expect(page.getByText(/only the artist can post links/i)).toBeVisible();
 		await expect(toggle).toContainText('2');
 
-		// Edit the comment — the body changes and an edited marker appears.
+		// Edit the comment — row actions live behind the overflow menu.
+		await page.getByRole('button', { name: 'More actions' }).first().click();
 		await page.getByRole('button', { name: 'Edit comment' }).first().click();
 		await page.getByRole('textbox', { name: 'Edit comment' }).fill('Loving this one, actually');
 		await page.getByRole('button', { name: 'Save' }).click();
@@ -149,6 +150,7 @@ test.describe.serial('post comments', () => {
 		await expect(page.getByText('(edited)')).toBeVisible();
 
 		// Delete it — it disappears and the count drops back.
+		await page.getByRole('button', { name: 'More actions' }).first().click();
 		await page.getByRole('button', { name: 'Delete comment' }).first().click();
 		await expect(page.getByText('Loving this one, actually')).toHaveCount(0);
 		await expect(toggle).toContainText('1');

@@ -2,7 +2,10 @@ import { and, count, desc, eq, inArray, isNull, lt } from 'drizzle-orm';
 import { db, withDbLogging } from '../index';
 import { comments, users, type Comment } from '../schema';
 
-export type CommentTargetType = 'post' | 'track';
+// Single declaration lives in the dependency-free shared module so the browser
+// can use the same type without importing anything under `$lib/server`.
+export type { CommentTargetType } from '$lib/messages/types';
+import type { CommentTargetType } from '$lib/messages/types';
 
 export interface CommentWithAuthor {
 	id: string;
