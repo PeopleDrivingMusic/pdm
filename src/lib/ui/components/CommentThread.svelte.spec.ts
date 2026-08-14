@@ -1,6 +1,8 @@
 import { page } from '@vitest/browser/context';
 import { expect, test, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { get } from 'svelte/store';
+import { notificationStore } from '$lib/stores/notification.svelte';
 
 const fetchComments = vi.fn();
 const createComment = vi.fn();
@@ -37,6 +39,7 @@ const dto = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	notificationStore.clear();
 	fetchComments.mockResolvedValue({ ok: true, comments: [dto()] });
 	createComment.mockResolvedValue({ ok: true, comment: dto({ id: 'm2', body: 'brand new' }) });
 	editComment.mockResolvedValue({
@@ -197,4 +200,41 @@ test('shows a load failure without breaking the thread', async () => {
 	await page.getByRole('button', { name: /^comments/i }).click();
 
 	await expect.element(page.getByText('Could not load comments.')).toBeInTheDocument();
+});
+
+test('likes a comment optimistically, before the server responds', async () => {
+	let release: (value: unknown) => void = () => {};
+	toggleLike.mockReturnValue(new Promise((resolve) => (release = resolve)));
+
+	mount();
+	await page.getByRole('button', { name: /^comments/i }).click();
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+
+	const like = page.getByRole('button', { name: 'Like comment' });
+	await like.click();
+
+	// The heart flips before the server answers — the request is still pending.
+	await expect.element(page.getByRole('button', { name: 'Unlike comment' })).toBeInTheDocument();
+
+	release({ ok: true, liked: true, likeCount: 1 });
+});
+
+test('rolls back a failed comment like and notifies the viewer', async () => {
+	toggleLike.mockResolvedValue({ ok: false, error: 'Could not register your like.' });
+
+	mount();
+	await page.getByRole('button', { name: /^comments/i }).click();
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+
+	await page.getByRole('button', { name: 'Like comment' }).click();
+
+	// Reverts to the pre-click state, same as a refused comment keeps its draft.
+	await expect.element(page.getByRole('button', { name: 'Like comment' })).toBeInTheDocument();
+	await expect
+		.element(page.getByRole('button', { name: 'Like comment' }))
+		.not.toHaveTextContent('1');
+
+	expect(get(notificationStore)).toEqual([
+		expect.objectContaining({ type: 'error', message: 'Could not register your like.' })
+	]);
 });

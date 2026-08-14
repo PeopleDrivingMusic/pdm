@@ -8,6 +8,7 @@
 	import CommentToggle from '../CommentToggle.svelte';
 	import CommentSection from '../CommentSection.svelte';
 	import { toggleLike } from '$lib/client/comments';
+	import { notificationStore } from '$lib/stores/notification.svelte';
 
 	interface PostMediaItem {
 		id: string;
@@ -75,8 +76,21 @@
 
 	async function handleLike() {
 		if (!isLoggedIn) return;
+		const before = likeOverride;
+
+		// Optimistic: flip immediately, then reconcile with (or roll back to) the
+		// server's answer rather than trusting the guess.
+		const optimisticLiked = !likedByViewer;
+		const optimisticCount = Math.max(0, likeCount + (optimisticLiked ? 1 : -1));
+		likeOverride = { liked: optimisticLiked, count: optimisticCount };
+
 		const result = await toggleLike('post', post.id);
-		if (result.ok) likeOverride = { liked: result.liked, count: result.likeCount };
+		if (!result.ok) {
+			likeOverride = before;
+			notificationStore.error(result.error);
+			return;
+		}
+		likeOverride = { liked: result.liked, count: result.likeCount };
 	}
 
 	function formatDate(value: Date | string | null) {

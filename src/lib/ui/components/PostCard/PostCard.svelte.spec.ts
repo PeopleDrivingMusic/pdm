@@ -1,6 +1,8 @@
 import { page } from '@vitest/browser/context';
 import { expect, test, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+import { get } from 'svelte/store';
+import { notificationStore } from '$lib/stores/notification.svelte';
 
 const toggleLike = vi.fn();
 const fetchComments = vi.fn();
@@ -129,6 +131,7 @@ test('hides the visibility badge for public posts', () => {
 
 beforeEach(() => {
 	vi.clearAllMocks();
+	notificationStore.clear();
 	toggleLike.mockResolvedValue({ ok: true, liked: true, likeCount: 1 });
 });
 
@@ -172,4 +175,31 @@ test('hides the like button on a locked post — the server refuses it either wa
 		isLoggedIn: true
 	});
 	expect(container.querySelector('.like')).toBeNull();
+});
+
+test('likes a post optimistically, before the server responds', async () => {
+	let release: (value: unknown) => void = () => {};
+	toggleLike.mockReturnValue(new Promise((resolve) => (release = resolve)));
+
+	render(PostCard, { post: basePost(), author, isLoggedIn: true });
+	await page.getByRole('button', { name: 'Like post' }).click();
+
+	// Flips before the server answers — the request is still pending.
+	await expect.element(page.getByRole('button', { name: 'Unlike post' })).toBeInTheDocument();
+
+	release({ ok: true, liked: true, likeCount: 1 });
+});
+
+test('rolls back a failed post like and notifies the viewer', async () => {
+	toggleLike.mockResolvedValue({ ok: false, error: 'Could not register your like.' });
+	render(PostCard, { post: basePost(), author, isLoggedIn: true });
+
+	await page.getByRole('button', { name: 'Like post' }).click();
+
+	await expect.element(page.getByRole('button', { name: 'Like post' })).toBeInTheDocument();
+	await expect.element(page.getByRole('button', { name: 'Like post' })).not.toHaveTextContent('1');
+
+	expect(get(notificationStore)).toEqual([
+		expect.objectContaining({ type: 'error', message: 'Could not register your like.' })
+	]);
 });
