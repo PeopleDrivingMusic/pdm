@@ -71,6 +71,32 @@ test('closes on an outside click', async () => {
 	await expect.element(page.getByRole('button', { name: 'Edit comment' })).not.toBeInTheDocument();
 });
 
+test('opening a second menu closes the first, without needing an outside click first', async () => {
+	// Each gets its own host, spaced apart, so B's dropdown doesn't render
+	// underneath A's and steal the click meant for B's trigger.
+	const hostA = document.body.appendChild(document.createElement('div'));
+	hostA.style.cssText = 'position: fixed; top: 20px; left: 220px;';
+	const hostB = document.body.appendChild(document.createElement('div'));
+	hostB.style.cssText = 'position: fixed; top: 300px; left: 220px;';
+
+	render(Menu, { target: hostA, props: { label: 'More actions A', items, onSelect: vi.fn() } });
+	render(Menu, { target: hostB, props: { label: 'More actions B', items, onSelect: vi.fn() } });
+
+	const triggerA = page.getByRole('button', { name: 'More actions A' });
+	const triggerB = page.getByRole('button', { name: 'More actions B' });
+
+	await triggerA.click();
+	await expect.element(triggerA).toHaveAttribute('aria-expanded', 'true');
+
+	// B's trigger sits outside A's own wrapper, so opening B must close A —
+	// same as any other outside click, not just an accident of DOM order.
+	await triggerB.click();
+
+	await expect.element(triggerA).toHaveAttribute('aria-expanded', 'false');
+	await expect.element(triggerB).toHaveAttribute('aria-expanded', 'true');
+	expect(document.querySelectorAll('.menu')).toHaveLength(1);
+});
+
 test('closes on Escape and returns focus to the trigger', async () => {
 	render(Menu, { label: 'More actions', items, onSelect: vi.fn() });
 

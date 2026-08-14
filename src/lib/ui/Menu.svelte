@@ -30,6 +30,7 @@
 
 	let open = $state(false);
 	let trigger = $state<HTMLButtonElement | null>(null);
+	let wrap = $state<HTMLDivElement | null>(null);
 
 	function close(restoreFocus = false) {
 		open = false;
@@ -39,8 +40,12 @@
 	$effect(() => {
 		if (!open) return;
 		const onClick = (event: MouseEvent) => {
-			const target = event.target as Element | null;
-			if (!target?.closest?.('.menu-wrap')) open = false;
+			// `.closest('.menu-wrap')` would match *any* Menu's wrapper, not just
+			// this one — with two on a page, clicking the second one's trigger
+			// counts as "inside a menu-wrap" and never closes the first. Checking
+			// against this instance's own element is what actually scopes it.
+			const target = event.target as Node | null;
+			if (!wrap?.contains(target)) open = false;
 		};
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') close(true);
@@ -59,7 +64,7 @@
 	}
 </script>
 
-<div class="menu-wrap">
+<div class="menu-wrap" bind:this={wrap}>
 	<button
 		type="button"
 		class="menu-trigger"
