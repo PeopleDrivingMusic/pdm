@@ -1,6 +1,17 @@
 import { page } from '@vitest/browser/context';
-import { expect, test, vi } from 'vitest';
+import { expect, test, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+
+const toggleLike = vi.fn();
+const fetchComments = vi.fn();
+vi.mock('$lib/client/comments', () => ({
+	toggleLike: (...args: unknown[]) => toggleLike(...args),
+	fetchComments: (...args: unknown[]) => fetchComments(...args),
+	createComment: vi.fn(),
+	editComment: vi.fn(),
+	deleteComment: vi.fn()
+}));
+
 import PostCard from './PostCard.svelte';
 
 type Poll = {
@@ -17,6 +28,8 @@ type Poll = {
 const basePost = (over: Record<string, unknown> = {}) => ({
 	id: 'post-1',
 	commentCount: 0,
+	likeCount: 0,
+	likedByViewer: false,
 	title: 'Studio session',
 	excerpt: 'A quick look behind the scenes.',
 	bodyHtml: null as string | null,
@@ -114,9 +127,49 @@ test('hides the visibility badge for public posts', () => {
 	expect(container.querySelector('.visibility')).toBeNull();
 });
 
-test('calls onLike when the like button is clicked', async () => {
-	const onLike = vi.fn();
-	render(PostCard, { post: basePost(), author, onLike });
+beforeEach(() => {
+	vi.clearAllMocks();
+	toggleLike.mockResolvedValue({ ok: true, liked: true, likeCount: 1 });
+});
+
+test('likes a post and shows the server count', async () => {
+	render(PostCard, { post: basePost(), author, isLoggedIn: true });
+
 	await page.getByRole('button', { name: 'Like post' }).click();
-	expect(onLike).toHaveBeenCalledOnce();
+
+	expect(toggleLike).toHaveBeenCalledWith('post', 'post-1');
+	const button = page.getByRole('button', { name: 'Unlike post' });
+	await expect.element(button).toBeInTheDocument();
+	await expect.element(button).toHaveTextContent('1');
+});
+
+test('unlikes a liked post', async () => {
+	toggleLike.mockResolvedValue({ ok: true, liked: false, likeCount: 0 });
+	render(PostCard, {
+		post: basePost({ likeCount: 1, likedByViewer: true }),
+		author,
+		isLoggedIn: true
+	});
+
+	await page.getByRole('button', { name: 'Unlike post' }).click();
+
+	expect(toggleLike).toHaveBeenCalledWith('post', 'post-1');
+	await expect.element(page.getByRole('button', { name: 'Like post' })).toBeInTheDocument();
+});
+
+test('does not register a like for an anonymous viewer', async () => {
+	render(PostCard, { post: basePost(), author, isLoggedIn: false });
+
+	await page.getByRole('button', { name: 'Like post' }).click();
+
+	expect(toggleLike).not.toHaveBeenCalled();
+});
+
+test('hides the like button on a locked post — the server refuses it either way', () => {
+	const { container } = render(PostCard, {
+		post: basePost({ isLocked: true }),
+		author,
+		isLoggedIn: true
+	});
+	expect(container.querySelector('.like')).toBeNull();
 });

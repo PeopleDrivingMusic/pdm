@@ -29,6 +29,8 @@ export interface PreviewPost {
 	publishedAt: Date | string | null;
 	isLocked: boolean;
 	commentCount: number;
+	likeCount: number;
+	likedByViewer: boolean;
 	media: PreviewMedia[];
 	poll: PreviewPoll | null;
 }
@@ -84,6 +86,8 @@ function base(over: Partial<PreviewPost>): PreviewPost {
 		publishedAt,
 		isLocked: false,
 		commentCount: 0,
+		likeCount: 0,
+		likedByViewer: false,
 		media: [],
 		poll: null,
 		...over
