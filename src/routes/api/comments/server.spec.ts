@@ -3,8 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('$lib/server/comments', () => ({
 	CommentService: { listForTarget: vi.fn(), create: vi.fn() }
 }));
+vi.mock('$lib/server/messages/access', () => ({
+	resolveTargetAccess: vi.fn()
+}));
 
 import { CommentService } from '$lib/server/comments';
+import { resolveTargetAccess } from '$lib/server/messages/access';
 import { commentReadLimiter, commentWriteLimiter } from '$lib/server/comments/rateLimits';
 import { GET, POST } from './+server';
 
@@ -43,6 +47,7 @@ beforeEach(() => {
 	// The limiters are module-level state — reset so cases can't leak tokens into
 	// each other (a later POST as the same user would otherwise spuriously 429).
 	commentWriteLimiter.reset();
+	(resolveTargetAccess as any).mockResolvedValue({ ok: true, ownerUserId: 'owner1' });
 	commentReadLimiter.reset();
 });
 
@@ -199,5 +204,18 @@ describe('POST /api/comments', () => {
 		expect(statuses.filter((s) => s === 201)).toHaveLength(10);
 		expect(statuses.slice(10)).toEqual([429, 429]);
 		expect(responses[10].headers.get('Retry-After')).toBe('60');
+	});
+});
+
+describe('GET — visibility', () => {
+	it('404s a target the viewer cannot see, and lists nothing', async () => {
+		// Reading the conversation must not be easier than reading the post: a
+		// subscribers-only post's comments are part of what the $1 unlocks.
+		(resolveTargetAccess as any).mockResolvedValue({ ok: false });
+
+		const res = await (GET as any)(getEvt());
+
+		expect(res.status).toBe(404);
+		expect(CommentService.listForTarget).not.toHaveBeenCalled();
 	});
 });

@@ -9,6 +9,7 @@ import {
 	tooManyRequests
 } from '$lib/server/security/guards';
 import { isUuid } from '$lib/server/security/uuid';
+import { resolveTargetAccess } from '$lib/server/messages/access';
 import type { RequestHandler } from './$types';
 
 const COMMENT_TARGET_TYPES: CommentTargetType[] = ['post', 'track'];
@@ -37,6 +38,16 @@ export const GET: RequestHandler = async (event) => {
 		event.url.searchParams.get('targetId')
 	);
 	if (!target) return json({ error: 'invalid_target' }, { status: 400 });
+
+	// The conversation is as gated as the thing it hangs off: a subscribers-only
+	// post's comments are part of what the subscription unlocks, and a draft's
+	// shouldn't be readable at all. 404 rather than 403 so the id isn't confirmed.
+	const access = await resolveTargetAccess(
+		target.targetType,
+		target.targetId,
+		event.locals.user?.id ?? null
+	);
+	if (!access.ok) return json({ error: 'invalid_target' }, { status: 404 });
 
 	const comments = await CommentService.listForTarget({
 		...target,

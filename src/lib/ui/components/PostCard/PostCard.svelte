@@ -58,6 +58,9 @@
 	} = $props();
 
 	let showComments = $state(false);
+	// A locked post is a teaser — its conversation is part of what the subscription
+	// unlocks, so the thread isn't offered here (the server refuses it either way).
+	const canComment = $derived(commentsEnabled && !post.isLocked);
 	// The server count stays the source of truth (a re-load updates it); the delta
 	// layers the viewer's own posts/deletes on top without shadowing it.
 	let countDelta = $state(0);
@@ -123,15 +126,17 @@
 		<button aria-label="Like post" onclick={onLike}>
 			<SvgIcon path={mdiHeartOutline} size={20} />
 		</button>
-		<CommentToggle
-			count={commentCount}
-			expanded={showComments}
-			onToggle={commentsEnabled ? () => (showComments = !showComments) : undefined}
-		/>
+		{#if canComment}
+			<CommentToggle
+				count={commentCount}
+				expanded={showComments}
+				onToggle={() => (showComments = !showComments)}
+			/>
+		{/if}
 	</footer>
 
 	<!-- Outside the action row on purpose: the panel spans the card's full width. -->
-	{#if showComments && commentsEnabled}
+	{#if showComments && canComment}
 		<div class="post-comments">
 			<CommentSection
 				targetType="post"
@@ -161,14 +166,10 @@
 			linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 40%),
 			color-mix(in srgb, var(--bg-surface) 74%, var(--bg-primary));
 		box-shadow: 0 14px 40px rgba(0, 0, 0, 0.16);
-		transition:
-			transform var(--duration-normal) var(--easing-ease-out),
-			border-color var(--duration-normal) var(--easing-ease-out);
 
-		&:hover {
-			transform: translateY(-2px);
-			border-color: color-mix(in srgb, var(--primary) 45%, var(--border-primary));
-		}
+		// No hover lift: a post card isn't a single click target — it holds its own
+		// buttons, thread and composer, so shifting the whole thing under the cursor
+		// is noise (and the transform made it a stacking context that trapped popovers).
 
 		&.is-locked {
 			border-color: color-mix(in srgb, var(--primary) 42%, transparent);
