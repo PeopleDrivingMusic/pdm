@@ -60,13 +60,19 @@
 	} = $props();
 
 	let showComments = $state(false);
-	// A locked post is a teaser — its conversation is part of what the subscription
-	// unlocks, so the thread isn't offered here (the server refuses it either way).
-	const canComment = $derived(commentsEnabled && !post.isLocked);
+	// A locked post still shows its counts as a teaser (curiosity toward
+	// subscribing), but the conversation itself is part of what the subscription
+	// unlocks — the thread never opens and the server refuses the write anyway.
+	const canOpenComments = $derived(commentsEnabled && !post.isLocked);
 	// The server count stays the source of truth (a re-load updates it); the delta
 	// layers the viewer's own posts/deletes on top without shadowing it.
 	let countDelta = $state(0);
 	const commentCount = $derived(Math.max(0, post.commentCount + countDelta));
+
+	function handleCommentToggle() {
+		if (!canOpenComments) return;
+		showComments = !showComments;
+	}
 
 	// Overrides the prop once the viewer has actually toggled — the server's
 	// response is the source of truth (another reader may have liked it since).
@@ -75,7 +81,7 @@
 	const likeCount = $derived(likeOverride?.count ?? post.likeCount);
 
 	async function handleLike() {
-		if (!isLoggedIn) return;
+		if (!isLoggedIn || post.isLocked) return;
 		const before = likeOverride;
 
 		// Optimistic: flip immediately, then reconcile with (or roll back to) the
@@ -150,32 +156,26 @@
 	</div>
 
 	<footer class="post-actions">
-		{#if !post.isLocked}
-			<button
-				type="button"
-				class="like"
-				class:is-liked={likedByViewer}
-				aria-label={likedByViewer ? 'Unlike post' : 'Like post'}
-				aria-pressed={likedByViewer}
-				onclick={handleLike}
-			>
-				<SvgIcon path={likedByViewer ? mdiHeart : mdiHeartOutline} size={20} />
-				{#if likeCount > 0}
-					<span>{likeCount}</span>
-				{/if}
-			</button>
-		{/if}
-		{#if canComment}
-			<CommentToggle
-				count={commentCount}
-				expanded={showComments}
-				onToggle={() => (showComments = !showComments)}
-			/>
+		<button
+			type="button"
+			class="like"
+			class:is-liked={likedByViewer}
+			aria-label={likedByViewer ? 'Unlike post' : 'Like post'}
+			aria-pressed={likedByViewer}
+			onclick={handleLike}
+		>
+			<SvgIcon path={likedByViewer ? mdiHeart : mdiHeartOutline} size={20} />
+			{#if likeCount > 0}
+				<span>{likeCount}</span>
+			{/if}
+		</button>
+		{#if commentsEnabled}
+			<CommentToggle count={commentCount} expanded={showComments} onToggle={handleCommentToggle} />
 		{/if}
 	</footer>
 
 	<!-- Outside the action row on purpose: the panel spans the card's full width. -->
-	{#if showComments && canComment}
+	{#if showComments && canOpenComments}
 		<div class="post-comments">
 			<CommentSection
 				targetType="post"

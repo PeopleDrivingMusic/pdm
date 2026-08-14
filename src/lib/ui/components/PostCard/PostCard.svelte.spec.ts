@@ -168,13 +168,33 @@ test('does not register a like for an anonymous viewer', async () => {
 	expect(toggleLike).not.toHaveBeenCalled();
 });
 
-test('hides the like button on a locked post — the server refuses it either way', () => {
-	const { container } = render(PostCard, {
-		post: basePost({ isLocked: true }),
+test('shows the like count on a locked post as a teaser, but does not register a like', async () => {
+	render(PostCard, {
+		post: basePost({ isLocked: true, likeCount: 3 }),
 		author,
 		isLoggedIn: true
 	});
-	expect(container.querySelector('.like')).toBeNull();
+
+	const like = page.getByRole('button', { name: 'Like post' });
+	await expect.element(like).toBeInTheDocument();
+	await expect.element(like).toHaveTextContent('3');
+
+	await like.click();
+	expect(toggleLike).not.toHaveBeenCalled();
+});
+
+test('shows the comment count on a locked post as a teaser, but never opens the thread', async () => {
+	render(PostCard, {
+		post: basePost({ isLocked: true, commentCount: 5 }),
+		author,
+		isLoggedIn: true
+	});
+
+	const toggle = page.getByRole('button', { name: 'Comments (5)' });
+	await expect.element(toggle).toBeInTheDocument();
+
+	await toggle.click();
+	await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
 });
 
 test('likes a post optimistically, before the server responds', async () => {
