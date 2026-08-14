@@ -7,6 +7,7 @@
 	import PostMediaGrid from './PostMediaGrid.svelte';
 	import CommentToggle from '../CommentToggle.svelte';
 	import CommentSection from '../CommentSection.svelte';
+	import IconButton from '../../IconButton.svelte';
 	import { toggleLikeOptimistic, type LikeState } from '$lib/client/comments';
 
 	interface PostMediaItem {
@@ -146,19 +147,14 @@
 	</div>
 
 	<footer class="post-actions">
-		<button
-			type="button"
-			class="like"
-			class:is-liked={likedByViewer}
-			aria-label={likedByViewer ? 'Unlike post' : 'Like post'}
-			aria-pressed={likedByViewer}
-			onclick={handleLike}
-		>
-			<SvgIcon path={likedByViewer ? mdiHeart : mdiHeartOutline} size={20} />
-			{#if likeCount > 0}
-				<span>{likeCount}</span>
-			{/if}
-		</button>
+		<IconButton
+			path={likedByViewer ? mdiHeart : mdiHeartOutline}
+			label={likedByViewer ? 'Unlike post' : 'Like post'}
+			variant="ghost"
+			tone={likedByViewer ? 'accent' : 'neutral'}
+			count={likeCount}
+			onClick={handleLike}
+		/>
 		{#if commentsEnabled}
 			<CommentToggle count={commentCount} expanded={showComments} onToggle={handleCommentToggle} />
 		{/if}
@@ -300,34 +296,5 @@
 
 	.post-actions {
 		justify-content: flex-end;
-
-		.like {
-			min-width: 44px;
-			height: 44px;
-			padding: 0 var(--space-2);
-			display: inline-flex;
-			align-items: center;
-			gap: var(--space-1);
-			border: none;
-			border-radius: var(--radius-md);
-			background: transparent;
-			color: var(--text-secondary);
-			font-size: var(--font-size-xs);
-			cursor: pointer;
-			transition: color var(--duration-fast) var(--easing-ease-out);
-
-			&.is-liked {
-				color: var(--primary);
-			}
-
-			&:hover {
-				color: var(--text-primary);
-			}
-
-			&:focus-visible {
-				outline: 2px solid var(--border-focus);
-				outline-offset: 2px;
-			}
-		}
 	}
 </style>
