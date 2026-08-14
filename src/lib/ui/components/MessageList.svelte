@@ -1,14 +1,9 @@
 <script lang="ts">
-	import {
-		mdiPencilOutline,
-		mdiTrashCanOutline,
-		mdiDotsVertical,
-		mdiHeart,
-		mdiHeartOutline
-	} from '@mdi/js';
+	import { mdiPencilOutline, mdiTrashCanOutline, mdiHeart, mdiHeartOutline } from '@mdi/js';
 	import Avatar from '../Avatar.svelte';
 	import SvgIcon from '../SvgIcon.svelte';
 	import Button from '../Button.svelte';
+	import Menu from '../Menu.svelte';
 
 	export interface MessageAuthor {
 		id: string;
@@ -46,17 +41,7 @@
 	let editingId = $state<string | null>(null);
 	let draft = $state('');
 	let busy = $state(false);
-	// Which row has its overflow menu open (only ever one).
-	let menuId = $state<string | null>(null);
-	// Kept so focus can go back where it came from when the menu closes.
-	let triggers: Record<string, HTMLButtonElement | undefined> = {};
 	let editField = $state<HTMLTextAreaElement | null>(null);
-
-	function closeMenu(restoreFocus = false) {
-		const id = menuId;
-		menuId = null;
-		if (restoreFocus && id) triggers[id]?.focus();
-	}
 
 	// Focus the editor as it opens — otherwise a keyboard user has to tab back from
 	// the top of the document to reach the field they just asked for.
@@ -64,34 +49,9 @@
 		if (editingId && editField) editField.focus();
 	});
 
-	// Close the overflow menu on an outside click or Escape. The click handler tests
-	// the target rather than relying on stopPropagation, so the very click that opens
-	// the menu (and clicks on its own items) can't race it shut.
-	$effect(() => {
-		if (!menuId) return;
-		const onClick = (event: MouseEvent) => {
-			const target = event.target as Element | null;
-			if (!target?.closest?.('.menu-wrap')) menuId = null;
-		};
-		const onKey = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') closeMenu(true);
-		};
-		document.addEventListener('click', onClick);
-		document.addEventListener('keydown', onKey);
-		return () => {
-			document.removeEventListener('click', onClick);
-			document.removeEventListener('keydown', onKey);
-		};
-	});
-
-	function toggleMenu(id: string) {
-		menuId = menuId === id ? null : id;
-	}
-
 	function startEdit(message: Message) {
 		editingId = message.id;
 		draft = message.body;
-		menuId = null;
 	}
 
 	function cancelEdit() {
@@ -143,42 +103,29 @@
 					{/if}
 
 					{#if (message.canEdit || message.canDelete) && editingId !== message.id}
-						<div class="menu-wrap">
-							<button
-								type="button"
-								class="menu-trigger"
-								bind:this={triggers[message.id]}
-								aria-label="More actions"
-								aria-haspopup="dialog"
-								aria-expanded={menuId === message.id}
-								onclick={() => toggleMenu(message.id)}
-							>
-								<SvgIcon path={mdiDotsVertical} size={16} />
-							</button>
-
-							{#if menuId === message.id}
-								<div class="menu">
-									{#if message.canEdit}
-										<button type="button" onclick={() => startEdit(message)}>
-											<SvgIcon path={mdiPencilOutline} size={16} />
-											<span>Edit comment</span>
-										</button>
-									{/if}
-									{#if message.canDelete}
-										<button
-											type="button"
-											class="danger"
-											onclick={() => {
-												menuId = null;
-												onDelete?.(message.id);
-											}}
-										>
-											<SvgIcon path={mdiTrashCanOutline} size={16} />
-											<span>Delete comment</span>
-										</button>
-									{/if}
-								</div>
-							{/if}
+						<div class="menu-slot">
+							<Menu
+								label="More actions"
+								items={[
+									...(message.canEdit
+										? [{ key: 'edit', label: 'Edit comment', icon: mdiPencilOutline }]
+										: []),
+									...(message.canDelete
+										? [
+												{
+													key: 'delete',
+													label: 'Delete comment',
+													icon: mdiTrashCanOutline,
+													danger: true
+												}
+											]
+										: [])
+								]}
+								onSelect={(key) => {
+									if (key === 'edit') startEdit(message);
+									if (key === 'delete') onDelete?.(message.id);
+								}}
+							/>
 						</div>
 					{/if}
 				</div>
@@ -261,75 +208,10 @@
 	// Pinned to the row's top-right and taken out of the flow: in-flow it would
 	// stretch `.message-meta` to the trigger's height, so rows with actions sat
 	// taller than rows without and the author/body baselines drifted between them.
-	.menu-wrap {
+	.menu-slot {
 		position: absolute;
 		top: 0;
 		right: 0;
-	}
-
-	.menu-trigger {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 28px;
-		height: 28px;
-		border: none;
-		border-radius: var(--radius-md);
-		background: transparent;
-		color: var(--text-secondary);
-		cursor: pointer;
-		// The visual button stays compact; the tap area is extended to 44px.
-		&::after {
-			content: '';
-			position: absolute;
-			inset: -8px;
-		}
-
-		&:hover,
-		&[aria-expanded='true'] {
-			color: var(--text-primary);
-			background: color-mix(in srgb, var(--bg-surface) 78%, transparent);
-		}
-	}
-
-	.menu {
-		position: absolute;
-		top: calc(100% + 4px);
-		right: 0;
-		z-index: 30;
-		min-width: 170px;
-		padding: var(--space-1);
-		display: flex;
-		flex-direction: column;
-		border: 1px solid color-mix(in srgb, var(--border-primary) 62%, transparent);
-		border-radius: var(--radius-md);
-		background: var(--bg-surface);
-		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
-
-		button {
-			display: flex;
-			align-items: center;
-			gap: var(--space-2);
-			width: 100%;
-			min-height: 40px;
-			padding: 0 var(--space-2);
-			border: none;
-			border-radius: var(--radius-sm, 6px);
-			background: transparent;
-			color: var(--text-primary);
-			font: inherit;
-			font-size: var(--font-size-sm);
-			text-align: left;
-			cursor: pointer;
-
-			&:hover {
-				background: color-mix(in srgb, var(--bg-primary) 60%, transparent);
-			}
-
-			&.danger {
-				color: var(--error, #e5484d);
-			}
-		}
 	}
 
 	.author {
