@@ -324,14 +324,13 @@
 			color: var(--text-secondary);
 			font-size: var(--font-size-xs);
 			cursor: pointer;
-			transition: background-color var(--duration-fast) var(--easing-ease-out);
+			transition: color var(--duration-fast) var(--easing-ease-out);
 
 			&.is-liked {
 				color: var(--primary);
 			}
 
 			&:hover {
-				background: var(--bg-tertiary);
 				color: var(--text-primary);
 			}
 

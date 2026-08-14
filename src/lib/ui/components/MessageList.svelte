@@ -214,7 +214,7 @@
 							aria-pressed={message.likedByViewer}
 							onclick={() => onToggleLike?.(message.id)}
 						>
-							<SvgIcon path={message.likedByViewer ? mdiHeart : mdiHeartOutline} size={16} />
+							<SvgIcon path={message.likedByViewer ? mdiHeart : mdiHeartOutline} size={14} />
 							{#if message.likeCount > 0}
 								<span>{message.likeCount}</span>
 							{/if}
@@ -394,12 +394,14 @@
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-1);
-		height: 26px;
+		height: 24px;
 		padding: 0 var(--space-1);
 		border: none;
 		border-radius: var(--radius-md);
 		background: transparent;
-		color: var(--text-secondary);
+		// Quieter than the body/author text by default — a comment row shouldn't
+		// compete with its own reaction button. Liked/hover states still stand out.
+		color: var(--text-tertiary);
 		font-size: var(--font-size-xs);
 		cursor: pointer;
 		// Compact visually, still a 44px tap target.
