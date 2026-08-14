@@ -7,8 +7,7 @@
 	import PostMediaGrid from './PostMediaGrid.svelte';
 	import CommentToggle from '../CommentToggle.svelte';
 	import CommentSection from '../CommentSection.svelte';
-	import { toggleLike } from '$lib/client/comments';
-	import { notificationStore } from '$lib/stores/notification.svelte';
+	import { toggleLikeOptimistic, type LikeState } from '$lib/client/comments';
 
 	interface PostMediaItem {
 		id: string;
@@ -76,27 +75,18 @@
 
 	// Overrides the prop once the viewer has actually toggled — the server's
 	// response is the source of truth (another reader may have liked it since).
-	let likeOverride = $state<{ liked: boolean; count: number } | null>(null);
+	let likeOverride = $state<LikeState | null>(null);
 	const likedByViewer = $derived(likeOverride?.liked ?? post.likedByViewer);
-	const likeCount = $derived(likeOverride?.count ?? post.likeCount);
+	const likeCount = $derived(likeOverride?.likeCount ?? post.likeCount);
 
 	async function handleLike() {
 		if (!isLoggedIn || post.isLocked) return;
-		const before = likeOverride;
-
-		// Optimistic: flip immediately, then reconcile with (or roll back to) the
-		// server's answer rather than trusting the guess.
-		const optimisticLiked = !likedByViewer;
-		const optimisticCount = Math.max(0, likeCount + (optimisticLiked ? 1 : -1));
-		likeOverride = { liked: optimisticLiked, count: optimisticCount };
-
-		const result = await toggleLike('post', post.id);
-		if (!result.ok) {
-			likeOverride = before;
-			notificationStore.error(result.error);
-			return;
-		}
-		likeOverride = { liked: result.liked, count: result.likeCount };
+		await toggleLikeOptimistic(
+			'post',
+			post.id,
+			{ liked: likedByViewer, likeCount },
+			(next) => (likeOverride = next)
+		);
 	}
 
 	function formatDate(value: Date | string | null) {

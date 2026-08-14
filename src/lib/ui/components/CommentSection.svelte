@@ -7,10 +7,9 @@
 		createComment,
 		editComment,
 		deleteComment,
-		toggleLike,
+		toggleLikeOptimistic,
 		type CommentTargetType
 	} from '$lib/client/comments';
-	import { notificationStore } from '$lib/stores/notification.svelte';
 	import type { MessageDTO } from '$lib/messages/types';
 
 	/**
@@ -91,27 +90,17 @@
 		const before = comments.find((entry) => entry.id === id);
 		if (!before) return;
 
-		// Optimistic: flip immediately so the tap feels instant, then reconcile with
-		// (or roll back to) the server's answer — another reader may have liked the
-		// same comment since this page loaded, so a plain increment could drift.
-		const optimisticLiked = !before.likedByViewer;
-		const optimisticCount = Math.max(0, before.likeCount + (optimisticLiked ? 1 : -1));
-		comments = comments.map((entry) =>
-			entry.id === id
-				? { ...entry, likedByViewer: optimisticLiked, likeCount: optimisticCount }
-				: entry
-		);
-
-		const result = await toggleLike('comment', id);
-		if (!result.ok) {
-			comments = comments.map((entry) => (entry.id === id ? before : entry));
-			notificationStore.error(result.error);
-			return;
-		}
-		comments = comments.map((entry) =>
-			entry.id === id
-				? { ...entry, likeCount: result.likeCount, likedByViewer: result.liked }
-				: entry
+		await toggleLikeOptimistic(
+			'comment',
+			id,
+			{ liked: before.likedByViewer, likeCount: before.likeCount },
+			(next) => {
+				comments = comments.map((entry) =>
+					entry.id === id
+						? { ...entry, likedByViewer: next.liked, likeCount: next.likeCount }
+						: entry
+				);
+			}
 		);
 	}
 

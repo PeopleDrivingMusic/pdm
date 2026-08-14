@@ -1,13 +1,14 @@
 import { page } from '@vitest/browser/context';
 import { expect, test, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { get } from 'svelte/store';
-import { notificationStore } from '$lib/stores/notification.svelte';
 
-const toggleLike = vi.fn();
+// The optimistic-apply/rollback/notify algorithm itself is `toggleLikeOptimistic`'s
+// job and is covered in `client/comments.spec.ts` — these tests only check that
+// PostCard calls it with the right target and reflects whatever it applies.
+const toggleLikeOptimistic = vi.fn();
 const fetchComments = vi.fn();
 vi.mock('$lib/client/comments', () => ({
-	toggleLike: (...args: unknown[]) => toggleLike(...args),
+	toggleLikeOptimistic: (...args: unknown[]) => toggleLikeOptimistic(...args),
 	fetchComments: (...args: unknown[]) => fetchComments(...args),
 	createComment: vi.fn(),
 	editComment: vi.fn(),
@@ -131,23 +132,30 @@ test('hides the visibility badge for public posts', () => {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	notificationStore.clear();
-	toggleLike.mockResolvedValue({ ok: true, liked: true, likeCount: 1 });
+	// Default: behave like the real helper for a plain success, so tests that
+	// don't care about the exact sequence still see the post-toggle state.
+	toggleLikeOptimistic.mockImplementation(async (_type, _id, current, apply) => {
+		apply({ liked: !current.liked, likeCount: current.likeCount + (!current.liked ? 1 : -1) });
+	});
 });
 
-test('likes a post and shows the server count', async () => {
+test('likes a post through the shared toggle helper', async () => {
 	render(PostCard, { post: basePost(), author, isLoggedIn: true });
 
 	await page.getByRole('button', { name: 'Like post' }).click();
 
-	expect(toggleLike).toHaveBeenCalledWith('post', 'post-1');
+	expect(toggleLikeOptimistic).toHaveBeenCalledWith(
+		'post',
+		'post-1',
+		{ liked: false, likeCount: 0 },
+		expect.any(Function)
+	);
 	const button = page.getByRole('button', { name: 'Unlike post' });
 	await expect.element(button).toBeInTheDocument();
 	await expect.element(button).toHaveTextContent('1');
 });
 
 test('unlikes a liked post', async () => {
-	toggleLike.mockResolvedValue({ ok: true, liked: false, likeCount: 0 });
 	render(PostCard, {
 		post: basePost({ likeCount: 1, likedByViewer: true }),
 		author,
@@ -156,7 +164,12 @@ test('unlikes a liked post', async () => {
 
 	await page.getByRole('button', { name: 'Unlike post' }).click();
 
-	expect(toggleLike).toHaveBeenCalledWith('post', 'post-1');
+	expect(toggleLikeOptimistic).toHaveBeenCalledWith(
+		'post',
+		'post-1',
+		{ liked: true, likeCount: 1 },
+		expect.any(Function)
+	);
 	await expect.element(page.getByRole('button', { name: 'Like post' })).toBeInTheDocument();
 });
 
@@ -165,7 +178,7 @@ test('does not register a like for an anonymous viewer', async () => {
 
 	await page.getByRole('button', { name: 'Like post' }).click();
 
-	expect(toggleLike).not.toHaveBeenCalled();
+	expect(toggleLikeOptimistic).not.toHaveBeenCalled();
 });
 
 test('shows the like count on a locked post as a teaser, but does not register a like', async () => {
@@ -180,7 +193,7 @@ test('shows the like count on a locked post as a teaser, but does not register a
 	await expect.element(like).toHaveTextContent('3');
 
 	await like.click();
-	expect(toggleLike).not.toHaveBeenCalled();
+	expect(toggleLikeOptimistic).not.toHaveBeenCalled();
 });
 
 test('shows the comment count on a locked post as a teaser, but never opens the thread', async () => {
@@ -195,31 +208,4 @@ test('shows the comment count on a locked post as a teaser, but never opens the 
 
 	await toggle.click();
 	await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
-});
-
-test('likes a post optimistically, before the server responds', async () => {
-	let release: (value: unknown) => void = () => {};
-	toggleLike.mockReturnValue(new Promise((resolve) => (release = resolve)));
-
-	render(PostCard, { post: basePost(), author, isLoggedIn: true });
-	await page.getByRole('button', { name: 'Like post' }).click();
-
-	// Flips before the server answers — the request is still pending.
-	await expect.element(page.getByRole('button', { name: 'Unlike post' })).toBeInTheDocument();
-
-	release({ ok: true, liked: true, likeCount: 1 });
-});
-
-test('rolls back a failed post like and notifies the viewer', async () => {
-	toggleLike.mockResolvedValue({ ok: false, error: 'Could not register your like.' });
-	render(PostCard, { post: basePost(), author, isLoggedIn: true });
-
-	await page.getByRole('button', { name: 'Like post' }).click();
-
-	await expect.element(page.getByRole('button', { name: 'Like post' })).toBeInTheDocument();
-	await expect.element(page.getByRole('button', { name: 'Like post' })).not.toHaveTextContent('1');
-
-	expect(get(notificationStore)).toEqual([
-		expect.objectContaining({ type: 'error', message: 'Could not register your like.' })
-	]);
 });

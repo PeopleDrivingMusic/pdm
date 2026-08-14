@@ -1,22 +1,23 @@
 import { page } from '@vitest/browser/context';
 import { expect, test, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { get } from 'svelte/store';
-import { notificationStore } from '$lib/stores/notification.svelte';
 
 const fetchComments = vi.fn();
 const createComment = vi.fn();
 const editComment = vi.fn();
 const deleteComment = vi.fn();
 
-const toggleLike = vi.fn();
+// The optimistic-apply/rollback/notify algorithm itself is `toggleLikeOptimistic`'s
+// job and is covered in `client/comments.spec.ts` — these tests only check that
+// CommentSection calls it with the right target and reflects whatever it applies.
+const toggleLikeOptimistic = vi.fn();
 
 vi.mock('$lib/client/comments', () => ({
 	fetchComments: (...args: unknown[]) => fetchComments(...args),
 	createComment: (...args: unknown[]) => createComment(...args),
 	editComment: (...args: unknown[]) => editComment(...args),
 	deleteComment: (...args: unknown[]) => deleteComment(...args),
-	toggleLike: (...args: unknown[]) => toggleLike(...args)
+	toggleLikeOptimistic: (...args: unknown[]) => toggleLikeOptimistic(...args)
 }));
 
 import CommentThread from './CommentThread.svelte';
@@ -39,7 +40,6 @@ const dto = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	notificationStore.clear();
 	fetchComments.mockResolvedValue({ ok: true, comments: [dto()] });
 	createComment.mockResolvedValue({ ok: true, comment: dto({ id: 'm2', body: 'brand new' }) });
 	editComment.mockResolvedValue({
@@ -47,7 +47,10 @@ beforeEach(() => {
 		comment: dto({ body: 'reworded', editedAt: '2026-08-05T00:00:00.000Z' })
 	});
 	deleteComment.mockResolvedValue({ ok: true });
-	toggleLike.mockResolvedValue({ ok: true, liked: true, likeCount: 1 });
+	// Default: behave like the real helper for a plain success.
+	toggleLikeOptimistic.mockImplementation(async (_type, _id, current, apply) => {
+		apply({ liked: !current.liked, likeCount: current.likeCount + (!current.liked ? 1 : -1) });
+	});
 });
 
 const mount = (over: Record<string, unknown> = {}) =>
@@ -202,39 +205,20 @@ test('shows a load failure without breaking the thread', async () => {
 	await expect.element(page.getByText('Could not load comments.')).toBeInTheDocument();
 });
 
-test('likes a comment optimistically, before the server responds', async () => {
-	let release: (value: unknown) => void = () => {};
-	toggleLike.mockReturnValue(new Promise((resolve) => (release = resolve)));
-
-	mount();
-	await page.getByRole('button', { name: /^comments/i }).click();
-	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
-
-	const like = page.getByRole('button', { name: 'Like comment' });
-	await like.click();
-
-	// The heart flips before the server answers — the request is still pending.
-	await expect.element(page.getByRole('button', { name: 'Unlike comment' })).toBeInTheDocument();
-
-	release({ ok: true, liked: true, likeCount: 1 });
-});
-
-test('rolls back a failed comment like and notifies the viewer', async () => {
-	toggleLike.mockResolvedValue({ ok: false, error: 'Could not register your like.' });
-
+test('likes a comment through the shared toggle helper', async () => {
 	mount();
 	await page.getByRole('button', { name: /^comments/i }).click();
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 
 	await page.getByRole('button', { name: 'Like comment' }).click();
 
-	// Reverts to the pre-click state, same as a refused comment keeps its draft.
-	await expect.element(page.getByRole('button', { name: 'Like comment' })).toBeInTheDocument();
-	await expect
-		.element(page.getByRole('button', { name: 'Like comment' }))
-		.not.toHaveTextContent('1');
-
-	expect(get(notificationStore)).toEqual([
-		expect.objectContaining({ type: 'error', message: 'Could not register your like.' })
-	]);
+	expect(toggleLikeOptimistic).toHaveBeenCalledWith(
+		'comment',
+		'm1',
+		{ liked: false, likeCount: 0 },
+		expect.any(Function)
+	);
+	const button = page.getByRole('button', { name: 'Unlike comment' });
+	await expect.element(button).toBeInTheDocument();
+	await expect.element(button).toHaveTextContent('1');
 });
