@@ -70,7 +70,6 @@
 		class="menu-trigger"
 		bind:this={trigger}
 		aria-label={label}
-		aria-haspopup="dialog"
 		aria-expanded={open}
 		onclick={() => (open = !open)}
 	>
