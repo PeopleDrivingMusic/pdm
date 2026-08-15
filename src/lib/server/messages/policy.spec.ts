@@ -38,6 +38,26 @@ describe('containsUrl', () => {
 		expect(containsUrl('go to scam.com for free stuff')).toBe(true));
 	it('detects a shortened link with a path', () =>
 		expect(containsUrl('here bit.ly/abc123 grab it')).toBe(true));
+
+	// The original TLD list was missing several TLDs that are trivial to abuse —
+	// a bare, no-scheme domain on one of these sailed through undetected.
+	it('detects a bare .co domain', () => expect(containsUrl('hit me up at scamhype.co')).toBe(true));
+	it('detects a bare .me domain', () =>
+		expect(containsUrl('dm me on grabit.me for the drop')).toBe(true));
+	it('detects a bare .to domain', () =>
+		expect(containsUrl('link in bio: freebeats.to')).toBe(true));
+
+	// Widening the TLD list must not reintroduce the typo false-positive: the same
+	// "missing space after a period" shape, just landing on one of the new entries.
+	it('still passes a capitalized typo landing on a newly added TLD', () =>
+		expect(containsUrl('shoutout.To the whole crew')).toBe(false));
+	it('still passes another capitalized typo on a newly added TLD', () =>
+		expect(containsUrl('love this.Co design though')).toBe(false));
+
+	// A rejected (capitalized) candidate earlier in the message must not hide a real,
+	// lowercase link later in the same message.
+	it('still finds a real link after a capitalized false candidate', () =>
+		expect(containsUrl('shoutout.To the crew, also check grabit.me for the drop')).toBe(true));
 });
 
 describe('resolveTargetOwnerUserId', () => {

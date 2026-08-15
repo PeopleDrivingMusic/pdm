@@ -15,16 +15,27 @@ export const MAX_MESSAGE_LENGTH = 2000;
 // `Node.js`) must not read as a link, since the rule blocks the very fans writing those.
 // Blatant obfuscation (`example[.]com`, `h t t p`) is out of scope for this soft control.
 const COMMON_TLDS =
-	'com|net|org|io|dev|app|xyz|info|biz|link|site|online|store|shop|blog|tv|fm|gg|ru|ua|uk|de|fr|es|pl|nl|cn|jp|br|eu';
+	'com|net|org|io|dev|app|xyz|info|biz|link|site|online|store|shop|blog|tv|fm|gg|ru|ua|uk|de|fr|es|pl|nl|cn|jp|br|eu' +
+	'|co|me|to|ai|cc|ly|ca|us|club|icu|top|pw|win';
 const URL_PATTERN = new RegExp(
 	`(?:https?:\\/\\/|www\\.)\\S+` + // scheme or www. host
 		`|[a-z0-9-]+\\.[a-z]{2,}\\/\\S*` + // any domain WITH a path (bit.ly/abc, evil.test/promo)
-		`|\\b[a-z0-9-]+\\.(?:${COMMON_TLDS})\\b(?![a-z])`, // bare common-TLD domain (scam.com)
-	'i'
+		`|\\b[a-z0-9-]+\\.(${COMMON_TLDS})\\b(?![a-z])`, // bare common-TLD domain (scam.com) — captured
+	'gi'
 );
 
 export function containsUrl(body: string): boolean {
-	return URL_PATTERN.test(body);
+	for (const match of body.matchAll(URL_PATTERN)) {
+		// Only the bare-domain branch (capture group 1) can come from ordinary prose:
+		// a "missing space after a period" typo reads as `word.NextSentence`, always
+		// capitalized, while a real bare domain is written lowercase — `grabit.me`,
+		// not `grabit.Me`. The scheme/www/path branches carry an unambiguous signal
+		// regardless of case, so only this branch needs the check. Reject-and-continue
+		// rather than reject-and-stop, so a capitalized false candidate earlier in the
+		// message can't hide a real link later in the same message.
+		if (!match[1] || match[1] === match[1].toLowerCase()) return true;
+	}
+	return false;
 }
 
 /** The userId that owns the artist behind a message target, or null. */
