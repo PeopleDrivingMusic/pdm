@@ -9,7 +9,9 @@
 		variant?: 'solid' | 'ghost';
 		/** `xs`/`sm` match `Button` sizes; each keeps a 44px tap area via a hit-slop. */
 		size?: 'xs' | 'sm' | 'md';
-		/** Solid-fill toggle state (toolbar formatting buttons, the emoji picker trigger). */
+		/** Solid-fill toggle state (toolbar formatting buttons, the emoji picker trigger).
+		 *  Left `undefined` (not `false`) for a non-toggle action button — that's what
+		 *  keeps `aria-pressed` off it below. */
 		active?: boolean;
 		/** Color-only toggle state — for a "liked" heart etc., where a filled background
 		 *  would compete with the row it sits in. Independent of `active`. Passing
@@ -31,12 +33,16 @@
 		type = 'button',
 		variant = 'solid',
 		size = 'md',
-		active = false,
+		active,
 		tone,
 		count,
 		disabled = false,
 		onClick
 	}: Props = $props();
+
+	const pressed = $derived(
+		active !== undefined ? active : tone !== undefined ? tone === 'accent' : undefined
+	);
 </script>
 
 <button
@@ -47,7 +53,7 @@
 	class:icon-button--counted={count !== undefined}
 	{disabled}
 	aria-label={label}
-	aria-pressed={tone !== undefined ? tone === 'accent' : undefined}
+	aria-pressed={pressed}
 	title={label}
 	onclick={onClick}
 >

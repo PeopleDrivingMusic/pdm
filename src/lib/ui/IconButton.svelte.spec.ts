@@ -59,3 +59,16 @@ test('active still applies the existing solid-fill toggle state', () => {
 	const { container } = render(IconButton, { path: mdiHeart, label: 'Bold', active: true });
 	expect(container.querySelector('.icon-button')).toHaveClass('icon-button--active');
 });
+
+test('exposes active as aria-pressed, including the off state — not just when tone is set', () => {
+	// Independent review: an inactive solid toggle (active: false) had no
+	// aria-pressed at all, so a screen reader couldn't tell it was a toggle.
+	const { container: on } = render(IconButton, { path: mdiHeart, label: 'Bold', active: true });
+	expect(on.querySelector('.icon-button')).toHaveAttribute('aria-pressed', 'true');
+
+	const { container: off } = render(IconButton, { path: mdiHeart, label: 'Bold', active: false });
+	expect(off.querySelector('.icon-button')).toHaveAttribute('aria-pressed', 'false');
+
+	const { container: plain } = render(IconButton, { path: mdiHeart, label: 'Delete' });
+	expect(plain.querySelector('.icon-button')).not.toHaveAttribute('aria-pressed');
+});
