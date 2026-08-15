@@ -58,3 +58,11 @@ export type CommentErrorCode =
 	| 'invalid_request'
 	| 'invalid_comment_id'
 	| 'unauthorized';
+
+/** Every machine-readable code `POST /api/likes` can return. */
+export type LikeErrorCode =
+	| 'invalid_target'
+	| 'forbidden'
+	| 'rate_limited'
+	| 'invalid_request'
+	| 'unauthorized';

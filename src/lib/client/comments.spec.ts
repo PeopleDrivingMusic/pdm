@@ -6,6 +6,7 @@ import {
 	createComment,
 	editComment,
 	deleteComment,
+	toggleLike,
 	toggleLikeOptimistic
 } from './comments';
 
@@ -101,6 +102,46 @@ describe('deleteComment', () => {
 		mockFetch(403, { error: 'forbidden' });
 		const result = await deleteComment('m1');
 		expect(result.ok).toBe(false);
+	});
+});
+
+describe('toggleLike', () => {
+	it('accepts a valid successful response', async () => {
+		mockFetch(200, { liked: true, likeCount: 5 });
+		const result = await toggleLike('post', TARGET_ID);
+		expect(result).toEqual({ ok: true, liked: true, likeCount: 5 });
+	});
+
+	// Independent review: a malformed 200 (e.g. `{}`) was silently coerced into
+	// `{ liked: false, likeCount: 0 }` and treated as success, corrupting the
+	// optimistic UI instead of rolling it back.
+	it('rejects a malformed successful response instead of guessing', async () => {
+		mockFetch(200, {});
+		const result = await toggleLike('post', TARGET_ID);
+		expect(result.ok).toBe(false);
+	});
+
+	it('rejects a successful response with a negative likeCount', async () => {
+		mockFetch(200, { liked: true, likeCount: -1 });
+		const result = await toggleLike('post', TARGET_ID);
+		expect(result.ok).toBe(false);
+	});
+
+	// Independent review: like failures reused the comment copy map, so a rate
+	// limit or bad-request on a *like* could read "You're posting too fast" or
+	// "That comment could not be sent." — text about the wrong action entirely.
+	it('surfaces a like-specific rate-limit message, not the comment one', async () => {
+		mockFetch(429, { error: 'rate_limited' });
+		const result = await toggleLike('post', TARGET_ID);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error).not.toMatch(/posting/i);
+	});
+
+	it('surfaces a like-specific message for an invalid request, not comment copy', async () => {
+		mockFetch(400, { error: 'invalid_request' });
+		const result = await toggleLike('post', TARGET_ID);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error).not.toMatch(/comment/i);
 	});
 });
 

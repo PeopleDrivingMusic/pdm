@@ -2,6 +2,7 @@ import type {
 	CommentDTO,
 	CommentErrorCode,
 	CommentTargetType,
+	LikeErrorCode,
 	LikeTargetType
 } from '$lib/messages/types';
 import { errorMessage, GENERIC_ERROR } from './errors';
@@ -125,6 +126,15 @@ export async function deleteComment(commentId: string): Promise<DeleteResult> {
 export type LikeResult = Ok<{ liked: boolean; likeCount: number }> | Fail;
 export type LikeState = { liked: boolean; likeCount: number };
 
+/** Target-neutral: a like can land on a post or a comment, never "posted". */
+const LIKE_ERROR_COPY = {
+	invalid_target: 'That could not be liked.',
+	forbidden: "You can't do that.",
+	rate_limited: "You're going too fast — try again in a minute.",
+	invalid_request: 'Could not register your like.',
+	unauthorized: 'Sign in to like this.'
+} satisfies Record<LikeErrorCode, string>;
+
 /** Toggle the current user's like on a comment or a post. */
 export async function toggleLike(
 	targetType: LikeTargetType,
@@ -139,11 +149,17 @@ export async function toggleLike(
 		if (!response.ok) {
 			return {
 				ok: false,
-				error: await errorMessage(response, COMMENT_ERROR_COPY, 'Could not register your like.')
+				error: await errorMessage(response, LIKE_ERROR_COPY, 'Could not register your like.')
 			};
 		}
 		const payload = await response.json();
-		return { ok: true, liked: Boolean(payload?.liked), likeCount: Number(payload?.likeCount ?? 0) };
+		// Don't guess on a malformed 200: a missing/wrong-typed field should roll
+		// the optimistic UI back, not silently apply a made-up unliked/zero state.
+		if (typeof payload?.liked !== 'boolean' || !Number.isSafeInteger(payload?.likeCount)) {
+			return { ok: false, error: GENERIC_ERROR };
+		}
+		if (payload.likeCount < 0) return { ok: false, error: GENERIC_ERROR };
+		return { ok: true, liked: payload.liked, likeCount: payload.likeCount };
 	} catch {
 		return { ok: false, error: 'Could not register your like.' };
 	}
