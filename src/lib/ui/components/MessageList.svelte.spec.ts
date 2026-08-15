@@ -78,6 +78,16 @@ test('hides the count while a message has no likes', async () => {
 	await expect.element(page.getByRole('button', { name: /^like/i })).not.toHaveTextContent('0');
 });
 
+test('disables the like button when there is no handler, instead of a silent no-op', async () => {
+	render(MessageList, { messages: [comment()] });
+	await expect.element(page.getByRole('button', { name: /^like/i })).toBeDisabled();
+});
+
+test('leaves the like button enabled when a handler is provided', async () => {
+	render(MessageList, { messages: [comment()], onToggleLike: vi.fn() });
+	await expect.element(page.getByRole('button', { name: /^like/i })).not.toBeDisabled();
+});
+
 test('keeps row actions behind a single overflow menu', async () => {
 	render(MessageList, { messages: [comment({ canEdit: true, canDelete: true })] });
 

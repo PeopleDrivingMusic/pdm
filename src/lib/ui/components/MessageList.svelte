@@ -159,6 +159,7 @@
 							class:is-liked={message.likedByViewer}
 							aria-label={message.likedByViewer ? 'Unlike comment' : 'Like comment'}
 							aria-pressed={message.likedByViewer}
+							disabled={!onToggleLike}
 							onclick={() => onToggleLike?.(message.id)}
 						>
 							<SvgIcon path={message.likedByViewer ? mdiHeart : mdiHeartOutline} size={14} />
@@ -294,12 +295,21 @@
 			inset: -8px;
 		}
 
-		&:hover {
+		&:hover:not(:disabled) {
 			color: var(--text-primary);
 		}
 
 		&.is-liked {
 			color: var(--primary);
+		}
+
+		// No handler means no signed-in viewer — same disabled treatment as the
+		// post-level like button, so the row stops implying an action that would
+		// silently do nothing.
+		// TODO(#19?): route this to a login modal instead of just disabling.
+		&:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
 		}
 	}
 </style>

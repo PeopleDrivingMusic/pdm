@@ -173,15 +173,15 @@ test('unlikes a liked post', async () => {
 	await expect.element(page.getByRole('button', { name: 'Like post' })).toBeInTheDocument();
 });
 
-test('does not register a like for an anonymous viewer', async () => {
+test('disables the like button for an anonymous viewer, instead of a silent no-op', async () => {
 	render(PostCard, { post: basePost(), author, isLoggedIn: false });
 
-	await page.getByRole('button', { name: 'Like post' }).click();
-
-	expect(toggleLikeOptimistic).not.toHaveBeenCalled();
+	// A disabled button can't be clicked at all — that's the point (no more
+	// silent no-op); toggleLikeOptimistic is unreachable, nothing left to assert.
+	await expect.element(page.getByRole('button', { name: 'Like post' })).toBeDisabled();
 });
 
-test('shows the like count on a locked post as a teaser, but does not register a like', async () => {
+test('shows the like count on a locked post as a teaser, disabled rather than a silent no-op', async () => {
 	render(PostCard, {
 		post: basePost({ isLocked: true, likeCount: 3 }),
 		author,
@@ -191,9 +191,12 @@ test('shows the like count on a locked post as a teaser, but does not register a
 	const like = page.getByRole('button', { name: 'Like post' });
 	await expect.element(like).toBeInTheDocument();
 	await expect.element(like).toHaveTextContent('3');
+	await expect.element(like).toBeDisabled();
+});
 
-	await like.click();
-	expect(toggleLikeOptimistic).not.toHaveBeenCalled();
+test('leaves the like button enabled for a logged-in viewer on an unlocked post', async () => {
+	render(PostCard, { post: basePost(), author, isLoggedIn: true });
+	await expect.element(page.getByRole('button', { name: 'Like post' })).not.toBeDisabled();
 });
 
 test('shows the comment count on a locked post as a teaser, but never opens the thread', async () => {

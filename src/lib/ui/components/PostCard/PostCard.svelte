@@ -80,8 +80,14 @@
 	const likedByViewer = $derived(likeOverride?.liked ?? post.likedByViewer);
 	const likeCount = $derived(likeOverride?.likeCount ?? post.likeCount);
 
+	// TODO(#19?): route an anonymous click to a login modal instead of just
+	// disabling — a locked post already has its own "Subscribe to unlock" CTA,
+	// but a logged-out viewer on an unlocked post currently has no path from
+	// this button into signing in.
+	const canLike = $derived(isLoggedIn && !post.isLocked);
+
 	async function handleLike() {
-		if (!isLoggedIn || post.isLocked) return;
+		if (!canLike) return;
 		await toggleLikeOptimistic(
 			'post',
 			post.id,
@@ -153,6 +159,7 @@
 			variant="ghost"
 			tone={likedByViewer ? 'accent' : 'neutral'}
 			count={likeCount}
+			disabled={!canLike}
 			onClick={handleLike}
 		/>
 		{#if commentsEnabled}
