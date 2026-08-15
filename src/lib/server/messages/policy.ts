@@ -24,16 +24,24 @@ const URL_PATTERN = new RegExp(
 	'gi'
 );
 
+/** First letter upper, rest lower — `To`, `Me`, `Co`. Never how a real domain is
+ *  written (lowercase, or SHOUTED all-caps); exactly how a sentence starts. */
+function isTitleCase(word: string): boolean {
+	return word[0] !== word[0].toLowerCase() && word.slice(1) === word.slice(1).toLowerCase();
+}
+
 export function containsUrl(body: string): boolean {
 	for (const match of body.matchAll(URL_PATTERN)) {
 		// Only the bare-domain branch (capture group 1) can come from ordinary prose:
-		// a "missing space after a period" typo reads as `word.NextSentence`, always
-		// capitalized, while a real bare domain is written lowercase — `grabit.me`,
-		// not `grabit.Me`. The scheme/www/path branches carry an unambiguous signal
+		// a "missing space after a period" typo reads as `word.NextSentence`, and
+		// English sentences start Title-case, never SHOUTED or lowercase. Domains
+		// are written either way — `grabit.me`, `GRABIT.ME` — so only the Title-case
+		// shape is a false-positive signal; anything else (including `scam.COM`) is
+		// a real link. The scheme/www/path branches carry an unambiguous signal
 		// regardless of case, so only this branch needs the check. Reject-and-continue
-		// rather than reject-and-stop, so a capitalized false candidate earlier in the
-		// message can't hide a real link later in the same message.
-		if (!match[1] || match[1] === match[1].toLowerCase()) return true;
+		// rather than reject-and-stop, so a rejected candidate earlier in the message
+		// can't hide a real link later in the same message.
+		if (!match[1] || !isTitleCase(match[1])) return true;
 	}
 	return false;
 }

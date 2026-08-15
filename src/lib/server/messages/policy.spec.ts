@@ -58,6 +58,13 @@ describe('containsUrl', () => {
 	// lowercase link later in the same message.
 	it('still finds a real link after a capitalized false candidate', () =>
 		expect(containsUrl('shoutout.To the crew, also check grabit.me for the drop')).toBe(true));
+
+	// Independent review caught a regression in the fix above: rejecting on *any*
+	// uppercase (not just the Title-case typo shape) let an all-caps domain — a
+	// real, common spam style — through undetected.
+	it('detects an ALL-CAPS domain', () => expect(containsUrl('visit scam.COM now')).toBe(true));
+	it('detects an ALL-CAPS domain on a newly added TLD', () =>
+		expect(containsUrl('DM me on GRABIT.ME for the drop')).toBe(true));
 });
 
 describe('resolveTargetOwnerUserId', () => {
