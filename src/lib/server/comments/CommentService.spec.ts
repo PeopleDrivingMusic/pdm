@@ -18,15 +18,25 @@ vi.mock('$lib/server/messages/policy', async (importOriginal) => ({
 vi.mock('$lib/server/entitlement', () => ({
 	EntitlementService: { isSubscriberOf: vi.fn() }
 }));
+vi.mock('$lib/server/messages/access', () => ({
+	resolveTargetAccess: vi.fn()
+}));
+vi.mock('$lib/server/likes', () => ({
+	LikeService: { summaryFor: vi.fn() }
+}));
 
 import { CommentRepository } from '$lib/db/services/CommentRepository';
 import { resolveTargetOwnerUserId } from '$lib/server/messages/policy';
+import { resolveTargetAccess } from '$lib/server/messages/access';
 import { EntitlementService } from '$lib/server/entitlement';
+import { LikeService } from '$lib/server/likes';
 import { CommentService } from './CommentService';
 
 beforeEach(() => {
 	vi.clearAllMocks();
 	(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
+	(resolveTargetAccess as any).mockResolvedValue({ ok: true, ownerUserId: 'owner1' });
+	(LikeService.summaryFor as any).mockResolvedValue(new Map());
 	(CommentRepository.create as any).mockResolvedValue({
 		id: 'm1',
 		body: 'nice',
@@ -92,8 +102,8 @@ describe('create — comments are free (no entitlement)', () => {
 		expect(r).toEqual({ ok: false, reason: 'invalid_target' });
 	});
 
-	it('rejects a target that does not resolve to an owner (missing/draft/deleted)', async () => {
-		(resolveTargetOwnerUserId as any).mockResolvedValue(null);
+	it('rejects a target the author cannot reach (missing, draft, or gated)', async () => {
+		(resolveTargetAccess as any).mockResolvedValue({ ok: false });
 		const r = await CommentService.create({
 			targetType: 'post',
 			targetId: 'p-does-not-exist',

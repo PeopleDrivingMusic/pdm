@@ -20,6 +20,7 @@ import {
 } from '$lib/db/schema';
 import { postDocumentRepository } from './PostDocumentRepository';
 import { CommentRepository } from './CommentRepository';
+import { LikeService } from '$lib/server/likes';
 import type {
 	ArtistFeedItem,
 	ContentMedia,
@@ -63,6 +64,8 @@ export interface PublicArtistPost {
 	publishedAt: Date | null;
 	isLocked: boolean;
 	commentCount: number;
+	likeCount: number;
+	likedByViewer: boolean;
 	media: Array<{
 		id: string;
 		type: string;
@@ -1153,7 +1156,8 @@ export class ArtistPublicContentService {
 				viewerVoteRows,
 				photoRows,
 				collectionItemRows,
-				commentCounts
+				commentCounts,
+				likeSummaries
 			] = await Promise.all([
 				postDocumentRepository.getPostDocuments(postIds),
 				postIds.length
@@ -1243,7 +1247,10 @@ export class ArtistPublicContentService {
 				// Comment counts are computed on read (no denormalized counter to drift).
 				postIds.length
 					? CommentRepository.countForTargets('post', postIds)
-					: new Map<string, number>()
+					: new Map<string, number>(),
+				postIds.length
+					? LikeService.summaryFor('post', postIds, viewer.userId ?? null)
+					: new Map<string, { likeCount: number; likedByViewer: boolean }>()
 			]);
 
 			const mediaByPost = new Map<string, typeof mediaRows>();
@@ -1320,6 +1327,8 @@ export class ArtistPublicContentService {
 					publishedAt: post.publishedAt,
 					isLocked,
 					commentCount: commentCounts.get(post.id) ?? 0,
+					likeCount: likeSummaries.get(post.id)?.likeCount ?? 0,
+					likedByViewer: likeSummaries.get(post.id)?.likedByViewer ?? false,
 					media: isLocked
 						? []
 						: (mediaByPost.get(post.id) ?? []).map((row) => ({

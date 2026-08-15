@@ -158,6 +158,78 @@ test.describe.serial('post comments', () => {
 		await context.close();
 	});
 
+	test('a listener can like and unlike a comment', async ({ browser, baseURL }) => {
+		// Exercises the real LikeRepository: the unit tests mock it, so an invalid
+		// insert (wrong key shape) passed them and still broke every like in the app.
+		const context = await browser.newContext();
+		await context.addCookies([
+			{
+				name: 'session',
+				value: fanSessionToken,
+				url: baseURL,
+				httpOnly: true,
+				secure: true,
+				sameSite: 'Lax'
+			}
+		]);
+		const page = await context.newPage();
+
+		await page.goto(`/artist/${artistSlug}`);
+		await page.locator('button.tab', { hasText: 'Posts' }).click();
+		await page
+			.getByRole('button', { name: /^Comments/ })
+			.first()
+			.click();
+		await expect(page.getByText('Seeded opening comment')).toBeVisible();
+
+		const like = page.getByRole('button', { name: 'Like comment' });
+		await expect(like).toBeVisible();
+		await like.click();
+
+		// The count comes back from the server, so a failed insert would show nothing.
+		const unlike = page.getByRole('button', { name: 'Unlike comment' });
+		await expect(unlike).toBeVisible();
+		await expect(unlike).toContainText('1');
+
+		await unlike.click();
+		await expect(page.getByRole('button', { name: 'Like comment' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Like comment' })).not.toContainText('1');
+
+		await context.close();
+	});
+
+	test('a listener can like and unlike a post', async ({ browser, baseURL }) => {
+		const context = await browser.newContext();
+		await context.addCookies([
+			{
+				name: 'session',
+				value: fanSessionToken,
+				url: baseURL,
+				httpOnly: true,
+				secure: true,
+				sameSite: 'Lax'
+			}
+		]);
+		const page = await context.newPage();
+
+		await page.goto(`/artist/${artistSlug}`);
+		await page.locator('button.tab', { hasText: 'Posts' }).click();
+
+		const like = page.getByRole('button', { name: 'Like post' });
+		await expect(like).toBeVisible();
+		await like.click();
+
+		const unlike = page.getByRole('button', { name: 'Unlike post' });
+		await expect(unlike).toBeVisible();
+		await expect(unlike).toContainText('1');
+
+		await unlike.click();
+		await expect(page.getByRole('button', { name: 'Like post' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Like post' })).not.toContainText('1');
+
+		await context.close();
+	});
+
 	test('a soft-deleted comment stays out of the count on a fresh load', async ({ page }) => {
 		await page.goto(`/artist/${artistSlug}`);
 		await page.locator('button.tab', { hasText: 'Posts' }).click();

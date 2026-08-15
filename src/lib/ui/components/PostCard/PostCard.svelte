@@ -1,12 +1,14 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { mdiHeartOutline, mdiLockOutline } from '@mdi/js';
+	import { mdiHeart, mdiHeartOutline, mdiLockOutline } from '@mdi/js';
 	import Avatar from '../../Avatar.svelte';
 	import SvgIcon from '../../SvgIcon.svelte';
 	import PostPoll from '../PostPoll.svelte';
 	import PostMediaGrid from './PostMediaGrid.svelte';
 	import CommentToggle from '../CommentToggle.svelte';
 	import CommentSection from '../CommentSection.svelte';
+	import IconButton from '../../IconButton.svelte';
+	import { toggleLikeOptimistic, type LikeState } from '$lib/client/comments';
 
 	interface PostMediaItem {
 		id: string;
@@ -36,6 +38,8 @@
 		publishedAt: Date | string | null;
 		isLocked: boolean;
 		commentCount: number;
+		likeCount: number;
+		likedByViewer: boolean;
 		media: PostMediaItem[];
 		poll: Poll | null;
 	}
@@ -45,8 +49,7 @@
 		author,
 		music,
 		isLoggedIn = false,
-		commentsEnabled = true,
-		onLike
+		commentsEnabled = true
 	}: {
 		post: PostCardData;
 		author: { name: string; avatar?: string | null };
@@ -54,14 +57,38 @@
 		isLoggedIn?: boolean;
 		/** Set false where the post id isn't real (e.g. the design preview fixtures). */
 		commentsEnabled?: boolean;
-		onLike?: () => void;
 	} = $props();
 
 	let showComments = $state(false);
+	// A locked post still shows its counts as a teaser (curiosity toward
+	// subscribing), but the conversation itself is part of what the subscription
+	// unlocks — the thread never opens and the server refuses the write anyway.
+	const canOpenComments = $derived(commentsEnabled && !post.isLocked);
 	// The server count stays the source of truth (a re-load updates it); the delta
 	// layers the viewer's own posts/deletes on top without shadowing it.
 	let countDelta = $state(0);
 	const commentCount = $derived(Math.max(0, post.commentCount + countDelta));
+
+	function handleCommentToggle() {
+		if (!canOpenComments) return;
+		showComments = !showComments;
+	}
+
+	// Overrides the prop once the viewer has actually toggled — the server's
+	// response is the source of truth (another reader may have liked it since).
+	let likeOverride = $state<LikeState | null>(null);
+	const likedByViewer = $derived(likeOverride?.liked ?? post.likedByViewer);
+	const likeCount = $derived(likeOverride?.likeCount ?? post.likeCount);
+
+	async function handleLike() {
+		if (!isLoggedIn || post.isLocked) return;
+		await toggleLikeOptimistic(
+			'post',
+			post.id,
+			{ liked: likedByViewer, likeCount },
+			(next) => (likeOverride = next)
+		);
+	}
 
 	function formatDate(value: Date | string | null) {
 		if (!value) return '';
@@ -120,18 +147,21 @@
 	</div>
 
 	<footer class="post-actions">
-		<button aria-label="Like post" onclick={onLike}>
-			<SvgIcon path={mdiHeartOutline} size={20} />
-		</button>
-		<CommentToggle
-			count={commentCount}
-			expanded={showComments}
-			onToggle={commentsEnabled ? () => (showComments = !showComments) : undefined}
+		<IconButton
+			path={likedByViewer ? mdiHeart : mdiHeartOutline}
+			label={likedByViewer ? 'Unlike post' : 'Like post'}
+			variant="ghost"
+			tone={likedByViewer ? 'accent' : 'neutral'}
+			count={likeCount}
+			onClick={handleLike}
 		/>
+		{#if commentsEnabled}
+			<CommentToggle count={commentCount} expanded={showComments} onToggle={handleCommentToggle} />
+		{/if}
 	</footer>
 
 	<!-- Outside the action row on purpose: the panel spans the card's full width. -->
-	{#if showComments && commentsEnabled}
+	{#if showComments && canOpenComments}
 		<div class="post-comments">
 			<CommentSection
 				targetType="post"
@@ -161,14 +191,10 @@
 			linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 40%),
 			color-mix(in srgb, var(--bg-surface) 74%, var(--bg-primary));
 		box-shadow: 0 14px 40px rgba(0, 0, 0, 0.16);
-		transition:
-			transform var(--duration-normal) var(--easing-ease-out),
-			border-color var(--duration-normal) var(--easing-ease-out);
 
-		&:hover {
-			transform: translateY(-2px);
-			border-color: color-mix(in srgb, var(--primary) 45%, var(--border-primary));
-		}
+		// No hover lift: a post card isn't a single click target — it holds its own
+		// buttons, thread and composer, so shifting the whole thing under the cursor
+		// is noise (and the transform made it a stacking context that trapped popovers).
 
 		&.is-locked {
 			border-color: color-mix(in srgb, var(--primary) 42%, transparent);
@@ -270,27 +296,5 @@
 
 	.post-actions {
 		justify-content: flex-end;
-
-		button {
-			width: 44px;
-			height: 44px;
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
-			border-radius: var(--radius-md);
-			color: var(--text-secondary);
-			cursor: pointer;
-			transition: background-color var(--duration-fast) var(--easing-ease-out);
-
-			&:hover {
-				background: var(--bg-tertiary);
-				color: var(--text-primary);
-			}
-
-			&:focus-visible {
-				outline: 2px solid var(--border-focus);
-				outline-offset: 2px;
-			}
-		}
 	}
 </style>

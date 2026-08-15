@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchComments, createComment, editComment, deleteComment } from './comments';
+import { get } from 'svelte/store';
+import { notificationStore } from '$lib/stores/notification.svelte';
+import {
+	fetchComments,
+	createComment,
+	editComment,
+	deleteComment,
+	toggleLikeOptimistic
+} from './comments';
 
 const TARGET_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -93,5 +101,40 @@ describe('deleteComment', () => {
 		mockFetch(403, { error: 'forbidden' });
 		const result = await deleteComment('m1');
 		expect(result.ok).toBe(false);
+	});
+});
+
+describe('toggleLikeOptimistic', () => {
+	beforeEach(() => notificationStore.clear());
+
+	it('applies the flipped state immediately, before the network resolves', async () => {
+		let release: (value: unknown) => void = () => {};
+		vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise((resolve) => (release = resolve))));
+		const apply = vi.fn();
+
+		const pending = toggleLikeOptimistic('comment', 'c1', { liked: false, likeCount: 0 }, apply);
+		expect(apply).toHaveBeenCalledWith({ liked: true, likeCount: 1 });
+
+		release({ ok: true, status: 200, json: async () => ({ liked: true, likeCount: 1 }) });
+		await pending;
+	});
+
+	it('reconciles with the server result on success, not a local increment', async () => {
+		mockFetch(200, { liked: true, likeCount: 4 });
+		const apply = vi.fn();
+
+		await toggleLikeOptimistic('post', 'p1', { liked: false, likeCount: 3 }, apply);
+
+		expect(apply).toHaveBeenLastCalledWith({ liked: true, likeCount: 4 });
+	});
+
+	it('rolls back to the exact prior state and notifies on failure', async () => {
+		mockFetch(404, { error: 'invalid_target' });
+		const apply = vi.fn();
+
+		await toggleLikeOptimistic('post', 'p1', { liked: false, likeCount: 3 }, apply);
+
+		expect(apply).toHaveBeenLastCalledWith({ liked: false, likeCount: 3 });
+		expect(get(notificationStore)).toEqual([expect.objectContaining({ type: 'error' })]);
 	});
 });

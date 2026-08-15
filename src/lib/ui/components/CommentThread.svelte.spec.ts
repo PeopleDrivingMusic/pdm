@@ -7,11 +7,17 @@ const createComment = vi.fn();
 const editComment = vi.fn();
 const deleteComment = vi.fn();
 
+// The optimistic-apply/rollback/notify algorithm itself is `toggleLikeOptimistic`'s
+// job and is covered in `client/comments.spec.ts` — these tests only check that
+// CommentSection calls it with the right target and reflects whatever it applies.
+const toggleLikeOptimistic = vi.fn();
+
 vi.mock('$lib/client/comments', () => ({
 	fetchComments: (...args: unknown[]) => fetchComments(...args),
 	createComment: (...args: unknown[]) => createComment(...args),
 	editComment: (...args: unknown[]) => editComment(...args),
-	deleteComment: (...args: unknown[]) => deleteComment(...args)
+	deleteComment: (...args: unknown[]) => deleteComment(...args),
+	toggleLikeOptimistic: (...args: unknown[]) => toggleLikeOptimistic(...args)
 }));
 
 import CommentThread from './CommentThread.svelte';
@@ -27,6 +33,8 @@ const dto = (over: Record<string, unknown> = {}) => ({
 	isArtist: false,
 	canDelete: true,
 	canEdit: true,
+	likeCount: 0,
+	likedByViewer: false,
 	...over
 });
 
@@ -39,6 +47,10 @@ beforeEach(() => {
 		comment: dto({ body: 'reworded', editedAt: '2026-08-05T00:00:00.000Z' })
 	});
 	deleteComment.mockResolvedValue({ ok: true });
+	// Default: behave like the real helper for a plain success.
+	toggleLikeOptimistic.mockImplementation(async (_type, _id, current, apply) => {
+		apply({ liked: !current.liked, likeCount: current.likeCount + (!current.liked ? 1 : -1) });
+	});
 });
 
 const mount = (over: Record<string, unknown> = {}) =>
@@ -56,7 +68,7 @@ test('keeps the server count when the loaded page is only part of the thread', a
 	fetchComments.mockResolvedValue({ ok: true, comments: [dto()] });
 	mount({ initialCount: 80 });
 
-	const toggle = page.getByRole('button', { name: /comment/i });
+	const toggle = page.getByRole('button', { name: /^comments/i });
 	await toggle.click();
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 
@@ -65,7 +77,7 @@ test('keeps the server count when the loaded page is only part of the thread', a
 
 test('moves the count by one as the viewer posts and deletes', async () => {
 	mount({ initialCount: 80 });
-	const toggle = page.getByRole('button', { name: /comment/i });
+	const toggle = page.getByRole('button', { name: /^comments/i });
 	await toggle.click();
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 
@@ -74,14 +86,17 @@ test('moves the count by one as the viewer posts and deletes', async () => {
 	await expect.element(page.getByText('brand new')).toBeInTheDocument();
 	await expect.element(toggle).toHaveTextContent('81');
 
-	await page.getByRole('button', { name: /more actions/i }).first().click();
+	await page
+		.getByRole('button', { name: /more actions/i })
+		.first()
+		.click();
 	await page.getByRole('button', { name: /delete comment/i }).click();
 	await expect.element(toggle).toHaveTextContent('80');
 });
 
 test('puts the composer above the list so acting needs no scrolling', async () => {
 	mount();
-	await page.getByRole('button', { name: /comment/i }).click();
+	await page.getByRole('button', { name: /^comments/i }).click();
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 
 	const composer = page.getByRole('textbox', { name: /add a comment/i }).element();
@@ -96,7 +111,7 @@ test('shows a skeleton while the comments load, not a text placeholder', async (
 	fetchComments.mockReturnValue(new Promise((resolve) => (release = resolve)));
 
 	mount();
-	await page.getByRole('button', { name: /comment/i }).click();
+	await page.getByRole('button', { name: /^comments/i }).click();
 
 	await expect.element(page.getByTestId('comment-skeleton')).toBeInTheDocument();
 	await expect.element(page.getByText('Loading comments…')).not.toBeInTheDocument();
@@ -108,13 +123,13 @@ test('shows a skeleton while the comments load, not a text placeholder', async (
 
 test('does not fetch until the thread is opened', async () => {
 	mount();
-	await expect.element(page.getByRole('button', { name: /comment/i })).toBeInTheDocument();
+	await expect.element(page.getByRole('button', { name: /^comments/i })).toBeInTheDocument();
 	expect(fetchComments).not.toHaveBeenCalled();
 });
 
 test('loads the comments once when opened', async () => {
 	mount();
-	await page.getByRole('button', { name: /comment/i }).click();
+	await page.getByRole('button', { name: /^comments/i }).click();
 
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 	expect(fetchComments).toHaveBeenCalledWith('post', TARGET_ID);
@@ -123,7 +138,7 @@ test('loads the comments once when opened', async () => {
 
 test('posting prepends the new comment', async () => {
 	mount();
-	await page.getByRole('button', { name: /comment/i }).click();
+	await page.getByRole('button', { name: /^comments/i }).click();
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 
 	await page.getByRole('textbox').fill('brand new');
@@ -139,7 +154,7 @@ test('surfaces a link-policy refusal inline', async () => {
 		error: 'Links are not allowed here — only the artist can post links.'
 	});
 	mount();
-	await page.getByRole('button', { name: /comment/i }).click();
+	await page.getByRole('button', { name: /^comments/i }).click();
 
 	await page.getByRole('textbox').fill('see scam.com');
 	await page.getByRole('button', { name: /send/i }).click();
@@ -149,7 +164,7 @@ test('surfaces a link-policy refusal inline', async () => {
 
 test('deleting removes the comment from the list', async () => {
 	mount();
-	await page.getByRole('button', { name: /comment/i }).click();
+	await page.getByRole('button', { name: /^comments/i }).click();
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 
 	await page.getByRole('button', { name: /more actions/i }).click();
@@ -161,7 +176,7 @@ test('deleting removes the comment from the list', async () => {
 
 test('editing replaces the body in place', async () => {
 	mount();
-	await page.getByRole('button', { name: /comment/i }).click();
+	await page.getByRole('button', { name: /^comments/i }).click();
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 
 	await page.getByRole('button', { name: /more actions/i }).click();
@@ -175,7 +190,7 @@ test('editing replaces the body in place', async () => {
 
 test('an anonymous viewer can read but is prompted to log in', async () => {
 	mount({ isLoggedIn: false });
-	await page.getByRole('button', { name: /comment/i }).click();
+	await page.getByRole('button', { name: /^comments/i }).click();
 
 	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
 	await expect.element(page.getByRole('link', { name: /log in to comment/i })).toBeInTheDocument();
@@ -185,7 +200,25 @@ test('an anonymous viewer can read but is prompted to log in', async () => {
 test('shows a load failure without breaking the thread', async () => {
 	fetchComments.mockResolvedValue({ ok: false, error: 'Could not load comments.' });
 	mount();
-	await page.getByRole('button', { name: /comment/i }).click();
+	await page.getByRole('button', { name: /^comments/i }).click();
 
 	await expect.element(page.getByText('Could not load comments.')).toBeInTheDocument();
+});
+
+test('likes a comment through the shared toggle helper', async () => {
+	mount();
+	await page.getByRole('button', { name: /^comments/i }).click();
+	await expect.element(page.getByText('This track slaps')).toBeInTheDocument();
+
+	await page.getByRole('button', { name: 'Like comment' }).click();
+
+	expect(toggleLikeOptimistic).toHaveBeenCalledWith(
+		'comment',
+		'm1',
+		{ liked: false, likeCount: 0 },
+		expect.any(Function)
+	);
+	const button = page.getByRole('button', { name: 'Unlike comment' });
+	await expect.element(button).toBeInTheDocument();
+	await expect.element(button).toHaveTextContent('1');
 });

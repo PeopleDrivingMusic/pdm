@@ -7,12 +7,23 @@
 		type?: 'button' | 'submit' | 'reset';
 		/** `solid` carries a border + surface; `ghost` is chrome-free for inline rows. */
 		variant?: 'solid' | 'ghost';
-		/** `sm` matches a `size="sm"` Button; it keeps a 44px tap area via a hit-slop. */
-		size?: 'sm' | 'md';
+		/** `xs`/`sm` match `Button` sizes; each keeps a 44px tap area via a hit-slop. */
+		size?: 'xs' | 'sm' | 'md';
+		/** Solid-fill toggle state (toolbar formatting buttons, the emoji picker trigger). */
 		active?: boolean;
+		/** Color-only toggle state — for a "liked" heart etc., where a filled background
+		 *  would compete with the row it sits in. Independent of `active`. Passing
+		 *  either value (not just 'accent') also opts the button into `aria-pressed`,
+		 *  since only toggle-style callers use this prop at all. */
+		tone?: 'neutral' | 'accent';
+		/** When set, the button widens to fit a trailing count instead of staying square;
+		 *  the number itself only renders once it's above zero. */
+		count?: number;
 		disabled?: boolean;
 		onClick?: () => void;
 	}
+
+	const ICON_SIZE = { xs: 14, sm: 16, md: 18 } as const;
 
 	let {
 		path,
@@ -21,6 +32,8 @@
 		variant = 'solid',
 		size = 'md',
 		active = false,
+		tone,
+		count,
 		disabled = false,
 		onClick
 	}: Props = $props();
@@ -30,12 +43,18 @@
 	{type}
 	class="icon-button icon-button--{variant} icon-button--{size}"
 	class:icon-button--active={active}
+	class:icon-button--accent={tone === 'accent'}
+	class:icon-button--counted={count !== undefined}
 	{disabled}
 	aria-label={label}
+	aria-pressed={tone !== undefined ? tone === 'accent' : undefined}
 	title={label}
 	onclick={onClick}
 >
-	<SvgIcon {path} size={size === 'sm' ? 16 : 18} />
+	<SvgIcon {path} size={ICON_SIZE[size]} />
+	{#if count !== undefined && count > 0}
+		<span class="icon-button__count">{count}</span>
+	{/if}
 </button>
 
 <style lang="scss">
@@ -98,9 +117,45 @@
 		}
 	}
 
+	.icon-button--xs {
+		width: 28px;
+		height: 28px;
+
+		&::after {
+			content: '';
+			position: absolute;
+			inset: -8px;
+		}
+	}
+
 	.icon-button--active {
 		background: var(--primary);
 		border-color: var(--primary);
 		color: var(--text-on-primary);
+	}
+
+	// Color-only toggle — no fill, so it stays quiet in a row of its own
+	// content (a comment's like button shouldn't out-shout the comment).
+	.icon-button--accent {
+		color: var(--primary);
+	}
+
+	// Widens to fit the trailing count instead of staying a fixed square.
+	.icon-button--counted {
+		width: auto;
+		min-width: 40px;
+		padding: 0 var(--space-2);
+		gap: var(--space-1);
+	}
+
+	.icon-button--counted.icon-button--sm,
+	.icon-button--counted.icon-button--xs {
+		min-width: 32px;
+		padding: 0 var(--space-1);
+	}
+
+	.icon-button__count {
+		font-size: var(--font-size-xs);
+		line-height: 1;
 	}
 </style>

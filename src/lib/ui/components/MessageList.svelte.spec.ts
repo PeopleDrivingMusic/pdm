@@ -12,6 +12,8 @@ const comment = (over: Record<string, unknown> = {}) => ({
 	isArtist: false,
 	canDelete: false,
 	canEdit: false,
+	likeCount: 0,
+	likedByViewer: false,
 	...over
 });
 
@@ -53,6 +55,27 @@ test('hides the edited marker for an untouched comment', async () => {
 test('renders a body containing markup as plain text', async () => {
 	render(MessageList, { messages: [comment({ body: '<img src=x onerror=alert(1)>' })] });
 	await expect.element(page.getByText('<img src=x onerror=alert(1)>')).toBeInTheDocument();
+});
+
+test('shows the like count and reflects the viewer state', async () => {
+	render(MessageList, { messages: [comment({ likeCount: 4, likedByViewer: true })] });
+
+	const like = page.getByRole('button', { name: /unlike/i });
+	await expect.element(like).toBeInTheDocument();
+	await expect.element(like).toHaveTextContent('4');
+});
+
+test('offers a like affordance when the viewer has not liked yet', async () => {
+	const onToggleLike = vi.fn().mockResolvedValue(undefined);
+	render(MessageList, { messages: [comment({ likeCount: 0 })], onToggleLike });
+
+	await page.getByRole('button', { name: /^like/i }).click();
+	expect(onToggleLike).toHaveBeenCalledWith('m1');
+});
+
+test('hides the count while a message has no likes', async () => {
+	render(MessageList, { messages: [comment({ likeCount: 0 })] });
+	await expect.element(page.getByRole('button', { name: /^like/i })).not.toHaveTextContent('0');
 });
 
 test('keeps row actions behind a single overflow menu', async () => {

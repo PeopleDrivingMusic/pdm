@@ -1,5 +1,11 @@
-import type { CommentDTO, CommentErrorCode, CommentTargetType } from '$lib/messages/types';
+import type {
+	CommentDTO,
+	CommentErrorCode,
+	CommentTargetType,
+	LikeTargetType
+} from '$lib/messages/types';
 import { errorMessage, GENERIC_ERROR } from './errors';
+import { notificationStore } from '$lib/stores/notification.svelte';
 
 export type { CommentTargetType };
 
@@ -114,4 +120,59 @@ export async function deleteComment(commentId: string): Promise<DeleteResult> {
 	} catch {
 		return { ok: false, error: 'Could not delete that comment.' };
 	}
+}
+
+export type LikeResult = Ok<{ liked: boolean; likeCount: number }> | Fail;
+export type LikeState = { liked: boolean; likeCount: number };
+
+/** Toggle the current user's like on a comment or a post. */
+export async function toggleLike(
+	targetType: LikeTargetType,
+	targetId: string
+): Promise<LikeResult> {
+	try {
+		const response = await fetch('/api/likes', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ targetType, targetId })
+		});
+		if (!response.ok) {
+			return {
+				ok: false,
+				error: await errorMessage(response, COMMENT_ERROR_COPY, 'Could not register your like.')
+			};
+		}
+		const payload = await response.json();
+		return { ok: true, liked: Boolean(payload?.liked), likeCount: Number(payload?.likeCount ?? 0) };
+	} catch {
+		return { ok: false, error: 'Could not register your like.' };
+	}
+}
+
+/**
+ * Every like affordance (comment, post, and eventually track/video) follows
+ * the same shape: flip immediately so the tap feels instant, then reconcile
+ * with the server's real count, or roll back to the exact pre-click state
+ * and surface the failure — the same toast used across the app. `apply` is
+ * the only thing that differs per caller (a single override vs. one row in a
+ * list), so it stays a plain callback rather than owned state here.
+ */
+export async function toggleLikeOptimistic(
+	targetType: LikeTargetType,
+	targetId: string,
+	current: LikeState,
+	apply: (next: LikeState) => void
+): Promise<void> {
+	const before = current;
+	const liked = !current.liked;
+	const likeCount = Math.max(0, current.likeCount + (liked ? 1 : -1));
+	apply({ liked, likeCount });
+
+	const result = await toggleLike(targetType, targetId);
+	if (!result.ok) {
+		apply(before);
+		notificationStore.error(result.error);
+		return;
+	}
+	apply({ liked: result.liked, likeCount: result.likeCount });
 }

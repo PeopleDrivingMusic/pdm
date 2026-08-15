@@ -4,6 +4,8 @@ import {
 	resolveTargetOwnerUserId,
 	MAX_MESSAGE_LENGTH
 } from '$lib/server/messages/policy';
+import { resolveTargetAccess } from '$lib/server/messages/access';
+import { LikeService } from '$lib/server/likes';
 
 import type { CommentDTO } from '$lib/messages/types';
 
@@ -42,6 +44,14 @@ export class CommentService {
 			CommentRepository.listForTarget({ targetType: input.targetType, targetId: input.targetId }),
 			resolveTargetOwnerUserId(input.targetType, input.targetId)
 		]);
+
+		// One grouped count + one membership query for the whole page, not per row.
+		const likes = await LikeService.summaryFor(
+			'comment',
+			rows.map((r) => r.id),
+			input.viewerUserId
+		);
+
 		return rows.map((r) => ({
 			id: r.id,
 			body: r.body,
@@ -58,7 +68,9 @@ export class CommentService {
 			canDelete:
 				!!input.viewerUserId &&
 				(input.viewerUserId === r.authorId || input.viewerUserId === ownerUserId),
-			canEdit: !!input.viewerUserId && input.viewerUserId === r.authorId
+			canEdit: !!input.viewerUserId && input.viewerUserId === r.authorId,
+			likeCount: likes.get(r.id)?.likeCount ?? 0,
+			likedByViewer: likes.get(r.id)?.likedByViewer ?? false
 		}));
 	}
 
@@ -78,11 +90,12 @@ export class CommentService {
 		if (!body) return { ok: false, reason: 'empty' };
 		if (body.length > MAX_MESSAGE_LENGTH) return { ok: false, reason: 'too_long' };
 
-		// A target that resolves to no owner does not exist (or is gone). Reject rather
-		// than writing an orphan row: `target_id` is polymorphic, so there is no FK to
-		// catch it and `deleteForTarget` would never reap it.
-		const ownerUserId = await resolveTargetOwnerUserId(input.targetType, input.targetId);
-		if (!ownerUserId) return { ok: false, reason: 'invalid_target' };
+		// Reject anything the author can't actually reach: a missing target (no FK
+		// backs the polymorphic `target_id`, so an orphan row would never be reaped),
+		// an unpublished draft, or gated content they aren't entitled to.
+		const access = await resolveTargetAccess(input.targetType, input.targetId, input.authorId);
+		if (!access.ok) return { ok: false, reason: 'invalid_target' };
+		const ownerUserId = access.ownerUserId;
 
 		if (containsUrl(body) && input.authorId !== ownerUserId) {
 			return { ok: false, reason: 'links_not_allowed' };
@@ -110,7 +123,10 @@ export class CommentService {
 				editedAt: null,
 				isArtist: input.authorId === ownerUserId,
 				canDelete: true,
-				canEdit: true
+				canEdit: true,
+				// A brand-new comment has no likes yet.
+				likeCount: 0,
+				likedByViewer: false
 			}
 		};
 	}
@@ -147,6 +163,11 @@ export class CommentService {
 		const updated = await CommentRepository.updateBody(input.commentId, body);
 		if (!updated) return { ok: false, reason: 'not_found' };
 
+		// The caller swaps this DTO in for the edited row, so carry the real like
+		// state — returning zeroes would wipe the count off screen.
+		const likes = await LikeService.summaryFor('comment', [updated.id], input.userId);
+		const like = likes.get(updated.id);
+
 		return {
 			ok: true,
 			comment: {
@@ -162,7 +183,9 @@ export class CommentService {
 				},
 				isArtist: updated.authorId === ownerUserId,
 				canDelete: true,
-				canEdit: true
+				canEdit: true,
+				likeCount: like?.likeCount ?? 0,
+				likedByViewer: like?.likedByViewer ?? false
 			}
 		};
 	}
