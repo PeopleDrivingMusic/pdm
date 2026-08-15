@@ -111,13 +111,14 @@ export class CommentRepository {
 		});
 	}
 
-	/** Replace a comment's body and stamp `edited_at`. Returns the updated row. */
+	/** Replace a comment's body and stamp `edited_at`. Returns the updated row, or
+	 *  `undefined` if it's gone — including a delete that raced this same edit. */
 	static async updateBody(id: string, body: string): Promise<Comment | undefined> {
 		return withDbLogging('CommentRepository.updateBody', async () => {
 			const [row] = await db
 				.update(comments)
 				.set({ body, editedAt: new Date() })
-				.where(eq(comments.id, id))
+				.where(and(eq(comments.id, id), isNull(comments.deletedAt)))
 				.returning();
 			return row;
 		});
