@@ -4,7 +4,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 export const GET: RequestHandler = async () => {
 	try {
 		const metrics = await register.metrics();
-		
+
 		return new Response(metrics, {
 			status: 200,
 			headers: {

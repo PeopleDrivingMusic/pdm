@@ -81,7 +81,7 @@
 	<!-- Color Tokens -->
 	<section>
 		<h2>Color Tokens</h2>
-		
+
 		<h3>Brand Colors</h3>
 		<div class="color-grid">
 			{#each colorTokens as color}
@@ -139,22 +139,14 @@
 			<div class="component-demo">
 				<h4>Form Elements</h4>
 				<div class="component-examples">
-					<input 
-						class="input" 
-						type="text" 
+					<input
+						class="input"
+						type="text"
 						placeholder="Enter your text..."
 						bind:value={sampleText}
 					/>
-					<input 
-						class="input" 
-						type="email" 
-						placeholder="email@example.com"
-					/>
-					<input 
-						class="input" 
-						type="password" 
-						placeholder="Password"
-					/>
+					<input class="input" type="email" placeholder="email@example.com" />
+					<input class="input" type="password" placeholder="Password" />
 				</div>
 			</div>
 		</div>
@@ -166,7 +158,10 @@
 		<div class="spacing-demo">
 			{#each spacingTokens as space}
 				<div class="spacing-item">
-					<div class="spacing-visual" style="width: var({space.value}); height: var({space.value});"></div>
+					<div
+						class="spacing-visual"
+						style="width: var({space.value}); height: var({space.value});"
+					></div>
 					<div class="spacing-label">{space.name}</div>
 					<div class="spacing-label">{space.size}</div>
 				</div>
@@ -202,7 +197,10 @@
 	<!-- Theme Toggle Demo -->
 	<section>
 		<h2>Theme System</h2>
-		<p>Use the theme toggle in the top-right corner to see how CSS custom properties enable dynamic theming.</p>
+		<p>
+			Use the theme toggle in the top-right corner to see how CSS custom properties enable dynamic
+			theming.
+		</p>
 		<div class="theme-demo">
 			<div class="theme-card">
 				<h4>Theme-aware Card</h4>
@@ -215,12 +213,12 @@
 
 <style lang="scss">
 	@use '../../styles/variables' as mixins;
-	
+
 	.design-system {
 		padding: var(--space-8);
 		max-width: 1200px;
 		margin: 0 auto;
-		
+
 		h1 {
 			@include mixins.text-display-lg();
 			@include mixins.font-bold();
@@ -228,18 +226,18 @@
 			margin-bottom: var(--space-4);
 			text-align: center;
 		}
-		
+
 		> p {
 			@include mixins.text-lg();
 			color: var(--text-secondary);
 			text-align: center;
 			margin-bottom: var(--space-12);
 		}
-		
+
 		section {
 			margin-bottom: var(--space-12);
 		}
-		
+
 		h2 {
 			@include mixins.text-display-md();
 			@include mixins.font-semibold();
@@ -248,14 +246,14 @@
 			border-bottom: 1px solid var(--border-primary);
 			padding-bottom: var(--space-3);
 		}
-		
+
 		h3 {
 			@include mixins.text-xl();
 			@include mixins.font-semibold();
 			color: var(--text-primary);
 			margin: var(--space-8) 0 var(--space-4) 0;
 		}
-		
+
 		h4 {
 			@include mixins.text-sm();
 			@include mixins.font-semibold();
@@ -264,7 +262,7 @@
 			text-transform: uppercase;
 			letter-spacing: 0.05em;
 		}
-		
+
 		p {
 			@include mixins.text-md();
 			color: var(--text-secondary);
@@ -272,34 +270,62 @@
 			line-height: 1.6;
 		}
 	}
-	
+
 	.typography-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
 		gap: var(--space-6);
 		margin-bottom: var(--space-8);
 	}
-	
+
 	.typography-sample {
 		@include mixins.card();
-		
-		.display-2xl { @include mixins.text-display-2xl(); @include mixins.font-bold(); color: var(--text-primary); }
-		.display-xl { @include mixins.text-display-xl(); @include mixins.font-bold(); color: var(--text-primary); }
-		.display-lg { @include mixins.text-display-lg(); @include mixins.font-bold(); color: var(--text-primary); }
-		.display-md { @include mixins.text-display-md(); @include mixins.font-bold(); color: var(--text-primary); }
-		.text-xl { @include mixins.text-xl(); color: var(--text-primary); }
-		.text-lg { @include mixins.text-lg(); color: var(--text-primary); }
-		.text-md { @include mixins.text-md(); color: var(--text-primary); }
-		.text-sm { @include mixins.text-sm(); color: var(--text-primary); }
+
+		.display-2xl {
+			@include mixins.text-display-2xl();
+			@include mixins.font-bold();
+			color: var(--text-primary);
+		}
+		.display-xl {
+			@include mixins.text-display-xl();
+			@include mixins.font-bold();
+			color: var(--text-primary);
+		}
+		.display-lg {
+			@include mixins.text-display-lg();
+			@include mixins.font-bold();
+			color: var(--text-primary);
+		}
+		.display-md {
+			@include mixins.text-display-md();
+			@include mixins.font-bold();
+			color: var(--text-primary);
+		}
+		.text-xl {
+			@include mixins.text-xl();
+			color: var(--text-primary);
+		}
+		.text-lg {
+			@include mixins.text-lg();
+			color: var(--text-primary);
+		}
+		.text-md {
+			@include mixins.text-md();
+			color: var(--text-primary);
+		}
+		.text-sm {
+			@include mixins.text-sm();
+			color: var(--text-primary);
+		}
 	}
-	
+
 	.color-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 		gap: var(--space-4);
 		margin-bottom: var(--space-8);
 	}
-	
+
 	.color-swatch {
 		background: var(--bg-surface);
 		border: 1px solid var(--border-secondary);
@@ -307,27 +333,27 @@
 		overflow: hidden;
 		box-shadow: var(--shadow-sm);
 		transition: all var(--duration-normal) var(--easing-ease-out);
-		
+
 		&:hover {
 			box-shadow: var(--shadow-md);
 			transform: translateY(-2px);
 		}
-		
+
 		.color-preview {
 			height: 80px;
 			width: 100%;
 		}
-		
+
 		.color-info {
 			padding: var(--space-3);
-			
+
 			.color-name {
 				@include mixins.text-sm();
 				@include mixins.font-semibold();
 				color: var(--text-primary);
 				margin-bottom: var(--space-1);
 			}
-			
+
 			.color-value {
 				@include mixins.text-xs();
 				color: var(--text-tertiary);
@@ -335,54 +361,60 @@
 			}
 		}
 	}
-	
+
 	.component-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 		gap: var(--space-6);
 		margin-bottom: var(--space-8);
 	}
-	
+
 	.component-demo {
 		@include mixins.card();
-		
+
 		.component-examples {
 			display: flex;
 			flex-direction: column;
 			gap: var(--space-3);
 		}
 	}
-	
+
 	.button {
 		@include mixins.button-base();
-		
-		&.primary { @include mixins.button-primary(); }
-		&.secondary { @include mixins.button-secondary(); }
-		&.outline { @include mixins.button-outline(); }
+
+		&.primary {
+			@include mixins.button-primary();
+		}
+		&.secondary {
+			@include mixins.button-secondary();
+		}
+		&.outline {
+			@include mixins.button-outline();
+		}
 	}
-	
+
 	.input {
 		@include mixins.input-base();
 	}
-	
+
 	.spacing-demo {
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--space-6);
 		margin-bottom: var(--space-8);
-		
+
 		.spacing-item {
 			display: flex;
 			flex-direction: column;
 			align-items: center;
 			gap: var(--space-2);
-			
+
 			.spacing-visual {
 				background: var(--primary);
 				border-radius: var(--radius-sm);
 				opacity: 0.7;
 			}
-			
+
 			.spacing-label {
 				@include mixins.text-xs();
 				color: var(--text-tertiary);
@@ -391,44 +423,56 @@
 			}
 		}
 	}
-	
+
 	.shadow-demo {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 		gap: var(--space-6);
 		margin-bottom: var(--space-8);
-		
+
 		.shadow-item {
 			background: var(--bg-surface);
 			border-radius: var(--radius-lg);
 			padding: var(--space-6);
 			text-align: center;
 			transition: all var(--duration-normal) var(--easing-ease-out);
-			
+
 			.shadow-label {
 				@include mixins.text-sm();
 				@include mixins.font-medium();
 				color: var(--text-secondary);
 				font-family: var(--font-family-mono);
 			}
-			
-			&.shadow-xs { box-shadow: var(--shadow-xs); }
-			&.shadow-sm { box-shadow: var(--shadow-sm); }
-			&.shadow-md { box-shadow: var(--shadow-md); }
-			&.shadow-lg { box-shadow: var(--shadow-lg); }
-			&.shadow-xl { box-shadow: var(--shadow-xl); }
-			&.shadow-2xl { box-shadow: var(--shadow-2xl); }
+
+			&.shadow-xs {
+				box-shadow: var(--shadow-xs);
+			}
+			&.shadow-sm {
+				box-shadow: var(--shadow-sm);
+			}
+			&.shadow-md {
+				box-shadow: var(--shadow-md);
+			}
+			&.shadow-lg {
+				box-shadow: var(--shadow-lg);
+			}
+			&.shadow-xl {
+				box-shadow: var(--shadow-xl);
+			}
+			&.shadow-2xl {
+				box-shadow: var(--shadow-2xl);
+			}
 		}
 	}
-	
+
 	.theme-demo {
 		margin-top: var(--space-6);
-		
+
 		.theme-card {
 			@include mixins.card();
 			max-width: 400px;
 			text-align: center;
-			
+
 			h4 {
 				@include mixins.text-lg();
 				@include mixins.font-semibold();
@@ -437,28 +481,28 @@
 				text-transform: none;
 				letter-spacing: normal;
 			}
-			
+
 			p {
 				margin-bottom: var(--space-4);
 			}
 		}
 	}
-	
+
 	@include mixins.mobile-only {
 		.design-system {
 			padding: var(--space-4);
 		}
-		
+
 		.typography-grid,
 		.color-grid,
 		.component-grid {
 			grid-template-columns: 1fr;
 		}
-		
+
 		.shadow-demo {
 			grid-template-columns: repeat(2, 1fr);
 		}
-		
+
 		.spacing-demo {
 			justify-content: center;
 		}

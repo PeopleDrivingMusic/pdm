@@ -120,43 +120,61 @@ export type Visibility = 'public' | 'subscribers_only';
 export type TrackUploadStatus = 'draft' | 'pending_upload' | 'uploaded' | 'ready' | 'failed';
 
 export interface TrackDTO {
-  id; artistId; albumId: string | null;
-  title; duration: number | null;
-  audioKey: string | null; imageKey: string | null;
-  genres: string[]; status: TrackUploadStatus;
-  visibility: Visibility; isPublished: boolean;
-  trackNumber: number | null; createdAt; updatedAt;
+	id;
+	artistId;
+	albumId: string | null;
+	title;
+	duration: number | null;
+	audioKey: string | null;
+	imageKey: string | null;
+	genres: string[];
+	status: TrackUploadStatus;
+	visibility: Visibility;
+	isPublished: boolean;
+	trackNumber: number | null;
+	createdAt;
+	updatedAt;
 }
 export interface AlbumDTO {
-  id; artistId; title; description: string | null; coverImageKey: string | null;
-  releaseDate: string | null; genres: string[];
-  visibility: Visibility; isPublished: boolean; createdAt; updatedAt;
+	id;
+	artistId;
+	title;
+	description: string | null;
+	coverImageKey: string | null;
+	releaseDate: string | null;
+	genres: string[];
+	visibility: Visibility;
+	isPublished: boolean;
+	createdAt;
+	updatedAt;
 }
 export interface StudioMusicOverviewDTO {
-  albums: AlbumDTO[];
-  tracks: { track: TrackDTO; stats: TrackStatsDTO | null }[];
-  albumTracks: AlbumTrackDTO[]; genres: GenreDTO[]; stats: StudioStatsDTO;
+	albums: AlbumDTO[];
+	tracks: { track: TrackDTO; stats: TrackStatsDTO | null }[];
+	albumTracks: AlbumTrackDTO[];
+	genres: GenreDTO[];
+	stats: StudioStatsDTO;
 }
 export type UploadIntent = { fileName: string; contentType: string; size: number };
 ```
 
 **Method → current-action mapping** (every route action becomes a thin wrapper):
 
-| Boundary method | Replaces / wraps |
-| --- | --- |
-| `getStudioOverview(artistId)` | the entire `load` block |
-| `createAlbum(artistId, input)` → `{album, coverUpload?}` | `createAlbum` (cover now presigned) |
-| `updateAlbum(artistId, albumId, patch)` → `{album, coverUpload?}` | `updateAlbum` (+ visibility cascade) |
-| `deleteAlbum(artistId, albumId)` | `deleteAlbum` (+ R2 cover cleanup — fixes leak) |
-| `createTrack(artistId, input)` → `{track, uploadTargets}` | `createTrack` |
-| `resumeTrackUpload(artistId, trackId)` → `{track, uploadTargets}` | `resumeTrackUpload` |
-| `finalizeTrackUpload(artistId, trackId, {audioParts, coverUploaded})` | `finalizeTrackUpload` (+ emit `track.uploaded`) |
-| `updateTrackMetadata(artistId, trackId, patch)` | metadata branch of `updateTrack` |
-| `replaceTrackAudio(artistId, trackId, audio)` → `{track, uploadTargets}` | audio branch of `updateTrack` → presigned |
-| `replaceTrackImage(artistId, trackId, image)` → `{track, uploadTargets}` | image branch of `updateTrack` → presigned |
-| `deleteTrack(artistId, trackId)` | `deleteTrack` |
-| `linkTrackToAlbum(artistId, albumId, trackId, n)` | `linkTrackToAlbum` (+ inherit visibility) |
-| `unlinkTrackFromAlbum(artistId, albumId, trackId)` | `unlinkTrackFromAlbum` |
+| Boundary method                                                          | Replaces / wraps                                |
+| ------------------------------------------------------------------------ | ----------------------------------------------- |
+| `getStudioOverview(artistId)`                                            | the entire `load` block                         |
+| `createAlbum(artistId, input)` → `{album, coverUpload?}`                 | `createAlbum` (cover now presigned)             |
+| `updateAlbum(artistId, albumId, patch)` → `{album, coverUpload?}`        | `updateAlbum` (+ visibility cascade)            |
+| `deleteAlbum(artistId, albumId)`                                         | `deleteAlbum` (+ R2 cover cleanup — fixes leak) |
+| `createTrack(artistId, input)` → `{track, uploadTargets}`                | `createTrack`                                   |
+| `resumeTrackUpload(artistId, trackId)` → `{track, uploadTargets}`        | `resumeTrackUpload`                             |
+| `finalizeTrackUpload(artistId, trackId, {audioParts, coverUploaded})`    | `finalizeTrackUpload` (+ emit `track.uploaded`) |
+| `updateTrackMetadata(artistId, trackId, patch)`                          | metadata branch of `updateTrack`                |
+| `replaceTrackAudio(artistId, trackId, audio)` → `{track, uploadTargets}` | audio branch of `updateTrack` → presigned       |
+| `replaceTrackImage(artistId, trackId, image)` → `{track, uploadTargets}` | image branch of `updateTrack` → presigned       |
+| `deleteTrack(artistId, trackId)`                                         | `deleteTrack`                                   |
+| `linkTrackToAlbum(artistId, albumId, trackId, n)`                        | `linkTrackToAlbum` (+ inherit visibility)       |
+| `unlinkTrackFromAlbum(artistId, albumId, trackId)`                       | `unlinkTrackFromAlbum`                          |
 
 The route stops importing `$lib/db/queries` and `$lib/server/upload`.
 
@@ -165,21 +183,36 @@ The route stops importing `$lib/db/queries` and `$lib/server/upload`.
 ```ts
 // types.ts
 export type DomainEvent =
-  | { type: 'track.uploaded';           trackId; artistId; occurredAt: string }
-  | { type: 'track.published';          trackId; artistId; occurredAt: string }
-  | { type: 'track.visibility_changed'; trackId; artistId; visibility: Visibility; occurredAt: string }
-  | { type: 'track.deleted';            trackId; artistId; occurredAt: string }
-  | { type: 'album.visibility_changed'; albumId; artistId; visibility: Visibility; trackIds: string[]; occurredAt: string };
+	| { type: 'track.uploaded'; trackId; artistId; occurredAt: string }
+	| { type: 'track.published'; trackId; artistId; occurredAt: string }
+	| {
+			type: 'track.visibility_changed';
+			trackId;
+			artistId;
+			visibility: Visibility;
+			occurredAt: string;
+	  }
+	| { type: 'track.deleted'; trackId; artistId; occurredAt: string }
+	| {
+			type: 'album.visibility_changed';
+			albumId;
+			artistId;
+			visibility: Visibility;
+			trackIds: string[];
+			occurredAt: string;
+	  };
 
-export interface EventPublisher { publish(event: DomainEvent): Promise<void>; }
+export interface EventPublisher {
+	publish(event: DomainEvent): Promise<void>;
+}
 ```
 
 ```ts
 // LogEventPublisher.ts — shipped now
 export class LogEventPublisher implements EventPublisher {
-  async publish(event: DomainEvent) {
-    logger.info('domain.event', { component: 'events', metadata: { event } });
-  }
+	async publish(event: DomainEvent) {
+		logger.info('domain.event', { component: 'events', metadata: { event } });
+	}
 }
 // index.ts
 export const eventPublisher: EventPublisher = new LogEventPublisher();
@@ -311,9 +344,16 @@ Job shape:
 ```ts
 type JobState = 'queued' | 'uploading' | 'finalizing' | 'uploaded' | 'failed';
 interface TrackUploadJob {
-  trackId; title; audioFile: File; coverFile: File | null;
-  uploadTargets; coverPreviewUrl: string | null;
-  state: JobState; progress: number; error: string; attempt: number;
+	trackId;
+	title;
+	audioFile: File;
+	coverFile: File | null;
+	uploadTargets;
+	coverPreviewUrl: string | null;
+	state: JobState;
+	progress: number;
+	error: string;
+	attempt: number;
 }
 ```
 
@@ -465,7 +505,7 @@ Shipped now: `EventPublisher` interface + `LogEventPublisher` (§3.3). Documente
 path (not built):
 
 - **Transactional outbox:** `events.outbox(id uuid pk, aggregate_type, aggregate_id,
-  type, payload jsonb, created_at, published_at null, attempts, status)`. A future
+type, payload jsonb, created_at, published_at null, attempts, status)`. A future
   `OutboxEventPublisher` inserts the event **in the same transaction** as the track
   mutation (atomic, no cross-domain transaction); an in-process relay drains
   `published_at IS NULL`. This is the swap point — `finalizeTrackUpload` is untouched
@@ -485,9 +525,10 @@ at finalize. Add upload counters (`media_upload_started/finalized/failed_total{k
 duration histograms (createTrack→finalize, finalize, R2 op), a `media_pending_uploads`
 gauge, and an R2 error counter (route `deleteFileFromR2`'s swallowed errors through
 `logger`/`MetricsCollector`). Structured logs (with `requestId` + `artistId` + `trackId`
-+ `key`) at presign issued / finalize start / verify result / failure; rejected uploads
-via `logger.security(...)`. All flows through the existing prom-client `/api/metrics` +
-Loki/Grafana stack — **no new infra**.
+
+- `key`) at presign issued / finalize start / verify result / failure; rejected uploads
+  via `logger.security(...)`. All flows through the existing prom-client `/api/metrics` +
+  Loki/Grafana stack — **no new infra**.
 
 ## 9. Implementation phases
 

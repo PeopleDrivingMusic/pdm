@@ -2,16 +2,12 @@
 	import { playerStore } from '$lib/stores/player.svelte';
 	import Progress from '$lib/ui/Progress.svelte';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
-	import {
-		mdiSkipPrevious,
-		mdiPause,
-		mdiPlay,
-		mdiSkipNext
-	} from '@mdi/js';
+	import { mdiSkipPrevious, mdiPause, mdiPlay, mdiSkipNext } from '@mdi/js';
 
 	let isUserSeeking = $state(false);
 
-	const { isPlaying, currentTime, currentTrack, que, currentTrackIndex, duration } = $derived(playerStore);
+	const { isPlaying, currentTime, currentTrack, que, currentTrackIndex, duration } =
+		$derived(playerStore);
 
 	function togglePlay() {
 		playerStore.isPlaying = !isPlaying;
@@ -49,6 +45,7 @@
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	}
 </script>
+
 <div class="main-wrapper">
 	<div class="progress-bar">
 		<Progress

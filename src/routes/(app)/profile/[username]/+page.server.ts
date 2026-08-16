@@ -1,10 +1,9 @@
-import { TrackService, UserService } from "$lib/db/queries";
-import { error } from "@sveltejs/kit";
-import type { PageServerLoad } from "./$types";
+import { TrackService, UserService } from '$lib/db/queries';
+import { error } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({params}) => {
-
-    const user = await UserService.getUserByUsername(params.username);
+export const load: PageServerLoad = async ({ params }) => {
+	const user = await UserService.getUserByUsername(params.username);
 
 	if (!user) {
 		error(404, {

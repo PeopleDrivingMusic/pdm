@@ -52,6 +52,7 @@ npm run monitoring:up
 After startup, open Grafana: http://localhost:3000
 
 **Login credentials:**
+
 - Username: `admin`
 - Password: `admin`
 
@@ -73,19 +74,23 @@ After startup, open Grafana: http://localhost:3000
 ## 📈 Application Metrics
 
 ### HTTP Metrics:
+
 - `http_requests_total` - Total HTTP requests count
 - `http_request_duration_seconds` - HTTP request response time
 
 ### Database Metrics:
+
 - `db_connections_active` - Active DB connections
 - `db_queries_total` - Total database queries count
 - `db_query_duration_seconds` - Query execution time
 
 ### User Metrics:
+
 - `active_users` - Active users count
 - `user_actions_total` - Total user actions count
 
 ### PDM Business Metrics:
+
 - `songs_played_total` - Songs played count
 - `playlists_created_total` - Playlists created
 - `music_uploads_total` - Music uploaded
@@ -97,21 +102,22 @@ After startup, open Grafana: http://localhost:3000
 
 ```json
 {
-  "timestamp": "2024-01-15T10:30:00.000Z",
-  "level": "info",
-  "message": "HTTP GET /api/users - 200 (45ms)",
-  "component": "http",
-  "request_id": "uuid-string",
-  "metadata": {
-    "method": "GET",
-    "path": "/api/users",
-    "status_code": 200,
-    "duration": 45
-  }
+	"timestamp": "2024-01-15T10:30:00.000Z",
+	"level": "info",
+	"message": "HTTP GET /api/users - 200 (45ms)",
+	"component": "http",
+	"request_id": "uuid-string",
+	"metadata": {
+		"method": "GET",
+		"path": "/api/users",
+		"status_code": 200,
+		"duration": 45
+	}
 }
 ```
 
 ### Log Levels:
+
 - `debug` - Detailed debugging information
 - `info` - General operational information
 - `warn` - Warnings
@@ -120,6 +126,7 @@ After startup, open Grafana: http://localhost:3000
 ## 🔧 Management Commands
 
 ### Logging and Monitoring:
+
 ```bash
 # Start logging services
 npm run logging:up
@@ -135,6 +142,7 @@ npm run logging:restart
 ```
 
 ### Metrics Monitoring Only:
+
 ```bash
 # Start Prometheus and exporters
 npm run monitoring:up
@@ -147,6 +155,7 @@ npm run monitoring:logs
 ```
 
 ### Docker:
+
 ```bash
 # Start all services
 npm run docker:up
@@ -163,17 +172,20 @@ npm run docker:clean
 The following alerts are configured in Prometheus:
 
 ### Application Alerts:
+
 - **PDMApplicationDown** - Application unavailable (>1 min)
 - **PDMHighResponseTime** - High response time (>1 sec)
 - **PDMHighErrorRate** - High error rate (>10%)
 - **PDMHighMemoryUsage** - High memory usage (>500MB)
 
 ### System Alerts:
+
 - **HighCPUUsage** - High CPU load (>80%)
 - **HighMemoryUsage** - High memory usage (>85%)
 - **LowDiskSpace** - Low disk space (<15%)
 
 ### Docker Alerts:
+
 - **ContainerDown** - Container unavailable
 - **ContainerHighCPU** - High container CPU load
 - **ContainerHighMemory** - High container memory usage
@@ -207,9 +219,9 @@ import { logger } from '$lib/utils/logger';
 logger.info('User logged in', { userId: '123', component: 'auth' });
 
 // Error logging
-logger.error('Database connection failed', { 
-  component: 'database',
-  metadata: { error: err, connectionString: 'postgres://...' }
+logger.error('Database connection failed', {
+	component: 'database',
+	metadata: { error: err, connectionString: 'postgres://...' }
 });
 
 // Special methods
@@ -259,6 +271,7 @@ pdm/
 ## 🐛 Troubleshooting
 
 ### Loki issues:
+
 ```bash
 # Check configuration
 docker-compose logs loki
@@ -268,6 +281,7 @@ curl http://localhost:3100/ready
 ```
 
 ### Prometheus issues:
+
 ```bash
 # Check configuration
 docker-compose logs prometheus
@@ -277,6 +291,7 @@ docker-compose logs prometheus
 ```
 
 ### Application metrics issues:
+
 ```bash
 # Check metrics endpoint
 curl http://localhost:4173/api/metrics

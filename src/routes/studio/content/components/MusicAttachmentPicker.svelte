@@ -30,7 +30,12 @@
 			<div class="options">
 				{#each tracks as track}
 					<label class="option">
-						<input type="checkbox" name="trackIds" value={track.id} checked={selectedTrackIds.includes(track.id)} />
+						<input
+							type="checkbox"
+							name="trackIds"
+							value={track.id}
+							checked={selectedTrackIds.includes(track.id)}
+						/>
 						<span class="cover">
 							{#if track.imageUrl}
 								<img src={track.imageUrl} alt="" loading="lazy" />
@@ -55,7 +60,12 @@
 			<div class="options">
 				{#each albums as album}
 					<label class="option">
-						<input type="checkbox" name="albumIds" value={album.id} checked={selectedAlbumIds.includes(album.id)} />
+						<input
+							type="checkbox"
+							name="albumIds"
+							value={album.id}
+							checked={selectedAlbumIds.includes(album.id)}
+						/>
 						<span class="cover">
 							{#if album.coverImageUrl}
 								<img src={album.coverImageUrl} alt="" loading="lazy" />

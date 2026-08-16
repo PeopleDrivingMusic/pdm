@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move album-cover and track audio/image *replacement* uploads off the legacy server-buffered path onto direct-to-R2 presigned targets, with ownership-checked, validated, server-derived keys — eliminating music's dependency on `$lib/server/upload.ts`.
+**Goal:** Move album-cover and track audio/image _replacement_ uploads off the legacy server-buffered path onto direct-to-R2 presigned targets, with ownership-checked, validated, server-derived keys — eliminating music's dependency on `$lib/server/upload.ts`.
 
 **Architecture:** Adds an `album-cover` kind to `MediaUploadService`, three new `MusicApplicationService` methods that issue presigned targets (ownership + validation enforced), and extends the `upload-target` JSON endpoint to serve those kinds. The legacy `uploadImage`/`uploadAudio` (through-server) path is no longer reachable from music; `upload.ts` remains only for the content route.
 
@@ -25,10 +25,12 @@
 ### Task 1: `album-cover` media kind
 
 **Files:**
+
 - Modify: `src/lib/server/media/MediaUploadService.ts`
 - Test: `src/lib/server/media/MediaUploadService.spec.ts`
 
 **Interfaces:**
+
 - Produces: `MediaUploadKind` gains `'album-cover'`; `MediaUploadService.createAlbumCoverUpload({ artistId, albumId, fileName, contentType, size }): Promise<MediaUploadTarget>` with key `${artistId}/albums/${albumId}/cover<ext>` in the `images` bucket, single PUT.
 
 - [ ] **Step 1: Write the failing test**
@@ -38,7 +40,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('$lib/db/services/R2Service', () => ({
-	createPresignedPutUrl: vi.fn(async (i) => ({ mode: 'single', bucket: i.bucket, key: i.key, url: 'https://r2/put', expiresIn: 900 })),
+	createPresignedPutUrl: vi.fn(async (i) => ({
+		mode: 'single',
+		bucket: i.bucket,
+		key: i.key,
+		url: 'https://r2/put',
+		expiresIn: 900
+	})),
 	createMultipartUpload: vi.fn(),
 	signMultipartParts: vi.fn(),
 	completeMultipartUpload: vi.fn(),
@@ -53,7 +61,11 @@ beforeEach(() => vi.clearAllMocks());
 describe('createAlbumCoverUpload', () => {
 	it('derives an artist/album-namespaced key in the images bucket', async () => {
 		const target = await MediaUploadService.createAlbumCoverUpload({
-			artistId: 'a1', albumId: 'al1', fileName: 'My Cover.PNG', contentType: 'image/png', size: 2048
+			artistId: 'a1',
+			albumId: 'al1',
+			fileName: 'My Cover.PNG',
+			contentType: 'image/png',
+			size: 2048
 		});
 		expect(target.kind).toBe('album-cover');
 		expect(target.bucket).toBe('images');
@@ -123,10 +135,12 @@ git commit -m "feat(media): add album-cover presigned upload kind"
 ### Task 2: Boundary — `createAlbumCover` (presigned album cover)
 
 **Files:**
+
 - Modify: `src/lib/server/music/MusicApplicationService.ts`
 - Test: `src/lib/server/music/MusicApplicationService.cover.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `MediaUploadService.createAlbumCoverUpload`, `validateImageUpload`, `deleteFileFromR2`, `AlbumService.updateAlbum`.
 - Produces: `createAlbumCover(artistId, albumId, intent: UploadIntent): Promise<{ album: AlbumDTO; uploadTarget: MediaUploadTarget }>` — validates, deletes previous cover, issues target, stores the new key on the album.
 
@@ -139,11 +153,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('$lib/db/queries', () => ({
 	AlbumService: { getAlbumById: vi.fn(), updateAlbum: vi.fn() },
 	TrackService: { getTrackById: vi.fn(), updateTrack: vi.fn() },
-	GenreService: {}, AlbumTrackService: {}
+	GenreService: {},
+	AlbumTrackService: {}
 }));
-vi.mock('$lib/db/services/R2Service', () => ({ deleteFileFromR2: vi.fn(), R2_MULTIPART_PART_SIZE: 8 * 1024 * 1024 }));
+vi.mock('$lib/db/services/R2Service', () => ({
+	deleteFileFromR2: vi.fn(),
+	R2_MULTIPART_PART_SIZE: 8 * 1024 * 1024
+}));
 vi.mock('$lib/server/media', () => ({
-	MediaUploadService: { createAlbumCoverUpload: vi.fn(), createTrackCoverUpload: vi.fn(), createTrackAudioUpload: vi.fn(), toStoredTarget: vi.fn((t) => ({ stored: t.key })) }
+	MediaUploadService: {
+		createAlbumCoverUpload: vi.fn(),
+		createTrackCoverUpload: vi.fn(),
+		createTrackAudioUpload: vi.fn(),
+		toStoredTarget: vi.fn((t) => ({ stored: t.key }))
+	}
 }));
 vi.mock('$lib/server/events', () => ({ eventPublisher: { publish: vi.fn() } }));
 
@@ -153,19 +176,51 @@ import { MediaUploadService } from '$lib/server/media';
 import { MusicApplicationService } from './MusicApplicationService';
 
 const d = new Date('2026-06-30T00:00:00Z');
-const album = (over = {}) => ({ id: 'al1', artistId: 'a1', title: 'A', description: null, coverImageUrl: null, releaseDate: null, price: null, isPublished: false, visibility: 'public', genres: [], metadata: null, createdAt: d, updatedAt: d, ...over });
+const album = (over = {}) => ({
+	id: 'al1',
+	artistId: 'a1',
+	title: 'A',
+	description: null,
+	coverImageUrl: null,
+	releaseDate: null,
+	price: null,
+	isPublished: false,
+	visibility: 'public',
+	genres: [],
+	metadata: null,
+	createdAt: d,
+	updatedAt: d,
+	...over
+});
 
 beforeEach(() => vi.clearAllMocks());
 
 describe('createAlbumCover', () => {
 	it('validates, deletes old cover, issues a target and stores the key', async () => {
-		(AlbumService.getAlbumById as any).mockResolvedValue(album({ coverImageUrl: 'a1/albums/al1/cover.jpg' }));
-		(MediaUploadService.createAlbumCoverUpload as any).mockResolvedValue({ key: 'a1/albums/al1/cover.png', bucket: 'images', target: { mode: 'single' } });
-		(AlbumService.updateAlbum as any).mockResolvedValue(album({ coverImageUrl: 'a1/albums/al1/cover.png' }));
+		(AlbumService.getAlbumById as any).mockResolvedValue(
+			album({ coverImageUrl: 'a1/albums/al1/cover.jpg' })
+		);
+		(MediaUploadService.createAlbumCoverUpload as any).mockResolvedValue({
+			key: 'a1/albums/al1/cover.png',
+			bucket: 'images',
+			target: { mode: 'single' }
+		});
+		(AlbumService.updateAlbum as any).mockResolvedValue(
+			album({ coverImageUrl: 'a1/albums/al1/cover.png' })
+		);
 
-		const res = await MusicApplicationService.createAlbumCover('a1', 'al1', { fileName: 'c.png', contentType: 'image/png', size: 2048 });
-		expect(deleteFileFromR2).toHaveBeenCalledWith({ uniqueKey: 'a1/albums/al1/cover.jpg', bucket: 'images' });
-		expect(AlbumService.updateAlbum).toHaveBeenCalledWith('al1', { coverImageUrl: 'a1/albums/al1/cover.png' });
+		const res = await MusicApplicationService.createAlbumCover('a1', 'al1', {
+			fileName: 'c.png',
+			contentType: 'image/png',
+			size: 2048
+		});
+		expect(deleteFileFromR2).toHaveBeenCalledWith({
+			uniqueKey: 'a1/albums/al1/cover.jpg',
+			bucket: 'images'
+		});
+		expect(AlbumService.updateAlbum).toHaveBeenCalledWith('al1', {
+			coverImageUrl: 'a1/albums/al1/cover.png'
+		});
 		expect(res.uploadTarget.key).toBe('a1/albums/al1/cover.png');
 		expect(res.album.coverImageKey).toBe('a1/albums/al1/cover.png');
 	});
@@ -173,7 +228,11 @@ describe('createAlbumCover', () => {
 	it('rejects a non-image before issuing a target', async () => {
 		(AlbumService.getAlbumById as any).mockResolvedValue(album());
 		await expect(
-			MusicApplicationService.createAlbumCover('a1', 'al1', { fileName: 'c.gif', contentType: 'image/gif', size: 2048 })
+			MusicApplicationService.createAlbumCover('a1', 'al1', {
+				fileName: 'c.gif',
+				contentType: 'image/gif',
+				size: 2048
+			})
 		).rejects.toThrow();
 		expect(MediaUploadService.createAlbumCoverUpload).not.toHaveBeenCalled();
 	});
@@ -237,10 +296,12 @@ git commit -m "feat(music): presigned album cover upload via boundary (ownership
 ### Task 3: Boundary — `replaceTrackImage` + `replaceTrackAudio`
 
 **Files:**
+
 - Modify: `src/lib/server/music/MusicApplicationService.ts`
 - Test: `src/lib/server/music/MusicApplicationService.replace.spec.ts`
 
 **Interfaces:**
+
 - Produces:
   - `replaceTrackImage(artistId, trackId, intent): Promise<{ track: TrackDTO; uploadTarget }>` — validates image, issues track-cover target, stores `imageUrl`.
   - `replaceTrackAudio(artistId, trackId, intent): Promise<{ track: TrackDTO; uploadTargets }>` — validates audio + part cap, issues track-audio target, sets `status='pending_upload'` and stores upload metadata (re-uses the existing `finalizeTrackUpload` to complete).
@@ -253,13 +314,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('$lib/db/queries', () => ({
 	TrackService: { getTrackById: vi.fn(), updateTrack: vi.fn() },
-	AlbumService: {}, GenreService: {}, AlbumTrackService: {}
+	AlbumService: {},
+	GenreService: {},
+	AlbumTrackService: {}
 }));
-vi.mock('$lib/db/services/R2Service', () => ({ deleteFileFromR2: vi.fn(), R2_MULTIPART_PART_SIZE: 8 * 1024 * 1024 }));
+vi.mock('$lib/db/services/R2Service', () => ({
+	deleteFileFromR2: vi.fn(),
+	R2_MULTIPART_PART_SIZE: 8 * 1024 * 1024
+}));
 vi.mock('$lib/server/media', () => ({
 	MediaUploadService: {
-		createTrackCoverUpload: vi.fn(async () => ({ key: 'a1/tracks/t1/cover.jpg', target: { mode: 'single' } })),
-		createTrackAudioUpload: vi.fn(async () => ({ key: 'a1/tracks/t1/source.mp3', target: { mode: 'single' } })),
+		createTrackCoverUpload: vi.fn(async () => ({
+			key: 'a1/tracks/t1/cover.jpg',
+			target: { mode: 'single' }
+		})),
+		createTrackAudioUpload: vi.fn(async () => ({
+			key: 'a1/tracks/t1/source.mp3',
+			target: { mode: 'single' }
+		})),
 		toStoredTarget: vi.fn((t) => ({ key: t.key, mode: 'single' }))
 	}
 }));
@@ -270,16 +342,44 @@ import { MediaUploadService } from '$lib/server/media';
 import { MusicApplicationService } from './MusicApplicationService';
 
 const d = new Date('2026-06-30T00:00:00Z');
-const track = (over = {}) => ({ id: 't1', albumId: null, artistId: 'a1', title: 'S', duration: 100, audioUrl: 'k', lyrics: null, clipUrl: null, imageUrl: null, trackNumber: null, genre: [], status: 'uploaded', isPublished: true, visibility: 'public', contentId: null, metadata: null, createdAt: d, updatedAt: d, ...over });
+const track = (over = {}) => ({
+	id: 't1',
+	albumId: null,
+	artistId: 'a1',
+	title: 'S',
+	duration: 100,
+	audioUrl: 'k',
+	lyrics: null,
+	clipUrl: null,
+	imageUrl: null,
+	trackNumber: null,
+	genre: [],
+	status: 'uploaded',
+	isPublished: true,
+	visibility: 'public',
+	contentId: null,
+	metadata: null,
+	createdAt: d,
+	updatedAt: d,
+	...over
+});
 
 beforeEach(() => vi.clearAllMocks());
 
 describe('replaceTrackImage', () => {
 	it('stores the new image key and returns the target', async () => {
 		(TrackService.getTrackById as any).mockResolvedValue(track());
-		(TrackService.updateTrack as any).mockResolvedValue(track({ imageUrl: 'a1/tracks/t1/cover.jpg' }));
-		const res = await MusicApplicationService.replaceTrackImage('a1', 't1', { fileName: 'c.jpg', contentType: 'image/jpeg', size: 1024 });
-		expect(TrackService.updateTrack).toHaveBeenCalledWith('t1', { imageUrl: 'a1/tracks/t1/cover.jpg' });
+		(TrackService.updateTrack as any).mockResolvedValue(
+			track({ imageUrl: 'a1/tracks/t1/cover.jpg' })
+		);
+		const res = await MusicApplicationService.replaceTrackImage('a1', 't1', {
+			fileName: 'c.jpg',
+			contentType: 'image/jpeg',
+			size: 1024
+		});
+		expect(TrackService.updateTrack).toHaveBeenCalledWith('t1', {
+			imageUrl: 'a1/tracks/t1/cover.jpg'
+		});
 		expect(res.uploadTarget.key).toBe('a1/tracks/t1/cover.jpg');
 	});
 });
@@ -288,8 +388,15 @@ describe('replaceTrackAudio', () => {
 	it('sets pending_upload + metadata and returns audio target', async () => {
 		(TrackService.getTrackById as any).mockResolvedValue(track());
 		(TrackService.updateTrack as any).mockResolvedValue(track({ status: 'pending_upload' }));
-		const res = await MusicApplicationService.replaceTrackAudio('a1', 't1', { fileName: 's.mp3', contentType: 'audio/mpeg', size: 1024 });
-		expect(TrackService.updateTrack).toHaveBeenCalledWith('t1', expect.objectContaining({ status: 'pending_upload', audioUrl: 'a1/tracks/t1/source.mp3' }));
+		const res = await MusicApplicationService.replaceTrackAudio('a1', 't1', {
+			fileName: 's.mp3',
+			contentType: 'audio/mpeg',
+			size: 1024
+		});
+		expect(TrackService.updateTrack).toHaveBeenCalledWith(
+			't1',
+			expect.objectContaining({ status: 'pending_upload', audioUrl: 'a1/tracks/t1/source.mp3' })
+		);
 		expect(res.uploadTargets.audio).toBeDefined();
 	});
 });
@@ -359,12 +466,14 @@ git commit -m "feat(music): presigned track audio/image replacement via boundary
 ### Task 4: Extend the `upload-target` endpoint with ownership-checked kinds
 
 **Files:**
+
 - Modify: `src/routes/api/studio/media/upload-target/+server.ts`
 - Test: `e2e/upload-target.spec.ts` (integration-level via Playwright request context) — OR a vitest server spec if the endpoint logic is extracted. This task extracts a pure handler for testability.
 - Create: `src/lib/server/media/uploadTargetHandler.ts`
 - Test: `src/lib/server/media/uploadTargetHandler.spec.ts`
 
 **Interfaces:**
+
 - Produces: `resolveUploadTarget(artistId, body): Promise<{ upload: MediaUploadTarget } | { error: string; status: number }>` — dispatches by `kind`, enforces ownership for album/track kinds via the boundary, validates, returns the target or a typed error. The `+server.ts` POST becomes a thin caller (auth + origin + rate-limit from Plan A, then `resolveUploadTarget`).
 
 - [ ] **Step 1: Write the failing test**
@@ -374,10 +483,16 @@ git commit -m "feat(music): presigned track audio/image replacement via boundary
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('$lib/server/music', () => ({
-	MusicApplicationService: { createAlbumCover: vi.fn(), replaceTrackImage: vi.fn(), replaceTrackAudio: vi.fn() }
+	MusicApplicationService: {
+		createAlbumCover: vi.fn(),
+		replaceTrackImage: vi.fn(),
+		replaceTrackAudio: vi.fn()
+	}
 }));
 vi.mock('$lib/server/media', () => ({
-	MediaUploadService: { createContentPhotoUpload: vi.fn(async () => ({ kind: 'content-photo', key: 'k' })) }
+	MediaUploadService: {
+		createContentPhotoUpload: vi.fn(async () => ({ kind: 'content-photo', key: 'k' }))
+	}
 }));
 
 import { MusicApplicationService } from '$lib/server/music';
@@ -391,19 +506,43 @@ describe('resolveUploadTarget', () => {
 		expect(res).toMatchObject({ status: 400 });
 	});
 	it('requires albumId for album-cover', async () => {
-		const res = await resolveUploadTarget('a1', { kind: 'album-cover', fileName: 'c.png', contentType: 'image/png', size: 10 });
+		const res = await resolveUploadTarget('a1', {
+			kind: 'album-cover',
+			fileName: 'c.png',
+			contentType: 'image/png',
+			size: 10
+		});
 		expect(res).toMatchObject({ status: 400 });
 	});
 	it('delegates album-cover to the boundary (ownership inside)', async () => {
-		(MusicApplicationService.createAlbumCover as any).mockResolvedValue({ uploadTarget: { kind: 'album-cover', key: 'a1/albums/al1/cover.png' } });
-		const res = await resolveUploadTarget('a1', { kind: 'album-cover', albumId: 'al1', fileName: 'c.png', contentType: 'image/png', size: 10 });
-		expect(MusicApplicationService.createAlbumCover).toHaveBeenCalledWith('a1', 'al1', expect.any(Object));
+		(MusicApplicationService.createAlbumCover as any).mockResolvedValue({
+			uploadTarget: { kind: 'album-cover', key: 'a1/albums/al1/cover.png' }
+		});
+		const res = await resolveUploadTarget('a1', {
+			kind: 'album-cover',
+			albumId: 'al1',
+			fileName: 'c.png',
+			contentType: 'image/png',
+			size: 10
+		});
+		expect(MusicApplicationService.createAlbumCover).toHaveBeenCalledWith(
+			'a1',
+			'al1',
+			expect.any(Object)
+		);
 		expect((res as any).upload.key).toBe('a1/albums/al1/cover.png');
 	});
 	it('maps a boundary 404 to a typed error', async () => {
-		const err: any = new Error('Album not found'); err.status = 404;
+		const err: any = new Error('Album not found');
+		err.status = 404;
 		(MusicApplicationService.createAlbumCover as any).mockRejectedValue(err);
-		const res = await resolveUploadTarget('a1', { kind: 'album-cover', albumId: 'x', fileName: 'c.png', contentType: 'image/png', size: 10 });
+		const res = await resolveUploadTarget('a1', {
+			kind: 'album-cover',
+			albumId: 'x',
+			fileName: 'c.png',
+			contentType: 'image/png',
+			size: 10
+		});
 		expect(res).toMatchObject({ status: 404 });
 	});
 });
@@ -446,19 +585,31 @@ export async function resolveUploadTarget(artistId: string, body: Body): Promise
 			case 'album-cover': {
 				const albumId = typeof body.albumId === 'string' ? body.albumId : '';
 				if (!albumId) return { error: 'albumId is required', status: 400 };
-				const { uploadTarget } = await MusicApplicationService.createAlbumCover(artistId, albumId, i);
+				const { uploadTarget } = await MusicApplicationService.createAlbumCover(
+					artistId,
+					albumId,
+					i
+				);
 				return { upload: uploadTarget };
 			}
 			case 'track-cover': {
 				const trackId = typeof body.trackId === 'string' ? body.trackId : '';
 				if (!trackId) return { error: 'trackId is required', status: 400 };
-				const { uploadTarget } = await MusicApplicationService.replaceTrackImage(artistId, trackId, i);
+				const { uploadTarget } = await MusicApplicationService.replaceTrackImage(
+					artistId,
+					trackId,
+					i
+				);
 				return { upload: uploadTarget };
 			}
 			case 'track-audio': {
 				const trackId = typeof body.trackId === 'string' ? body.trackId : '';
 				if (!trackId) return { error: 'trackId is required', status: 400 };
-				const { uploadTargets } = await MusicApplicationService.replaceTrackAudio(artistId, trackId, i);
+				const { uploadTargets } = await MusicApplicationService.replaceTrackAudio(
+					artistId,
+					trackId,
+					i
+				);
 				return { upload: uploadTargets.audio };
 			}
 			default:
@@ -481,11 +632,11 @@ Expected: PASS.
 Replace the body of `POST` in `src/routes/api/studio/media/upload-target/+server.ts` (keeping the Plan A auth/origin/rate-limit guards) with:
 
 ```ts
-	const body = await event.request.json().catch(() => null);
-	if (!body || typeof body !== 'object') return json({ error: 'Invalid body' }, { status: 400 });
-	const result = await resolveUploadTarget(artist.id, body as Record<string, unknown>);
-	if ('error' in result) return json({ error: result.error }, { status: result.status });
-	return json(result);
+const body = await event.request.json().catch(() => null);
+if (!body || typeof body !== 'object') return json({ error: 'Invalid body' }, { status: 400 });
+const result = await resolveUploadTarget(artist.id, body as Record<string, unknown>);
+if ('error' in result) return json({ error: result.error }, { status: result.status });
+return json(result);
 ```
 
 Add the import: `import { resolveUploadTarget } from '$lib/server/media/uploadTargetHandler';` and remove the now-unused `IMAGE_TYPES`/`MAX_IMAGE_SIZE`/`MediaUploadService` direct usage (validation now lives in the boundary/handler).
@@ -537,6 +688,7 @@ git commit -m "chore(music): confirm legacy through-server upload path removed f
 ## Self-Review
 
 **Spec coverage (Plan B = spec phase 6 + §6.6 cover cleanup):**
+
 - `createAlbumCoverUpload` media kind → Task 1. ✓
 - Album cover + track audio/image edits move to presigned → Tasks 2, 3. ✓
 - `upload-target` endpoint extended with kinds + ownership + validation (IDOR fix realized at the endpoint) → Task 4. ✓

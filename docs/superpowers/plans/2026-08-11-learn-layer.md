@@ -15,24 +15,24 @@
 - **Artifact language is English** (per the `WIKI.md` convention). Conversation stays Russian.
 - **No new dependencies.** Node built-ins only; tests run on `node --test`.
 - **Windows-first.** The hook is pure Node — no bash-isms, no shell quoting that breaks under PowerShell or Git Bash.
-- **Vitest does not glob `.claude/**`** (`vite.config.ts:83,93` include only `src/**`). Do not try to wire these tests into `yarn test`.
+- **Vitest does not glob `.claude/**`** (`vite.config.ts:83,93`include only`src/\*\*`). Do not try to wire these tests into `yarn test`.
 - Fixed values from the spec, to be used verbatim: promotion threshold **x3** (or **x2** when cost is high), active rules cap **10**, digest cap **60 lines**, detail retros kept **40** before archiving.
 - **No wall-clock thresholds anywhere** (spec §12). Every threshold counts events.
 
 ## File Structure
 
-| Path | Repo | Responsibility |
-|---|---|---|
-| `docs/superpowers/specs/2026-08-11-learn-retrospectives-design.md` | pdm | Spec; amended in Task 1 |
-| `.claude/learn/LEARN.md` | pdm-claude | Maintainer's manual for the layer |
-| `.claude/learn/LEARNINGS.md` | pdm-claude | Rolling digest — the only always-loaded file |
-| `.claude/learn/archive/.gitkeep` | pdm-claude | Holds retired detail retros |
-| `.claude/hooks/retro-debt.logic.mjs` | pdm-claude | Pure functions: parse, select, compute, format |
-| `.claude/hooks/retro-debt.logic.test.mjs` | pdm-claude | Unit tests for the above |
-| `.claude/hooks/retro-debt.mjs` | pdm-claude | CLI wrapper: git I/O + stdout |
-| `.claude/settings.json` | pdm-claude | `SessionStart` hook registration |
-| `.claude/skills/retro/SKILL.md` | pdm-claude | The `/retro` command |
-| `CLAUDE.md` | pdm | Pointer + the rule making the model offer a retro |
+| Path                                                               | Repo       | Responsibility                                    |
+| ------------------------------------------------------------------ | ---------- | ------------------------------------------------- |
+| `docs/superpowers/specs/2026-08-11-learn-retrospectives-design.md` | pdm        | Spec; amended in Task 1                           |
+| `.claude/learn/LEARN.md`                                           | pdm-claude | Maintainer's manual for the layer                 |
+| `.claude/learn/LEARNINGS.md`                                       | pdm-claude | Rolling digest — the only always-loaded file      |
+| `.claude/learn/archive/.gitkeep`                                   | pdm-claude | Holds retired detail retros                       |
+| `.claude/hooks/retro-debt.logic.mjs`                               | pdm-claude | Pure functions: parse, select, compute, format    |
+| `.claude/hooks/retro-debt.logic.test.mjs`                          | pdm-claude | Unit tests for the above                          |
+| `.claude/hooks/retro-debt.mjs`                                     | pdm-claude | CLI wrapper: git I/O + stdout                     |
+| `.claude/settings.json`                                            | pdm-claude | `SessionStart` hook registration                  |
+| `.claude/skills/retro/SKILL.md`                                    | pdm-claude | The `/retro` command                              |
+| `CLAUDE.md`                                                        | pdm        | Pointer + the rule making the model offer a retro |
 
 Split rationale: `retro-debt.logic.mjs` holds every decision and touches nothing external, so it is unit-testable without git fixtures. `retro-debt.mjs` holds only I/O and is verified by running it. Keeping them apart is what makes TDD possible here at all.
 
@@ -43,6 +43,7 @@ Split rationale: `retro-debt.logic.mjs` holds every decision and touches nothing
 The spec's template records `branch:` but no commit SHA, so "are there new commits since the last retro?" would fall back to comparing dates — exactly what spec §12 removed. A SHA makes the check exact and event-based.
 
 **Files:**
+
 - Modify: `docs/superpowers/specs/2026-08-11-learn-retrospectives-design.md` (§5 template, §6 trigger 3)
 
 - [ ] **Step 1: Add the field to the template in §5**
@@ -51,7 +52,7 @@ Find the frontmatter block in §5 and add `head:` directly under `branch:`:
 
 ```markdown
 branch: feature/comments-and-fan-chat--pr5-ui
-head: 5b75ab7                # HEAD sha when this retro was written
+head: 5b75ab7 # HEAD sha when this retro was written
 ```
 
 - [ ] **Step 2: Make §6 trigger 3 reference the SHA**
@@ -83,16 +84,18 @@ git commit -m "docs: record head sha in retro frontmatter for exact debt detecti
 ### Task 2: Scaffold `.claude/learn/` with the manual and an empty digest
 
 **Files:**
+
 - Create: `.claude/learn/LEARN.md`
 - Create: `.claude/learn/LEARNINGS.md`
 - Create: `.claude/learn/archive/.gitkeep`
 
 **Interfaces:**
+
 - Produces: the four digest section headings (`## Active rules (promoted)`, `## Recurring — promotion candidates`, `## Recent lessons (last 5)`, `## Retired`) that Task 6's `/retro` command edits, and the `head:` frontmatter field Task 4 reads.
 
 - [ ] **Step 1: Write `.claude/learn/LEARN.md`**
 
-```markdown
+````markdown
 # LEARN.md — the learn layer (maintainer's manual)
 
 Read this before writing a retro, updating the digest, or proposing a promotion.
@@ -130,24 +133,29 @@ type: retro
 branch: <git branch>
 head: <HEAD sha at time of writing>
 tags: [<area>, <area>]
-status: current         # current | promoted | superseded
-promoted: []            # links to rules grown from this retro
+status: current # current | promoted | superseded
+promoted: [] # links to rules grown from this retro
 updated: YYYY-MM-DD
 ---
 
 ## SUMMARY
+
 Two to four sentences. Condensed to one line, this is what travels up.
 
 ## WHAT WAS GOOD
+
 - <what worked> — **why:** <the mechanism, not praise>
 
 ## WHAT WAS BAD
+
 - <what did not work> — **why:** <root cause>
   — **cost:** <rework, wasted turns, lost time>
 
 ## HOW TO CONVERT BAD => GOOD
+
 - <checkable action, imperative> → **target:** CLAUDE.md | memory | skill | none
 ```
+````
 
 Rules for the content:
 
@@ -171,11 +179,11 @@ to the new occurrence. The counter is what justifies promotion later.
 Threshold: **x3**, or **x2** when cost is high. The model proposes a formulated
 rule; the founder approves; only then is it written. Never automatic.
 
-| Target | When |
-|---|---|
-| `memory/<slug>.md` + a line in `MEMORY.md` | how the founder and the model work together |
-| `CLAUDE.md` | an operational rule about the repository |
-| `skills/<name>/SKILL.md` | a multi-step procedure worth invoking by name |
+| Target                                     | When                                          |
+| ------------------------------------------ | --------------------------------------------- |
+| `memory/<slug>.md` + a line in `MEMORY.md` | how the founder and the model work together   |
+| `CLAUDE.md`                                | an operational rule about the repository      |
+| `skills/<name>/SKILL.md`                   | a multi-step procedure worth invoking by name |
 
 After approval: every detail retro linked from that Recurring entry gets
 `status: promoted` and a link in `promoted:`; the line moves to Active rules with
@@ -211,7 +219,8 @@ No fact is duplicated across two layers.
 ## Committing
 
 `.claude/` is the `pdm-claude` repo. Commit from inside it: `git -C .claude …`.
-```
+
+````
 
 - [ ] **Step 2: Write `.claude/learn/LEARNINGS.md`**
 
@@ -236,7 +245,7 @@ _None yet._
 ## Retired
 
 _None yet._
-```
+````
 
 - [ ] **Step 3: Create the archive directory**
 
@@ -251,6 +260,7 @@ printf '' > .claude/learn/archive/.gitkeep
 wc -l < .claude/learn/LEARNINGS.md
 grep -c '^## ' .claude/learn/LEARNINGS.md
 ```
+
 Expected: line count well under 60; exactly `4` section headings.
 
 - [ ] **Step 5: Commit (pdm-claude repo)**
@@ -265,10 +275,12 @@ git -C .claude commit -m "feat(learn): scaffold the learn layer with its manual 
 ### Task 3: Frontmatter parsing and retro selection (pure, TDD)
 
 **Files:**
+
 - Create: `.claude/hooks/retro-debt.logic.mjs`
 - Test: `.claude/hooks/retro-debt.logic.test.mjs`
 
 **Interfaces:**
+
 - Produces: `parseRetro(text, file)` → `{ file, branch, head } | null`; `selectLatestRetro(retros, branch)` → retro or `null`. Task 4 consumes both.
 
 - [ ] **Step 1: Write the failing tests**
@@ -378,10 +390,12 @@ git -C .claude commit -m "feat(learn): parse retro frontmatter and select the la
 ### Task 4: Debt computation and note formatting (pure, TDD)
 
 **Files:**
+
 - Modify: `.claude/hooks/retro-debt.logic.mjs`
 - Test: `.claude/hooks/retro-debt.logic.test.mjs` (append)
 
 **Interfaces:**
+
 - Consumes: `selectLatestRetro` from Task 3.
 - Produces: `computeDebt({ branch, defaultBranch, retros, countCommitsSince })` → `{ hasDebt, reason, commits?, since?, retro? }`; `formatDebtNote(debt)` → string or `null`. `countCommitsSince` is injected as `(sha) => number` so tests need no git. Task 5 supplies the real one.
 
@@ -518,10 +532,12 @@ git -C .claude commit -m "feat(learn): compute retro debt from commit counts and
 ### Task 5: Hook CLI wrapper and `SessionStart` registration
 
 **Files:**
+
 - Create: `.claude/hooks/retro-debt.mjs`
 - Create: `.claude/settings.json`
 
 **Interfaces:**
+
 - Consumes: `parseRetro`, `computeDebt`, `formatDebtNote` from Tasks 3–4.
 - Produces: a `SessionStart` hook that prints the digest, and the debt note when there is one.
 
@@ -597,18 +613,18 @@ Create `.claude/settings.json`:
 
 ```json
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/retro-debt.mjs"
-          }
-        ]
-      }
-    ]
-  }
+	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "node .claude/hooks/retro-debt.mjs"
+					}
+				]
+			}
+		]
+	}
 }
 ```
 
@@ -630,9 +646,11 @@ git -C .claude commit -m "feat(learn): deliver the digest and retro debt via a S
 ### Task 6: The `/retro` command
 
 **Files:**
+
 - Create: `.claude/skills/retro/SKILL.md`
 
 **Interfaces:**
+
 - Consumes: the template and rules in `.claude/learn/LEARN.md` (Task 2).
 - Produces: the `/retro` command that writes a detail retro and updates the digest.
 
@@ -716,9 +734,11 @@ git -C .claude commit -m "feat(learn): add the /retro command"
 ### Task 7: Wire the layer into `CLAUDE.md`
 
 **Files:**
+
 - Modify: `CLAUDE.md` (main repo) — add a subsection under "Project Knowledge Base & Memory (`.claude/`)"
 
 **Interfaces:**
+
 - Consumes: the layer built in Tasks 2–6.
 
 - [ ] **Step 1: Add the section**
@@ -745,6 +765,7 @@ session start by a hook; `LEARN.md` is its operating manual.
 ls .claude/learn/LEARN.md .claude/learn/LEARNINGS.md .claude/skills/retro/SKILL.md
 grep -c 'SessionStart' .claude/settings.json
 ```
+
 Expected: all three files listed; `1`.
 
 - [ ] **Step 3: Commit (main repo)**
@@ -763,6 +784,7 @@ The layer is only proven by producing a real retro. This branch
 genuine subject rather than a fabricated one.
 
 **Files:**
+
 - Create: `.claude/learn/2026-08-11-<slug>.md` (the first real retro)
 - Modify: `.claude/learn/LEARNINGS.md`
 
@@ -778,6 +800,7 @@ and skip the file. A skipped first retro is a valid result, not a failure.
 wc -l < .claude/learn/LEARNINGS.md
 grep -c '^## ' .claude/learn/LEARNINGS.md
 ```
+
 Expected: under 60 lines; exactly 4 headings.
 
 - [ ] **Step 3: Verify the debt clears**
@@ -804,19 +827,19 @@ git push
 
 ## Verification Summary
 
-| Spec section | Covered by |
-|---|---|
-| §3 three levels | Tasks 2, 5, 6 |
-| §4 directory structure | Task 2 |
-| §5 retro format | Tasks 1, 2 |
-| §6 triggers | Task 5 (hook), 6 (`/retro`), 7 (`CLAUDE.md` rule) |
-| §7 quality bar, dedup | Task 6 steps 3–4 |
-| §8 digest format | Task 2 |
-| §9 delivery | Task 5 |
-| §10 promotion | Task 6 step 7 |
-| §11 rules cap | Tasks 2 (LEARN.md), 7 (CLAUDE.md) |
-| §12 maintenance, no wall-clock | Tasks 1 step 3, 2 |
-| §13 success criteria | Task 2 (LEARN.md) |
-| §14 self-assessment bias | Task 6 honesty note |
-| §15 boundaries | Tasks 2, 7 |
-| §17 open items | Task 5 step 4 (hook schema), Task 6 step 2 (skill vs command), Task 5 step 3 (Windows) |
+| Spec section                   | Covered by                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------- |
+| §3 three levels                | Tasks 2, 5, 6                                                                          |
+| §4 directory structure         | Task 2                                                                                 |
+| §5 retro format                | Tasks 1, 2                                                                             |
+| §6 triggers                    | Task 5 (hook), 6 (`/retro`), 7 (`CLAUDE.md` rule)                                      |
+| §7 quality bar, dedup          | Task 6 steps 3–4                                                                       |
+| §8 digest format               | Task 2                                                                                 |
+| §9 delivery                    | Task 5                                                                                 |
+| §10 promotion                  | Task 6 step 7                                                                          |
+| §11 rules cap                  | Tasks 2 (LEARN.md), 7 (CLAUDE.md)                                                      |
+| §12 maintenance, no wall-clock | Tasks 1 step 3, 2                                                                      |
+| §13 success criteria           | Task 2 (LEARN.md)                                                                      |
+| §14 self-assessment bias       | Task 6 honesty note                                                                    |
+| §15 boundaries                 | Tasks 2, 7                                                                             |
+| §17 open items                 | Task 5 step 4 (hook schema), Task 6 step 2 (skill vs command), Task 5 step 3 (Windows) |

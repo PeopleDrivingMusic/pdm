@@ -21,6 +21,7 @@ docker-compose ps
 ```
 
 The setup includes:
+
 - **PostgreSQL**: Available at `localhost:5433`
   - Username: `postgres`
   - Password: `password`
@@ -68,6 +69,7 @@ npm run db:studio
 The database includes the following main tables:
 
 ### Core Tables
+
 - **users**: User accounts and profiles
 - **artists**: Artist profiles linked to users
 - **albums**: Music albums
@@ -76,10 +78,12 @@ The database includes the following main tables:
 - **playlist_tracks**: Many-to-many relationship between playlists and tracks
 
 ### Additional Tables
+
 - **user_favorites**: User favorite tracks
 - **purchases**: Purchase history and blockchain transactions
 
 ### Key Features
+
 - UUID primary keys for all tables
 - JSON fields for metadata and social links
 - Blockchain integration fields (wallet addresses, transaction hashes)
@@ -88,13 +92,13 @@ The database includes the following main tables:
 
 ## Available Scripts
 
-| Script | Description |
-|--------|-------------|
+| Script                | Description                                  |
+| --------------------- | -------------------------------------------- |
 | `npm run db:generate` | Generate migration files from schema changes |
-| `npm run db:migrate` | Apply pending migrations to database |
-| `npm run db:push` | Push schema changes directly (development) |
-| `npm run db:studio` | Open Drizzle Studio web interface |
-| `npm run db:drop` | Drop database objects (use with caution) |
+| `npm run db:migrate`  | Apply pending migrations to database         |
+| `npm run db:push`     | Push schema changes directly (development)   |
+| `npm run db:studio`   | Open Drizzle Studio web interface            |
+| `npm run db:drop`     | Drop database objects (use with caution)     |
 
 ## Usage Examples
 
@@ -109,10 +113,10 @@ import { db } from '$lib/db';
 
 ```typescript
 const user = await UserService.createUser({
-  email: 'user@example.com',
-  username: 'musiclover',
-  displayName: 'Music Lover',
-  walletAddress: '0x...'
+	email: 'user@example.com',
+	username: 'musiclover',
+	displayName: 'Music Lover',
+	walletAddress: '0x...'
 });
 ```
 
@@ -120,10 +124,10 @@ const user = await UserService.createUser({
 
 ```typescript
 const artist = await ArtistService.createArtist({
-  userId: user.id,
-  stageName: 'DJ Example',
-  genre: 'Electronic',
-  description: 'Electronic music producer'
+	userId: user.id,
+	stageName: 'DJ Example',
+	genre: 'Electronic',
+	description: 'Electronic music producer'
 });
 ```
 
@@ -175,11 +179,13 @@ await runCompleteExample();
 ### Connection Issues
 
 1. **Check Docker containers**:
+
    ```bash
    docker-compose logs postgres
    ```
 
 2. **Test database connection**:
+
    ```typescript
    import { testDatabaseConnection } from '$lib/db/queries';
    await testDatabaseConnection();
@@ -193,6 +199,7 @@ await runCompleteExample();
 ### Migration Issues
 
 1. **Reset database** (development only):
+
    ```bash
    docker-compose down -v
    docker-compose up -d
@@ -208,6 +215,7 @@ await runCompleteExample();
 ## Security Considerations
 
 ### Production Setup
+
 - Use strong passwords for database users
 - Enable SSL connections (`?sslmode=require`)
 - Use connection pooling for high-traffic applications

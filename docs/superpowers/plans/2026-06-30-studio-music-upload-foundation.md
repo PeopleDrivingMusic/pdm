@@ -25,10 +25,12 @@
 ### Task 1: Test coverage tooling
 
 **Files:**
+
 - Modify: `package.json` (devDependency + script)
 - Modify: `vite.config.ts:19-47` (coverage config on the `server` project)
 
 **Interfaces:**
+
 - Produces: `yarn test:coverage` script that runs the server project with v8 coverage and the ≥90% thresholds scoped to the seam paths.
 
 - [ ] **Step 1: Add the coverage dependency**
@@ -91,10 +93,12 @@ git commit -m "chore: add v8 coverage tooling and test:coverage script"
 ### Task 2: Media upload validation module
 
 **Files:**
+
 - Create: `src/lib/server/media/validation.ts`
 - Test: `src/lib/server/media/validation.spec.ts`
 
 **Interfaces:**
+
 - Produces:
   - `AUDIO_MIME_TYPES: Set<string>`, `IMAGE_MIME_TYPES: Set<string>`
   - `MAX_AUDIO_SIZE: number` (100 MB), `MAX_IMAGE_SIZE: number` (10 MB), `MAX_MULTIPART_PARTS: number` (2000)
@@ -139,7 +143,9 @@ describe('validateImageUpload', () => {
 		expect(validateImageUpload({ contentType: 'image/gif', size: 1024 }).ok).toBe(false);
 	});
 	it('rejects image over the max size', () => {
-		expect(validateImageUpload({ contentType: 'image/png', size: MAX_IMAGE_SIZE + 1 }).ok).toBe(false);
+		expect(validateImageUpload({ contentType: 'image/png', size: MAX_IMAGE_SIZE + 1 }).ok).toBe(
+			false
+		);
 	});
 });
 ```
@@ -169,7 +175,12 @@ export const MAX_MULTIPART_PARTS = 2000;
 
 type Result = { ok: true } | { ok: false; reason: string };
 
-function validate(allow: Set<string>, max: number, label: string, input: { contentType: string; size: number }): Result {
+function validate(
+	allow: Set<string>,
+	max: number,
+	label: string,
+	input: { contentType: string; size: number }
+): Result {
 	if (!Number.isFinite(input.size) || input.size <= 0) {
 		return { ok: false, reason: `${label} size is invalid` };
 	}
@@ -209,10 +220,12 @@ git commit -m "feat(media): add audio/image upload validation with size+MIME lim
 ### Task 3: Multipart part-count cap
 
 **Files:**
+
 - Modify: `src/lib/server/media/validation.ts`
 - Test: `src/lib/server/media/validation.spec.ts`
 
 **Interfaces:**
+
 - Produces: `assertPartCount(size: number, partSize: number): void` — throws `Error('Upload exceeds maximum part count')` when `ceil(size/partSize) > MAX_MULTIPART_PARTS`.
 
 - [ ] **Step 1: Add the failing test**
@@ -269,10 +282,12 @@ git commit -m "feat(media): cap multipart part count to prevent unbounded signin
 ### Task 4: In-memory per-artist rate limiter
 
 **Files:**
+
 - Create: `src/lib/server/security/rateLimiter.ts`
 - Test: `src/lib/server/security/rateLimiter.spec.ts`
 
 **Interfaces:**
+
 - Produces: `createRateLimiter(opts: { limit: number; windowMs: number }): { check(key: string, now?: number): boolean }` — returns `true` while under `limit` calls within `windowMs` for a `key`, `false` once exceeded. Sliding fixed-window per key. `now` is injectable for tests.
 
 - [ ] **Step 1: Write the failing test**
@@ -356,10 +371,12 @@ git commit -m "feat(security): add in-memory per-artist rate limiter"
 ### Task 5: Schema — visibility + content_id columns
 
 **Files:**
+
 - Modify: `src/lib/db/schemas/catalog.ts:22-58` (albums + tracks)
 - Generated: `drizzle/migrations/*.sql` (review only)
 
 **Interfaces:**
+
 - Produces: `tracks.visibility`, `albums.visibility` (`varchar(16)` default `'public'` not null), `tracks.contentId` (`uuid`, nullable). `Track`/`Album` types pick these up via `$inferSelect`.
 
 - [ ] **Step 1: Add columns to `albums`**
@@ -407,12 +424,14 @@ git commit -m "feat(db): add visibility gate to tracks+albums and content_id to 
 ### Task 6: Event seam — types + LogEventPublisher
 
 **Files:**
+
 - Create: `src/lib/server/events/types.ts`
 - Create: `src/lib/server/events/LogEventPublisher.ts`
 - Create: `src/lib/server/events/index.ts`
 - Test: `src/lib/server/events/LogEventPublisher.spec.ts`
 
 **Interfaces:**
+
 - Produces:
   - `Visibility = 'public' | 'subscribers_only'`
   - `DomainEvent` union (see code), `EventPublisher` interface with `publish(event): Promise<void>`
@@ -531,10 +550,12 @@ git commit -m "feat(events): add EventPublisher seam with LogEventPublisher impl
 ### Task 7: Music DTOs + mappers
 
 **Files:**
+
 - Create: `src/lib/server/music/dto.ts`
 - Test: `src/lib/server/music/dto.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `Track`, `Album`, `AlbumTrack`, `Genre`, `TrackStats` from `$lib/db`; `Visibility` from `$lib/server/events`.
 - Produces:
   - Types: `TrackDTO`, `AlbumDTO`, `TrackStatsDTO`, `AlbumTrackDTO`, `GenreDTO`, `StudioStatsDTO`, `StudioMusicOverviewDTO`, `UploadIntent`, `TrackUploadStatus`.
@@ -548,12 +569,24 @@ import { describe, it, expect } from 'vitest';
 import { toTrackDTO, toAlbumDTO } from './dto';
 
 const baseTrack = {
-	id: 't1', albumId: null, artistId: 'a1', title: 'Song', duration: 120,
-	audioUrl: 'a1/tracks/t1/source.mp3', lyrics: null, clipUrl: null,
-	imageUrl: 'a1/tracks/t1/cover.jpg', trackNumber: null, genre: ['rock'],
-	status: 'uploaded', isPublished: true, visibility: 'subscribers_only',
-	contentId: null, metadata: { upload: { secret: 1 } },
-	createdAt: new Date('2026-06-30T00:00:00Z'), updatedAt: new Date('2026-06-30T00:00:00Z')
+	id: 't1',
+	albumId: null,
+	artistId: 'a1',
+	title: 'Song',
+	duration: 120,
+	audioUrl: 'a1/tracks/t1/source.mp3',
+	lyrics: null,
+	clipUrl: null,
+	imageUrl: 'a1/tracks/t1/cover.jpg',
+	trackNumber: null,
+	genre: ['rock'],
+	status: 'uploaded',
+	isPublished: true,
+	visibility: 'subscribers_only',
+	contentId: null,
+	metadata: { upload: { secret: 1 } },
+	createdAt: new Date('2026-06-30T00:00:00Z'),
+	updatedAt: new Date('2026-06-30T00:00:00Z')
 } as any;
 
 describe('toTrackDTO', () => {
@@ -577,10 +610,19 @@ describe('toTrackDTO', () => {
 describe('toAlbumDTO', () => {
 	it('maps coverImageUrl to coverImageKey and keeps visibility', () => {
 		const dto = toAlbumDTO({
-			id: 'al1', artistId: 'a1', title: 'Album', description: null,
-			coverImageUrl: 'a1/albums/al1/cover.jpg', releaseDate: null, price: null,
-			isPublished: false, visibility: 'public', genres: ['pop'], metadata: null,
-			createdAt: new Date('2026-06-30T00:00:00Z'), updatedAt: new Date('2026-06-30T00:00:00Z')
+			id: 'al1',
+			artistId: 'a1',
+			title: 'Album',
+			description: null,
+			coverImageUrl: 'a1/albums/al1/cover.jpg',
+			releaseDate: null,
+			price: null,
+			isPublished: false,
+			visibility: 'public',
+			genres: ['pop'],
+			metadata: null,
+			createdAt: new Date('2026-06-30T00:00:00Z'),
+			updatedAt: new Date('2026-06-30T00:00:00Z')
 		} as any);
 		expect(dto.coverImageKey).toBe('a1/albums/al1/cover.jpg');
 		expect(dto.visibility).toBe('public');
@@ -746,11 +788,13 @@ git commit -m "feat(music): add Music boundary DTOs and mappers (no Drizzle leak
 ### Task 8: MusicApplicationService — read side + ownership
 
 **Files:**
+
 - Create: `src/lib/server/music/MusicApplicationService.ts`
 - Create: `src/lib/server/music/index.ts`
 - Test: `src/lib/server/music/MusicApplicationService.read.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `AlbumService`, `TrackService`, `GenreService`, `AlbumTrackService` from `$lib/db/queries`; DTO mappers from `./dto`.
 - Produces:
   - `MusicApplicationService.getStudioOverview(artistId: string): Promise<StudioMusicOverviewDTO>`
@@ -776,10 +820,25 @@ import { MusicApplicationService, MusicAccessError } from './MusicApplicationSer
 
 const d = new Date('2026-06-30T00:00:00Z');
 const track = (over = {}) => ({
-	id: 't1', albumId: null, artistId: 'a1', title: 'S', duration: 100, audioUrl: null,
-	lyrics: null, clipUrl: null, imageUrl: null, trackNumber: null, genre: [],
-	status: 'uploaded', isPublished: true, visibility: 'subscribers_only', contentId: null,
-	metadata: null, createdAt: d, updatedAt: d, ...over
+	id: 't1',
+	albumId: null,
+	artistId: 'a1',
+	title: 'S',
+	duration: 100,
+	audioUrl: null,
+	lyrics: null,
+	clipUrl: null,
+	imageUrl: null,
+	trackNumber: null,
+	genre: [],
+	status: 'uploaded',
+	isPublished: true,
+	visibility: 'subscribers_only',
+	contentId: null,
+	metadata: null,
+	createdAt: d,
+	updatedAt: d,
+	...over
 });
 
 beforeEach(() => vi.clearAllMocks());
@@ -805,15 +864,21 @@ describe('getStudioOverview', () => {
 describe('assertTrackOwned', () => {
 	it('returns the track when owned', async () => {
 		(TrackService.getTrackById as any).mockResolvedValue(track());
-		await expect(MusicApplicationService.assertTrackOwned('a1', 't1')).resolves.toMatchObject({ id: 't1' });
+		await expect(MusicApplicationService.assertTrackOwned('a1', 't1')).resolves.toMatchObject({
+			id: 't1'
+		});
 	});
 	it('throws MusicAccessError when not owned', async () => {
 		(TrackService.getTrackById as any).mockResolvedValue(track({ artistId: 'other' }));
-		await expect(MusicApplicationService.assertTrackOwned('a1', 't1')).rejects.toBeInstanceOf(MusicAccessError);
+		await expect(MusicApplicationService.assertTrackOwned('a1', 't1')).rejects.toBeInstanceOf(
+			MusicAccessError
+		);
 	});
 	it('throws MusicAccessError when missing', async () => {
 		(TrackService.getTrackById as any).mockResolvedValue(undefined);
-		await expect(MusicApplicationService.assertTrackOwned('a1', 't1')).rejects.toBeInstanceOf(MusicAccessError);
+		await expect(MusicApplicationService.assertTrackOwned('a1', 't1')).rejects.toBeInstanceOf(
+			MusicAccessError
+		);
 	});
 });
 ```
@@ -827,12 +892,7 @@ Expected: FAIL — cannot resolve `./MusicApplicationService`.
 
 ```ts
 // src/lib/server/music/MusicApplicationService.ts
-import {
-	AlbumService,
-	TrackService,
-	GenreService,
-	AlbumTrackService
-} from '$lib/db/queries';
+import { AlbumService, TrackService, GenreService, AlbumTrackService } from '$lib/db/queries';
 import type { Track, Album } from '$lib/db';
 import {
 	toTrackDTO,
@@ -931,10 +991,12 @@ git commit -m "feat(music): add MusicApplicationService read side + ownership gu
 ### Task 9: Album mutations on the boundary
 
 **Files:**
+
 - Modify: `src/lib/server/music/MusicApplicationService.ts`
 - Test: `src/lib/server/music/MusicApplicationService.album.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `AlbumService.createAlbum/updateAlbum/deleteAlbum`, `GenreService.getOrCreateGenres`, `AlbumTrackService.getAlbumTracks`, `TrackService.updateTrack`, `deleteFileFromR2` from `$lib/db/services/R2Service`, `eventPublisher` from `$lib/server/events`.
 - Produces:
   - `createAlbum(artistId, input: AlbumMutationInput): Promise<AlbumDTO>`
@@ -976,7 +1038,12 @@ export interface AlbumPatchInput {
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('$lib/db/queries', () => ({
-	AlbumService: { getAlbumById: vi.fn(), createAlbum: vi.fn(), updateAlbum: vi.fn(), deleteAlbum: vi.fn() },
+	AlbumService: {
+		getAlbumById: vi.fn(),
+		createAlbum: vi.fn(),
+		updateAlbum: vi.fn(),
+		deleteAlbum: vi.fn()
+	},
 	TrackService: { updateTrack: vi.fn(), getTrackById: vi.fn() },
 	GenreService: { getOrCreateGenres: vi.fn() },
 	AlbumTrackService: { getAlbumTracks: vi.fn() }
@@ -991,9 +1058,20 @@ import { MusicApplicationService } from './MusicApplicationService';
 
 const d = new Date('2026-06-30T00:00:00Z');
 const album = (over = {}) => ({
-	id: 'al1', artistId: 'a1', title: 'A', description: null, coverImageUrl: null,
-	releaseDate: null, price: null, isPublished: false, visibility: 'public',
-	genres: [], metadata: null, createdAt: d, updatedAt: d, ...over
+	id: 'al1',
+	artistId: 'a1',
+	title: 'A',
+	description: null,
+	coverImageUrl: null,
+	releaseDate: null,
+	price: null,
+	isPublished: false,
+	visibility: 'public',
+	genres: [],
+	metadata: null,
+	createdAt: d,
+	updatedAt: d,
+	...over
 });
 
 beforeEach(() => vi.clearAllMocks());
@@ -1002,7 +1080,10 @@ describe('createAlbum', () => {
 	it('creates and returns a DTO', async () => {
 		(AlbumService.createAlbum as any).mockResolvedValue(album({ title: 'New' }));
 		(GenreService.getOrCreateGenres as any).mockResolvedValue([]);
-		const dto = await MusicApplicationService.createAlbum('a1', { title: 'New', visibility: 'public' });
+		const dto = await MusicApplicationService.createAlbum('a1', {
+			title: 'New',
+			visibility: 'public'
+		});
 		expect(dto.title).toBe('New');
 		expect(AlbumService.createAlbum).toHaveBeenCalledWith(
 			expect.objectContaining({ artistId: 'a1', visibility: 'public' })
@@ -1030,7 +1111,9 @@ describe('updateAlbum visibility cascade', () => {
 	});
 	it('does not cascade when visibility is unchanged', async () => {
 		(AlbumService.getAlbumById as any).mockResolvedValue(album({ visibility: 'public' }));
-		(AlbumService.updateAlbum as any).mockResolvedValue(album({ title: 'Renamed', visibility: 'public' }));
+		(AlbumService.updateAlbum as any).mockResolvedValue(
+			album({ title: 'Renamed', visibility: 'public' })
+		);
 		await MusicApplicationService.updateAlbum('a1', 'al1', { title: 'Renamed' });
 		expect(AlbumTrackService.getAlbumTracks).not.toHaveBeenCalled();
 	});
@@ -1038,10 +1121,15 @@ describe('updateAlbum visibility cascade', () => {
 
 describe('deleteAlbum', () => {
 	it('deletes the R2 cover when present then the album', async () => {
-		(AlbumService.getAlbumById as any).mockResolvedValue(album({ coverImageUrl: 'a1/albums/al1/cover.jpg' }));
+		(AlbumService.getAlbumById as any).mockResolvedValue(
+			album({ coverImageUrl: 'a1/albums/al1/cover.jpg' })
+		);
 		(AlbumService.deleteAlbum as any).mockResolvedValue(true);
 		const res = await MusicApplicationService.deleteAlbum('a1', 'al1');
-		expect(deleteFileFromR2).toHaveBeenCalledWith({ uniqueKey: 'a1/albums/al1/cover.jpg', bucket: 'images' });
+		expect(deleteFileFromR2).toHaveBeenCalledWith({
+			uniqueKey: 'a1/albums/al1/cover.jpg',
+			bucket: 'images'
+		});
 		expect(res).toEqual({ ok: true });
 	});
 });
@@ -1166,11 +1254,13 @@ git commit -m "feat(music): album create/update/delete with visibility cascade +
 ### Task 10: Track lifecycle on the boundary (create / resume / finalize)
 
 **Files:**
+
 - Modify: `src/lib/server/music/MusicApplicationService.ts`
 - Modify: `src/lib/server/music/dto.ts` (input types)
 - Test: `src/lib/server/music/MusicApplicationService.track.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `TrackService.createTrack/updateTrack`, `MediaUploadService` (`createTrackAudioUpload`, `createTrackCoverUpload`, `toStoredTarget`, `renewStoredTarget`, `completeMultipart`, `verifyObject`), `validateAudioUpload`/`validateImageUpload`/`assertPartCount` from `../media/validation`, `R2_MULTIPART_PART_SIZE`, `eventPublisher`.
 - Produces:
   - `createTrack(artistId, input: CreateTrackInput): Promise<{ track: TrackDTO; uploadTargets }>` — validates audio/cover, caps part count, persists `pending_upload`, returns presigned targets.
@@ -1219,7 +1309,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('$lib/db/queries', () => ({
 	TrackService: { createTrack: vi.fn(), updateTrack: vi.fn(), getTrackById: vi.fn() },
 	GenreService: { getOrCreateGenres: vi.fn() },
-	AlbumService: {}, AlbumTrackService: {}
+	AlbumService: {},
+	AlbumTrackService: {}
 }));
 vi.mock('$lib/server/media', () => ({
 	MediaUploadService: {
@@ -1241,11 +1332,25 @@ import { MAX_AUDIO_SIZE } from '../media/validation';
 
 const d = new Date('2026-06-30T00:00:00Z');
 const track = (over = {}) => ({
-	id: 't1', albumId: null, artistId: 'a1', title: 'S', duration: 100, audioUrl: 'k',
-	lyrics: null, clipUrl: null, imageUrl: null, trackNumber: null, genre: [],
-	status: 'pending_upload', isPublished: false, visibility: 'public', contentId: null,
+	id: 't1',
+	albumId: null,
+	artistId: 'a1',
+	title: 'S',
+	duration: 100,
+	audioUrl: 'k',
+	lyrics: null,
+	clipUrl: null,
+	imageUrl: null,
+	trackNumber: null,
+	genre: [],
+	status: 'pending_upload',
+	isPublished: false,
+	visibility: 'public',
+	contentId: null,
 	metadata: { upload: { uploads: { audio: { key: 'a1/tracks/t1/source.mp3', mode: 'single' } } } },
-	createdAt: d, updatedAt: d, ...over
+	createdAt: d,
+	updatedAt: d,
+	...over
 });
 
 beforeEach(() => vi.clearAllMocks());
@@ -1254,7 +1359,8 @@ describe('createTrack', () => {
 	it('rejects an oversize audio file before creating anything', async () => {
 		await expect(
 			MusicApplicationService.createTrack('a1', {
-				title: 'S', audio: { fileName: 'x.mp3', contentType: 'audio/mpeg', size: MAX_AUDIO_SIZE + 1 }
+				title: 'S',
+				audio: { fileName: 'x.mp3', contentType: 'audio/mpeg', size: MAX_AUDIO_SIZE + 1 }
 			})
 		).rejects.toThrow();
 		expect(TrackService.createTrack).not.toHaveBeenCalled();
@@ -1264,15 +1370,23 @@ describe('createTrack', () => {
 		(TrackService.createTrack as any).mockResolvedValue(track());
 		(TrackService.updateTrack as any).mockResolvedValue(track());
 		(GenreService.getOrCreateGenres as any).mockResolvedValue([]);
-		(MediaUploadService.createTrackAudioUpload as any).mockResolvedValue({ key: 'a1/tracks/t1/source.mp3', target: { mode: 'single' } });
+		(MediaUploadService.createTrackAudioUpload as any).mockResolvedValue({
+			key: 'a1/tracks/t1/source.mp3',
+			target: { mode: 'single' }
+		});
 
 		const result = await MusicApplicationService.createTrack('a1', {
-			title: 'S', visibility: 'subscribers_only',
+			title: 'S',
+			visibility: 'subscribers_only',
 			audio: { fileName: 'x.mp3', contentType: 'audio/mpeg', size: 1024 }
 		});
 
 		expect(TrackService.createTrack).toHaveBeenCalledWith(
-			expect.objectContaining({ artistId: 'a1', status: 'pending_upload', visibility: 'subscribers_only' })
+			expect.objectContaining({
+				artistId: 'a1',
+				status: 'pending_upload',
+				visibility: 'subscribers_only'
+			})
 		);
 		expect(result.uploadTargets.audio).toBeDefined();
 		expect(result.track.id).toBe('t1');
@@ -1286,10 +1400,14 @@ describe('finalizeTrackUpload', () => {
 		(TrackService.updateTrack as any).mockResolvedValue(track({ status: 'uploaded' }));
 
 		const res = await MusicApplicationService.finalizeTrackUpload('a1', 't1', {
-			audioParts: [], coverUploaded: false
+			audioParts: [],
+			coverUploaded: false
 		});
 
-		expect(TrackService.updateTrack).toHaveBeenCalledWith('t1', expect.objectContaining({ status: 'uploaded' }));
+		expect(TrackService.updateTrack).toHaveBeenCalledWith(
+			't1',
+			expect.objectContaining({ status: 'uploaded' })
+		);
 		expect(eventPublisher.publish).toHaveBeenCalledWith(
 			expect.objectContaining({ type: 'track.uploaded', trackId: 't1' })
 		);
@@ -1298,10 +1416,16 @@ describe('finalizeTrackUpload', () => {
 
 	it('marks failed and throws on verify mismatch', async () => {
 		(TrackService.getTrackById as any).mockResolvedValue(track());
-		(MediaUploadService.verifyObject as any).mockResolvedValue({ ok: false, reason: 'size mismatch' });
+		(MediaUploadService.verifyObject as any).mockResolvedValue({
+			ok: false,
+			reason: 'size mismatch'
+		});
 		(TrackService.updateTrack as any).mockResolvedValue(track({ status: 'failed' }));
 		await expect(
-			MusicApplicationService.finalizeTrackUpload('a1', 't1', { audioParts: [], coverUploaded: false })
+			MusicApplicationService.finalizeTrackUpload('a1', 't1', {
+				audioParts: [],
+				coverUploaded: false
+			})
 		).rejects.toThrow('size mismatch');
 		expect(eventPublisher.publish).not.toHaveBeenCalled();
 	});
@@ -1496,11 +1620,13 @@ git commit -m "feat(music): move track create/resume/finalize into boundary + va
 ### Task 11: Track metadata, delete, link/unlink with inheritance
 
 **Files:**
+
 - Modify: `src/lib/server/music/MusicApplicationService.ts`
 - Modify: `src/lib/server/music/dto.ts`
 - Test: `src/lib/server/music/MusicApplicationService.link.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `TrackService.updateTrack/deleteTrack`, `AlbumTrackService.linkTrackToAlbum/unlinkTrackFromAlbum`, `eventPublisher`.
 - Produces:
   - `updateTrackMetadata(artistId, trackId, patch: TrackPatchInput): Promise<TrackDTO>` — emits `track.visibility_changed` / `track.published` when those change.
@@ -1543,12 +1669,36 @@ import { MusicApplicationService } from './MusicApplicationService';
 
 const d = new Date('2026-06-30T00:00:00Z');
 const track = (over = {}) => ({
-	id: 't1', albumId: null, artistId: 'a1', title: 'S', duration: 100, audioUrl: null,
-	lyrics: null, clipUrl: null, imageUrl: null, trackNumber: null, genre: [],
-	status: 'uploaded', isPublished: false, visibility: 'public', contentId: null,
-	metadata: null, createdAt: d, updatedAt: d, ...over
+	id: 't1',
+	albumId: null,
+	artistId: 'a1',
+	title: 'S',
+	duration: 100,
+	audioUrl: null,
+	lyrics: null,
+	clipUrl: null,
+	imageUrl: null,
+	trackNumber: null,
+	genre: [],
+	status: 'uploaded',
+	isPublished: false,
+	visibility: 'public',
+	contentId: null,
+	metadata: null,
+	createdAt: d,
+	updatedAt: d,
+	...over
 });
-const album = (over = {}) => ({ ...track(), id: 'al1', coverImageUrl: null, releaseDate: null, price: null, genres: [], description: null, ...over });
+const album = (over = {}) => ({
+	...track(),
+	id: 'al1',
+	coverImageUrl: null,
+	releaseDate: null,
+	price: null,
+	genres: [],
+	description: null,
+	...over
+});
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -1556,7 +1706,11 @@ describe('linkTrackToAlbum inheritance', () => {
 	it('overwrites track visibility with the album visibility and emits', async () => {
 		(AlbumService.getAlbumById as any).mockResolvedValue(album({ visibility: 'subscribers_only' }));
 		(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'public' }));
-		(AlbumTrackService.linkTrackToAlbum as any).mockResolvedValue({ albumId: 'al1', trackId: 't1', trackNumber: 1 });
+		(AlbumTrackService.linkTrackToAlbum as any).mockResolvedValue({
+			albumId: 'al1',
+			trackId: 't1',
+			trackNumber: 1
+		});
 		(TrackService.updateTrack as any).mockResolvedValue(track({ visibility: 'subscribers_only' }));
 
 		const res = await MusicApplicationService.linkTrackToAlbum('a1', 'al1', 't1', 1);
@@ -1569,7 +1723,11 @@ describe('linkTrackToAlbum inheritance', () => {
 	it('does not emit when album visibility matches the track', async () => {
 		(AlbumService.getAlbumById as any).mockResolvedValue(album({ visibility: 'public' }));
 		(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'public' }));
-		(AlbumTrackService.linkTrackToAlbum as any).mockResolvedValue({ albumId: 'al1', trackId: 't1', trackNumber: 1 });
+		(AlbumTrackService.linkTrackToAlbum as any).mockResolvedValue({
+			albumId: 'al1',
+			trackId: 't1',
+			trackNumber: 1
+		});
 		await MusicApplicationService.linkTrackToAlbum('a1', 'al1', 't1', 1);
 		expect(eventPublisher.publish).not.toHaveBeenCalled();
 	});
@@ -1577,11 +1735,22 @@ describe('linkTrackToAlbum inheritance', () => {
 
 describe('updateTrackMetadata', () => {
 	it('emits track.visibility_changed and track.published when both change', async () => {
-		(TrackService.getTrackById as any).mockResolvedValue(track({ visibility: 'public', isPublished: false }));
-		(TrackService.updateTrack as any).mockResolvedValue(track({ visibility: 'subscribers_only', isPublished: true }));
-		await MusicApplicationService.updateTrackMetadata('a1', 't1', { visibility: 'subscribers_only', isPublished: true });
-		expect(eventPublisher.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'track.visibility_changed' }));
-		expect(eventPublisher.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'track.published' }));
+		(TrackService.getTrackById as any).mockResolvedValue(
+			track({ visibility: 'public', isPublished: false })
+		);
+		(TrackService.updateTrack as any).mockResolvedValue(
+			track({ visibility: 'subscribers_only', isPublished: true })
+		);
+		await MusicApplicationService.updateTrackMetadata('a1', 't1', {
+			visibility: 'subscribers_only',
+			isPublished: true
+		});
+		expect(eventPublisher.publish).toHaveBeenCalledWith(
+			expect.objectContaining({ type: 'track.visibility_changed' })
+		);
+		expect(eventPublisher.publish).toHaveBeenCalledWith(
+			expect.objectContaining({ type: 'track.published' })
+		);
 	});
 });
 
@@ -1591,7 +1760,9 @@ describe('deleteTrack', () => {
 		(TrackService.deleteTrack as any).mockResolvedValue(true);
 		const res = await MusicApplicationService.deleteTrack('a1', 't1');
 		expect(res).toEqual({ ok: true });
-		expect(eventPublisher.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'track.deleted' }));
+		expect(eventPublisher.publish).toHaveBeenCalledWith(
+			expect.objectContaining({ type: 'track.deleted' })
+		);
 	});
 });
 ```
@@ -1717,12 +1888,14 @@ git commit -m "feat(music): track metadata/delete + link inheritance with visibi
 ### Task 12: Refactor route actions to the boundary + secure the upload-target endpoint
 
 **Files:**
+
 - Modify: `src/routes/studio/music/+page.server.ts` (all actions + `load`)
 - Modify: `src/routes/api/studio/media/upload-target/+server.ts` (origin check + rate limit)
 - Create: `src/lib/server/security/origin.ts`
 - Test: `src/lib/server/security/origin.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `MusicApplicationService`, `MusicAccessError` from `$lib/server/music`; `createRateLimiter` from `$lib/server/security/rateLimiter`.
 - Produces: `isSameOrigin(event): boolean` (compares `request.headers.get('origin')` to `event.url.origin`, allowing missing origin only for `Sec-Fetch-Site: same-origin`).
 
@@ -1792,10 +1965,10 @@ const uploadTargetLimiter = createRateLimiter({ limit: 60, windowMs: 60_000 });
 Then immediately after `if (!artist) return json({ error: 'Unauthorized' }, { status: 401 });`:
 
 ```ts
-	if (!isSameOrigin(event)) return json({ error: 'Forbidden' }, { status: 403 });
-	if (!uploadTargetLimiter.check(artist.id)) {
-		return json({ error: 'Too many requests' }, { status: 429 });
-	}
+if (!isSameOrigin(event)) return json({ error: 'Forbidden' }, { status: 403 });
+if (!uploadTargetLimiter.check(artist.id)) {
+	return json({ error: 'Too many requests' }, { status: 429 });
+}
 ```
 
 - [ ] **Step 6: Refactor the music route `load`**
@@ -1926,6 +2099,7 @@ git commit -m "refactor(studio): route music actions through MusicApplicationSer
 ### Task 13: Coverage gate verification
 
 **Files:**
+
 - (none — verification only)
 
 - [ ] **Step 1: Run the coverage gate**
@@ -1950,6 +2124,7 @@ git commit -m "test(music): close coverage gaps to satisfy the 90% seam gate"
 ## Self-Review
 
 **Spec coverage (Plan A = §9 phases 1–5 of the spec):**
+
 - §6.1 IDOR/ownership → Tasks 8–11 (`assertTrackOwned`/`assertAlbumOwned` on every mutation) + Task 12 (origin guard). ✓
 - §6.2 audio/image MIME+size + partCount cap → Tasks 2, 3, used in Task 10. ✓
 - §6.3 rate limiting (in-memory) → Tasks 4, 12. ✓

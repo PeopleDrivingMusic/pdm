@@ -29,9 +29,9 @@ export class MediaService {
 		return Promise.all(list.map((item) => this.enrichTrackUrls(item)));
 	}
 
-	static async enrichComplexPopularTracks<T extends { tracks?: TrackWithMedia; albums?: TrackWithMedia }>(
-		result: T[]
-	): Promise<T[]> {
+	static async enrichComplexPopularTracks<
+		T extends { tracks?: TrackWithMedia; albums?: TrackWithMedia }
+	>(result: T[]): Promise<T[]> {
 		return Promise.all(
 			result.map(async (row) => ({
 				...row,

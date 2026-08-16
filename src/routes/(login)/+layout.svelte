@@ -1,9 +1,8 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import '../../app.scss';
-	
+
 	let { children } = $props();
-	
 </script>
 
 <svelte:head>
@@ -25,12 +24,14 @@
 		background: var(--bg-secondary);
 		color: var(--text-primary);
 		padding-top: 20px;
-		transition: max-height 300ms ease, height 300ms ease;
+		transition:
+			max-height 300ms ease,
+			height 300ms ease;
 
 		&.fullHeight {
 			max-height: 100vh;
 		}
-		
+
 		.page {
 			flex: 1;
 			overflow-y: auto;
@@ -41,7 +42,6 @@
 			background-position: center;
 			background-size: contain;
 			box-shadow: var(--shadow-sm);
-			
 		}
 	}
 </style>

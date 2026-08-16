@@ -1,151 +1,160 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
-        "enable": true,
-        "hide": true,
-        "type": "dashboard"
-      }
-    ]
-  },
-  "editable": true,
-  "graphTooltip": 0,
-  "panels": [
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 },
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "id": 1,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (kind) (rate(media_upload_started_total[5m]))",
-          "legendFormat": "started {{kind}}",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (kind) (rate(media_upload_finalized_total{result=\"success\"}[5m]))",
-          "legendFormat": "finalized ok {{kind}}",
-          "refId": "B"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (reason) (rate(media_upload_failed_total[5m]))",
-          "legendFormat": "failed {{reason}}",
-          "refId": "C"
-        }
-      ],
-      "title": "Upload rate (start / finalize / fail)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 },
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "id": 2,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(media_upload_duration_seconds_bucket[5m])))",
-          "legendFormat": "p50",
-          "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(media_upload_duration_seconds_bucket[5m])))",
-          "legendFormat": "p95",
-          "refId": "B"
-        }
-      ],
-      "title": "Upload duration (create → finalize)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 10 },
-              { "color": "red", "value": 50 }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
-      "id": 3,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "media_pending_uploads",
-          "legendFormat": "pending",
-          "refId": "A"
-        }
-      ],
-      "title": "Pending uploads",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 },
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 8 },
-      "id": 4,
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
-      "targets": [
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (op) (rate(r2_errors_total[5m]))",
-          "legendFormat": "{{op}}",
-          "refId": "A"
-        }
-      ],
-      "title": "R2 operation errors",
-      "type": "timeseries"
-    }
-  ],
-  "refresh": "30s",
-  "schemaVersion": 39,
-  "tags": ["pdm", "media", "upload"],
-  "templating": { "list": [] },
-  "time": { "from": "now-6h", "to": "now" },
-  "timezone": "",
-  "title": "PDM Media Upload Pipeline",
-  "uid": "pdm-media-upload-pipeline",
-  "version": 1
+	"annotations": {
+		"list": [
+			{
+				"builtIn": 1,
+				"datasource": { "type": "grafana", "uid": "-- Grafana --" },
+				"enable": true,
+				"hide": true,
+				"type": "dashboard"
+			}
+		]
+	},
+	"editable": true,
+	"graphTooltip": 0,
+	"panels": [
+		{
+			"datasource": { "type": "prometheus", "uid": "prometheus" },
+			"fieldConfig": {
+				"defaults": {
+					"color": { "mode": "palette-classic" },
+					"custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 },
+					"unit": "reqps"
+				},
+				"overrides": []
+			},
+			"gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+			"id": 1,
+			"options": {
+				"legend": { "displayMode": "list", "placement": "bottom" },
+				"tooltip": { "mode": "multi" }
+			},
+			"targets": [
+				{
+					"datasource": { "type": "prometheus", "uid": "prometheus" },
+					"expr": "sum by (kind) (rate(media_upload_started_total[5m]))",
+					"legendFormat": "started {{kind}}",
+					"refId": "A"
+				},
+				{
+					"datasource": { "type": "prometheus", "uid": "prometheus" },
+					"expr": "sum by (kind) (rate(media_upload_finalized_total{result=\"success\"}[5m]))",
+					"legendFormat": "finalized ok {{kind}}",
+					"refId": "B"
+				},
+				{
+					"datasource": { "type": "prometheus", "uid": "prometheus" },
+					"expr": "sum by (reason) (rate(media_upload_failed_total[5m]))",
+					"legendFormat": "failed {{reason}}",
+					"refId": "C"
+				}
+			],
+			"title": "Upload rate (start / finalize / fail)",
+			"type": "timeseries"
+		},
+		{
+			"datasource": { "type": "prometheus", "uid": "prometheus" },
+			"fieldConfig": {
+				"defaults": {
+					"color": { "mode": "palette-classic" },
+					"custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 },
+					"unit": "s"
+				},
+				"overrides": []
+			},
+			"gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+			"id": 2,
+			"options": {
+				"legend": { "displayMode": "list", "placement": "bottom" },
+				"tooltip": { "mode": "multi" }
+			},
+			"targets": [
+				{
+					"datasource": { "type": "prometheus", "uid": "prometheus" },
+					"expr": "histogram_quantile(0.5, sum by (le) (rate(media_upload_duration_seconds_bucket[5m])))",
+					"legendFormat": "p50",
+					"refId": "A"
+				},
+				{
+					"datasource": { "type": "prometheus", "uid": "prometheus" },
+					"expr": "histogram_quantile(0.95, sum by (le) (rate(media_upload_duration_seconds_bucket[5m])))",
+					"legendFormat": "p95",
+					"refId": "B"
+				}
+			],
+			"title": "Upload duration (create → finalize)",
+			"type": "timeseries"
+		},
+		{
+			"datasource": { "type": "prometheus", "uid": "prometheus" },
+			"fieldConfig": {
+				"defaults": {
+					"color": { "mode": "thresholds" },
+					"thresholds": {
+						"mode": "absolute",
+						"steps": [
+							{ "color": "green", "value": null },
+							{ "color": "yellow", "value": 10 },
+							{ "color": "red", "value": 50 }
+						]
+					},
+					"unit": "short"
+				},
+				"overrides": []
+			},
+			"gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+			"id": 3,
+			"options": {
+				"colorMode": "value",
+				"graphMode": "area",
+				"reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+			},
+			"targets": [
+				{
+					"datasource": { "type": "prometheus", "uid": "prometheus" },
+					"expr": "media_pending_uploads",
+					"legendFormat": "pending",
+					"refId": "A"
+				}
+			],
+			"title": "Pending uploads",
+			"type": "stat"
+		},
+		{
+			"datasource": { "type": "prometheus", "uid": "prometheus" },
+			"fieldConfig": {
+				"defaults": {
+					"color": { "mode": "palette-classic" },
+					"custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 },
+					"unit": "reqps"
+				},
+				"overrides": []
+			},
+			"gridPos": { "h": 8, "w": 16, "x": 8, "y": 8 },
+			"id": 4,
+			"options": {
+				"legend": { "displayMode": "list", "placement": "bottom" },
+				"tooltip": { "mode": "multi" }
+			},
+			"targets": [
+				{
+					"datasource": { "type": "prometheus", "uid": "prometheus" },
+					"expr": "sum by (op) (rate(r2_errors_total[5m]))",
+					"legendFormat": "{{op}}",
+					"refId": "A"
+				}
+			],
+			"title": "R2 operation errors",
+			"type": "timeseries"
+		}
+	],
+	"refresh": "30s",
+	"schemaVersion": 39,
+	"tags": ["pdm", "media", "upload"],
+	"templating": { "list": [] },
+	"time": { "from": "now-6h", "to": "now" },
+	"timezone": "",
+	"title": "PDM Media Upload Pipeline",
+	"uid": "pdm-media-upload-pipeline",
+	"version": 1
 }

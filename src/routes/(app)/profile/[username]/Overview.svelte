@@ -63,7 +63,7 @@
 
 <style lang="scss">
 	.profile-stats {
-        width: 100%;
+		width: 100%;
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
 		gap: var(--space-4);

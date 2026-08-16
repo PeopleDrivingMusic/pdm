@@ -9,8 +9,8 @@ groups:
           severity: critical
           service: pdm-app
         annotations:
-          summary: "PDM Application is down"
-          description: "PDM application has been down for more than 1 minute"
+          summary: 'PDM Application is down'
+          description: 'PDM application has been down for more than 1 minute'
 
       # High response time
       - alert: PDMHighResponseTime
@@ -20,8 +20,8 @@ groups:
           severity: warning
           service: pdm-app
         annotations:
-          summary: "PDM Application high response time"
-          description: "95th percentile response time is {{ $value }}s"
+          summary: 'PDM Application high response time'
+          description: '95th percentile response time is {{ $value }}s'
 
       # High error rate
       - alert: PDMHighErrorRate
@@ -31,8 +31,8 @@ groups:
           severity: warning
           service: pdm-app
         annotations:
-          summary: "PDM Application high error rate"
-          description: "Error rate is {{ $value | humanizePercentage }}"
+          summary: 'PDM Application high error rate'
+          description: 'Error rate is {{ $value | humanizePercentage }}'
 
       # High memory usage
       - alert: PDMHighMemoryUsage
@@ -42,8 +42,8 @@ groups:
           severity: warning
           service: pdm-app
         annotations:
-          summary: "PDM Application high memory usage"
-          description: "Memory usage is {{ $value }}MB"
+          summary: 'PDM Application high memory usage'
+          description: 'Memory usage is {{ $value }}MB'
 
       # Database connection issues
       - alert: PDMDatabaseConnectionIssues
@@ -53,8 +53,8 @@ groups:
           severity: warning
           service: pdm-app
         annotations:
-          summary: "PDM Application database connection issues"
-          description: "Active database connections: {{ $value }}"
+          summary: 'PDM Application database connection issues'
+          description: 'Active database connections: {{ $value }}'
 
   - name: system-resources
     rules:
@@ -66,8 +66,8 @@ groups:
           severity: warning
           service: system
         annotations:
-          summary: "High CPU usage detected"
-          description: "CPU usage is {{ $value }}%"
+          summary: 'High CPU usage detected'
+          description: 'CPU usage is {{ $value }}%'
 
       # High memory usage
       - alert: HighMemoryUsage
@@ -77,8 +77,8 @@ groups:
           severity: warning
           service: system
         annotations:
-          summary: "High memory usage detected"
-          description: "Memory usage is {{ $value }}%"
+          summary: 'High memory usage detected'
+          description: 'Memory usage is {{ $value }}%'
 
       # Low disk space
       - alert: LowDiskSpace
@@ -88,8 +88,8 @@ groups:
           severity: warning
           service: system
         annotations:
-          summary: "Low disk space"
-          description: "Available disk space is {{ $value }}%"
+          summary: 'Low disk space'
+          description: 'Available disk space is {{ $value }}%'
 
   - name: docker-containers
     rules:
@@ -101,8 +101,8 @@ groups:
           severity: critical
           service: docker
         annotations:
-          summary: "Container {{ $labels.instance }} is down"
-          description: "Container has been down for more than 1 minute"
+          summary: 'Container {{ $labels.instance }} is down'
+          description: 'Container has been down for more than 1 minute'
 
       # High container CPU usage
       - alert: ContainerHighCPU
@@ -112,8 +112,8 @@ groups:
           severity: warning
           service: docker
         annotations:
-          summary: "Container {{ $labels.name }} high CPU usage"
-          description: "CPU usage is {{ $value }}%"
+          summary: 'Container {{ $labels.name }} high CPU usage'
+          description: 'CPU usage is {{ $value }}%'
 
       # High container memory usage
       - alert: ContainerHighMemory
@@ -123,8 +123,8 @@ groups:
           severity: warning
           service: docker
         annotations:
-          summary: "Container {{ $labels.name }} high memory usage"
-          description: "Memory usage is {{ $value }}%"
+          summary: 'Container {{ $labels.name }} high memory usage'
+          description: 'Memory usage is {{ $value }}%'
 
   - name: loki-logging
     rules:
@@ -136,8 +136,8 @@ groups:
           severity: critical
           service: loki
         annotations:
-          summary: "Loki is down"
-          description: "Loki has been down for more than 1 minute"
+          summary: 'Loki is down'
+          description: 'Loki has been down for more than 1 minute'
 
       # Promtail is down
       - alert: PromtailDown
@@ -147,8 +147,8 @@ groups:
           severity: critical
           service: promtail
         annotations:
-          summary: "Promtail is down"
-          description: "Promtail has been down for more than 1 minute"
+          summary: 'Promtail is down'
+          description: 'Promtail has been down for more than 1 minute'
 
       # High log ingestion rate
       - alert: HighLogIngestionRate
@@ -158,5 +158,5 @@ groups:
           severity: warning
           service: loki
         annotations:
-          summary: "High log ingestion rate"
-          description: "Log ingestion rate is {{ $value }} logs/second"
+          summary: 'High log ingestion rate'
+          description: 'Log ingestion rate is {{ $value }} logs/second'
