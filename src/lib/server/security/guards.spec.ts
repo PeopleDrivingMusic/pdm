@@ -38,3 +38,15 @@ describe('isGuardResponse', () => {
 		expect(isGuardResponse({ userId: 'u1' })).toBe(false);
 	});
 });
+
+describe('error bodies are machine-readable codes', () => {
+	it('answers a cross-origin request with a forbidden code', async () => {
+		const res = requireSameOrigin(evt({ headers: { origin: 'http://evil.test' } })) as Response;
+		expect(await res.json()).toEqual({ error: 'forbidden' });
+	});
+
+	it('answers an anonymous caller with an unauthorized code', async () => {
+		const res = requireUser(evt({ locals: {} })) as Response;
+		expect(await res.json()).toEqual({ error: 'unauthorized' });
+	});
+});

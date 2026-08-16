@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db, withDbLogging } from '$lib/db';
 import { PUBLIC_R2_IMAGES_BUCKET } from '$env/static/public';
 import {
@@ -19,6 +19,8 @@ import {
 	videoCollections
 } from '$lib/db/schema';
 import { postDocumentRepository } from './PostDocumentRepository';
+import { CommentRepository } from './CommentRepository';
+import { LikeService } from '$lib/server/likes';
 import type {
 	ArtistFeedItem,
 	ContentMedia,
@@ -61,6 +63,9 @@ export interface PublicArtistPost {
 	visibility: ContentVisibility;
 	publishedAt: Date | null;
 	isLocked: boolean;
+	commentCount: number;
+	likeCount: number;
+	likedByViewer: boolean;
 	media: Array<{
 		id: string;
 		type: string;
@@ -367,7 +372,7 @@ export class PostService {
 
 		const [voteCountRow] = existingPoll
 			? await db
-					.select({ count: sql<number>`count(*)::int` })
+					.select({ count: count() })
 					.from(postPollVotes)
 					.where(eq(postPollVotes.pollId, existingPoll.id))
 			: [{ count: 0 }];
@@ -1150,7 +1155,9 @@ export class ArtistPublicContentService {
 				pollVoteRows,
 				viewerVoteRows,
 				photoRows,
-				collectionItemRows
+				collectionItemRows,
+				commentCounts,
+				likeSummaries
 			] = await Promise.all([
 				postDocumentRepository.getPostDocuments(postIds),
 				postIds.length
@@ -1198,7 +1205,7 @@ export class ArtistPublicContentService {
 					? db
 							.select({
 								optionId: postPollVotes.optionId,
-								votes: sql<number>`count(*)::int`
+								votes: count()
 							})
 							.from(postPollVotes)
 							.innerJoin(postPolls, eq(postPollVotes.pollId, postPolls.id))
@@ -1236,7 +1243,14 @@ export class ArtistPublicContentService {
 							.from(videoCollectionItems)
 							.where(inArray(videoCollectionItems.collectionId, collectionIds))
 							.orderBy(asc(videoCollectionItems.sortOrder))
-					: []
+					: [],
+				// Comment counts are computed on read (no denormalized counter to drift).
+				postIds.length
+					? CommentRepository.countForTargets('post', postIds)
+					: new Map<string, number>(),
+				postIds.length
+					? LikeService.summaryFor('post', postIds, viewer.userId ?? null)
+					: new Map<string, { likeCount: number; likedByViewer: boolean }>()
 			]);
 
 			const mediaByPost = new Map<string, typeof mediaRows>();
@@ -1312,6 +1326,9 @@ export class ArtistPublicContentService {
 					visibility,
 					publishedAt: post.publishedAt,
 					isLocked,
+					commentCount: commentCounts.get(post.id) ?? 0,
+					likeCount: likeSummaries.get(post.id)?.likeCount ?? 0,
+					likedByViewer: likeSummaries.get(post.id)?.likedByViewer ?? false,
 					media: isLocked
 						? []
 						: (mediaByPost.get(post.id) ?? []).map((row) => ({

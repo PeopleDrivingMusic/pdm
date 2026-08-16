@@ -1,6 +1,20 @@
 import { page } from '@vitest/browser/context';
-import { expect, test, vi } from 'vitest';
+import { expect, test, vi, beforeEach } from 'vitest';
 import { render } from 'vitest-browser-svelte';
+
+// The optimistic-apply/rollback/notify algorithm itself is `toggleLikeOptimistic`'s
+// job and is covered in `client/comments.spec.ts` — these tests only check that
+// PostCard calls it with the right target and reflects whatever it applies.
+const toggleLikeOptimistic = vi.fn();
+const fetchComments = vi.fn();
+vi.mock('$lib/client/comments', () => ({
+	toggleLikeOptimistic: (...args: unknown[]) => toggleLikeOptimistic(...args),
+	fetchComments: (...args: unknown[]) => fetchComments(...args),
+	createComment: vi.fn(),
+	editComment: vi.fn(),
+	deleteComment: vi.fn()
+}));
+
 import PostCard from './PostCard.svelte';
 
 type Poll = {
@@ -16,6 +30,9 @@ type Poll = {
 
 const basePost = (over: Record<string, unknown> = {}) => ({
 	id: 'post-1',
+	commentCount: 0,
+	likeCount: 0,
+	likedByViewer: false,
 	title: 'Studio session',
 	excerpt: 'A quick look behind the scenes.',
 	bodyHtml: null as string | null,
@@ -113,9 +130,85 @@ test('hides the visibility badge for public posts', () => {
 	expect(container.querySelector('.visibility')).toBeNull();
 });
 
-test('calls onLike when the like button is clicked', async () => {
-	const onLike = vi.fn();
-	render(PostCard, { post: basePost(), author, onLike });
+beforeEach(() => {
+	vi.clearAllMocks();
+	// Default: behave like the real helper for a plain success, so tests that
+	// don't care about the exact sequence still see the post-toggle state.
+	toggleLikeOptimistic.mockImplementation(async (_type, _id, current, apply) => {
+		apply({ liked: !current.liked, likeCount: current.likeCount + (!current.liked ? 1 : -1) });
+	});
+});
+
+test('likes a post through the shared toggle helper', async () => {
+	render(PostCard, { post: basePost(), author, isLoggedIn: true });
+
 	await page.getByRole('button', { name: 'Like post' }).click();
-	expect(onLike).toHaveBeenCalledOnce();
+
+	expect(toggleLikeOptimistic).toHaveBeenCalledWith(
+		'post',
+		'post-1',
+		{ liked: false, likeCount: 0 },
+		expect.any(Function)
+	);
+	const button = page.getByRole('button', { name: 'Unlike post' });
+	await expect.element(button).toBeInTheDocument();
+	await expect.element(button).toHaveTextContent('1');
+});
+
+test('unlikes a liked post', async () => {
+	render(PostCard, {
+		post: basePost({ likeCount: 1, likedByViewer: true }),
+		author,
+		isLoggedIn: true
+	});
+
+	await page.getByRole('button', { name: 'Unlike post' }).click();
+
+	expect(toggleLikeOptimistic).toHaveBeenCalledWith(
+		'post',
+		'post-1',
+		{ liked: true, likeCount: 1 },
+		expect.any(Function)
+	);
+	await expect.element(page.getByRole('button', { name: 'Like post' })).toBeInTheDocument();
+});
+
+test('disables the like button for an anonymous viewer, instead of a silent no-op', async () => {
+	render(PostCard, { post: basePost(), author, isLoggedIn: false });
+
+	// A disabled button can't be clicked at all — that's the point (no more
+	// silent no-op); toggleLikeOptimistic is unreachable, nothing left to assert.
+	await expect.element(page.getByRole('button', { name: 'Like post' })).toBeDisabled();
+});
+
+test('shows the like count on a locked post as a teaser, disabled rather than a silent no-op', async () => {
+	render(PostCard, {
+		post: basePost({ isLocked: true, likeCount: 3 }),
+		author,
+		isLoggedIn: true
+	});
+
+	const like = page.getByRole('button', { name: 'Like post' });
+	await expect.element(like).toBeInTheDocument();
+	await expect.element(like).toHaveTextContent('3');
+	await expect.element(like).toBeDisabled();
+});
+
+test('leaves the like button enabled for a logged-in viewer on an unlocked post', async () => {
+	render(PostCard, { post: basePost(), author, isLoggedIn: true });
+	await expect.element(page.getByRole('button', { name: 'Like post' })).not.toBeDisabled();
+});
+
+test('shows the comment count on a locked post as a teaser, but never opens the thread', async () => {
+	render(PostCard, {
+		post: basePost({ isLocked: true, commentCount: 5 }),
+		author,
+		isLoggedIn: true
+	});
+
+	const toggle = page.getByRole('button', { name: 'Comments (5)' });
+	await expect.element(toggle).toBeInTheDocument();
+
+	await toggle.click();
+	await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
 });

@@ -22,7 +22,8 @@ export {
 	artistFeedItems
 } from './schemas/content';
 export { genres, albums, tracks, albumTracks } from './schemas/catalog';
-export { trackStats } from './schemas/engagement';
+export { trackStats, commentLikes, postLikes } from './schemas/engagement';
+export { comments } from './schemas/messages';
 export { playlists, playlistTracks, userFavorites } from './schemas/user-library';
 export { purchases, subscriptions } from './schemas/finance';
 import { users, sessions } from './schemas/users';
@@ -48,7 +49,8 @@ import {
 	artistFeedItems
 } from './schemas/content';
 import { genres, albums, tracks, albumTracks } from './schemas/catalog';
-import { trackStats } from './schemas/engagement';
+import { trackStats, commentLikes, postLikes } from './schemas/engagement';
+import { comments } from './schemas/messages';
 import { playlists, playlistTracks, userFavorites } from './schemas/user-library';
 import { purchases, subscriptions } from './schemas/finance';
 
@@ -187,6 +189,13 @@ export const trackStatsRelations = relations(trackStats, ({ one }) => ({
 	track: one(tracks, {
 		fields: [trackStats.trackId],
 		references: [tracks.id]
+	})
+}));
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+	author: one(users, {
+		fields: [comments.authorId],
+		references: [users.id]
 	})
 }));
 
@@ -351,6 +360,12 @@ export type NewAlbum = typeof albums.$inferInsert;
 export type Track = typeof tracks.$inferSelect;
 export type NewTrack = typeof tracks.$inferInsert;
 export type TrackStats = typeof trackStats.$inferSelect;
+export type CommentLike = typeof commentLikes.$inferSelect;
+export type NewCommentLike = typeof commentLikes.$inferInsert;
+export type PostLike = typeof postLikes.$inferSelect;
+export type NewPostLike = typeof postLikes.$inferInsert;
+export type Comment = typeof comments.$inferSelect;
+export type NewComment = typeof comments.$inferInsert;
 export type Genre = typeof genres.$inferSelect;
 export type NewGenre = typeof genres.$inferInsert;
 export type AlbumTrack = typeof albumTracks.$inferSelect;
@@ -411,6 +426,9 @@ export const schema = {
 	albums,
 	tracks,
 	trackStats,
+	commentLikes,
+	postLikes,
+	comments,
 	albumTracks,
 	playlists,
 	playlistTracks,
