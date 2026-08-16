@@ -10,6 +10,19 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# `$env/static/private` and `$env/static/public` (SvelteKit) only export the
+# keys that exist in the environment at sync/build time — the keys just need
+# to exist (empty is fine), not carry real values. Without these, svelte-check
+# fails on "has no exported member", and the client project's real-Chromium
+# ESM import throws "does not provide an export named ..." at module load.
+# Mirrors .env.example.
+env:
+  CLOUDFLARE_ACCOUNT_ID: ''
+  R2_ACCESS_KEY_ID: ''
+  R2_SECRET_ACCESS_KEY: ''
+  PUBLIC_R2_IMAGES_BUCKET: ''
+  PUBLIC_PGADMIN_URL: ''
+
 jobs:
   lint:
     runs-on: ubuntu-latest
