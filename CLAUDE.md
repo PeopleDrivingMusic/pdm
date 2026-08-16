@@ -7,7 +7,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **PDM (People Driven Music)** is first and foremost a **music-social platform** — everything is built around music and musical content. Anyone can listen for free; a fan who wants more subscribes to a specific artist for **$1/mo** to unlock exclusive content and platform perks (the artist's shared fan chat, offline caching of that artist, no ads on that artist, ticket presale access, etc.).
 
 The core mechanics the product is built around:
-
 - **Listening** — music playback with all its features.
 - **Content & social layer** — artist posts, videos, polls, fan interaction.
 - **Recommendations.**
@@ -26,13 +25,6 @@ The **`.claude/` directory is the project's AI knowledge base — the user's "se
 - When you learn something durable about the project, **file it into the wiki** per `.claude/wiki/WIKI.md` (project knowledge, distinct from memory below).
 
 **Memory (hard rule)** — Claude Code memory **lives in the project at `.claude/memory/`, NOT only on the local machine.** The harness's machine-local memory path is a **directory symlink → `.claude/memory/`** (part of the `pdm-claude` repo), so every memory write lands directly in the repo folder — no manual mirroring. After **any** memory change, just **commit/push `pdm-claude`** so nothing ever lives only locally. (If the symlink is ever missing, recreate it with `cmd /c mklink /D` — not PowerShell 5.1's `New-Item`.)
-
-**Learn layer** — retrospectives on _how the work went_ live at **`.claude/learn/`** (also part of `pdm-claude`). `LEARN.md` is its operating manual; `LEARNINGS.md` is a capped rolling digest of past lessons.
-
-- **`LEARNINGS.md` arrives automatically** via the `SessionStart` hook (`.claude/hooks/retro-debt.mjs`, registered in `.claude/settings.json`), which also reports retro debt — commits on the current branch since its last retro. If you do not see it in context the hook did not fire; read `.claude/learn/LEARNINGS.md` yourself. It is short by design (60-line cap).
-- When a unit of work closes — a slice merged, a PR opened, a feature finished — **offer `/retro`**. Do not write one unattended, and do not write one when there is no lesson: the bar is an item with non-zero cost or a non-obvious win.
-- A recurring lesson becomes a standing rule only with the founder's approval. Promoted rules land in `memory/`, in this file, or in a skill — never automatically, and never more than 10 active at once.
-- Technical lessons about PDM itself belong in `.claude/wiki/decisions/`, not here.
 
 ## Commands
 
@@ -67,7 +59,6 @@ Path aliases: `$lib` (src/lib), `$styles` (src/styles, auto-injects `variables` 
 ## Architecture
 
 ### Guiding principle: build for scale and microservice-readiness
-
 PDM aims to operate at Spotify / Instagram / YouTube scale, so every architectural decision is made with **horizontal scalability and fault tolerance** in mind. The target is a microservice architecture; the codebase today is a SvelteKit monolith, but it must stay **ready to split into independent services on separate servers** with minimal rework. Concretely:
 
 - Keep clear service boundaries (e.g. `src/lib/server/content/`, `src/lib/server/media/`) that routes call instead of reaching into DB code directly — these are the seams along which the app will be carved into services (Content, Media, …). See `.claude/wiki/architecture/content-and-scale-strategy.md` and `.claude/wiki/architecture/system-design.md`.
@@ -77,7 +68,6 @@ PDM aims to operate at Spotify / Instagram / YouTube scale, so every architectur
 When adding a feature, place new logic behind/along these boundaries rather than expanding the monolith inward.
 
 ### Dual authentication — two parallel session systems
-
 This is the most important thing to understand before touching auth or the Studio.
 
 - **User sessions** (listeners): cookie `session`, validated in `src/hooks.server.ts` → populates `event.locals.user` / `event.locals.session` for every request. Logic in `src/lib/server/session.ts`. `locals.user` is a `SafeUser` (no `hashedPassword`, see `src/app.d.ts`).
@@ -86,7 +76,6 @@ This is the most important thing to understand before touching auth or the Studi
 An `artistAccount` is the credential record; an `artist` is the public profile. One user → one artist → many artist accounts/sessions.
 
 ### Route groups
-
 - `src/routes/(app)/` — public listener app (home, listen, artists, profile, crowdfunding). Has `+layout.server.ts` exposing the user.
 - `src/routes/(login)/` — login/logout/email/Google OAuth flows.
 - `src/routes/(studio)/` — artist auth pages only (`/artist/login`, `/artist/register`).
@@ -94,11 +83,9 @@ An `artistAccount` is the credential record; an `artist` is the public profile. 
 - `src/routes/api/` — JSON/streaming endpoints (`music/[id]`, `track/[id]/[action]`, `studio/content/*`, `studio/media/*`, health, metrics).
 
 ### Database layer
-
 Schema is **split by domain** under `src/lib/db/schemas/` (`users`, `artist`, `content`, `catalog`, `engagement`, `finance`, `user-library`, `core`) and re-aggregated in `src/lib/db/schema.ts`, which also defines all Drizzle `relations` and the `$inferSelect`/`$inferInsert` type exports. **`drizzle.config.ts` points at `schema.ts`** — always add new tables to both their domain file and the aggregator, or migrations/types break.
 
 Access patterns, in increasing abstraction:
-
 1. `src/lib/db/queries.ts` — static class services (`UserService`, `ArtistService`, `TrackService`, `AlbumService`, `AnalyticsService`, …) for core catalog/user data.
 2. `src/lib/db/services/` — feature DB services (`ContentService` with `PostService`/`GalleryService`/`VideoService`/`StudioContentService`, `MediaService`, `PlaylistService`, `R2Service`).
 3. `src/lib/server/content/` and `src/lib/server/media/` — **application-service boundaries** (`ContentApplicationService`, `MediaUploadService`) that route loads/actions call. These exist deliberately so the in-process DB implementation can later be swapped for a remote Content/Media microservice (see `.claude/wiki/architecture/service-boundaries.md`). Prefer calling these from routes rather than reaching into DB services directly.
@@ -106,15 +93,12 @@ Access patterns, in increasing abstraction:
 Wrap notable DB operations in `withDbLogging(name, fn)` (from `src/lib/db/index.ts`) for structured timing logs.
 
 ### Media storage (Cloudflare R2)
-
 `src/lib/db/services/R2Service.ts` wraps the S3 SDK against R2. Two buckets: `music` (audio) and `images` (covers/photos), chosen by content type via `bucketForContentType()`. Supports presigned single PUTs and **multipart uploads** (8 MB parts) for large audio, plus presigned read URLs with TTLs. Tracks carry an upload `status` (`draft`/`uploaded`/`ready`/…); only `uploaded`/`ready` are playable (`playableTrackStatus()` in queries.ts). Browser uploads go direct-to-R2 via presigned targets issued by `api/studio/media/upload-target` and `MediaUploadService`.
 
 ### Observability
-
 `hooks.server.ts` chains middleware via `sequence()`: `sessionHandle` → `loggingHandle` → `mainHandle`. Every request gets a `requestId` (in `locals`) and structured logs through `src/lib/utils/logger.ts`; HTTP/DB/error metrics via `src/lib/utils/metrics.ts` (`MetricsCollector`), exposed at `/api/metrics` for Prometheus. The full Grafana/Loki/Promtail/Prometheus stack runs through `docker-compose.yml`.
 
 ### UI
-
 Reusable primitives in `src/lib/ui/` (`Button`, `Input`, `Avatar`, `FileUpload`, `Tabs`, `SvgIcon`, etc.), feature components in `src/lib/ui/components/` (notably `MusicPlayer/`). Global player/modal/notification state are **Svelte 5 rune stores** in `src/lib/stores/*.svelte.ts`. Styles/tokens/themes in `src/styles/`. Icons use `@mdi/js` paths through `SvgIcon`.
 
 ## Conventions
