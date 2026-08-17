@@ -164,7 +164,7 @@
 				<span class="online-dot"></span>
 			</div>
 			<div class="chat-preview">
-				{#each Array(6) as _, index}
+				{#each Array(6) as _, index (index)}
 					<div class="message-row">
 						<Avatar size="s" name={`User ${index + 1}`} />
 						<span>Fan message {index + 1}</span>

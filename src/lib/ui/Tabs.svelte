@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { onMount, tick, untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 
 	interface Tab {
 		id: string;
 		label: string;
-		[key: string]: any;
+		[key: string]: unknown;
 	}
 	interface TabsProps {
 		tabs: Array<Tab>;
@@ -80,7 +80,7 @@
 
 <svelte:window onresize={handleResize} />
 <div class="tabs-wrapper {type}" bind:this={wrapperNode}>
-	{#each tabs as tab}
+	{#each tabs as tab (tab.id)}
 		<button
 			data-tab-id={tab.id}
 			class="tab {tab.id === activeTab.id ? 'active' : ''}"

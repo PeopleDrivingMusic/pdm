@@ -4,30 +4,30 @@
    Uses CSS Custom Properties from tokens.css
    ========================================================================== */
 
-[data-theme="light"] {
-  /* Background tokens */
-  --bg-primary: var(--color-white);
-  --bg-secondary: var(--color-gray-50);
-  --bg-tertiary: var(--color-gray-100);
-  --bg-surface: var(--color-white);
-  --bg-overlay: rgba(255, 255, 255, 0.8);
+[data-theme='light'] {
+	/* Background tokens */
+	--bg-primary: var(--color-white);
+	--bg-secondary: var(--color-gray-50);
+	--bg-tertiary: var(--color-gray-100);
+	--bg-surface: var(--color-white);
+	--bg-overlay: rgba(255, 255, 255, 0.8);
 
-  /* Text tokens */
-  --text-primary: var(--color-gray-900);
-  --text-secondary: var(--color-gray-600);
-  --text-tertiary: var(--color-gray-500);
-  --text-disabled: var(--color-gray-400);
-  --text-inverse: var(--color-white);
+	/* Text tokens */
+	--text-primary: var(--color-gray-900);
+	--text-secondary: var(--color-gray-600);
+	--text-tertiary: var(--color-gray-500);
+	--text-disabled: var(--color-gray-400);
+	--text-inverse: var(--color-white);
 
-  /* Border tokens */
-  --border-primary: var(--color-gray-300);
-  --border-secondary: var(--color-gray-200);
+	/* Border tokens */
+	--border-primary: var(--color-gray-300);
+	--border-secondary: var(--color-gray-200);
 
-  /* Shadows (lighter for light theme) */
-  --shadow-xs: 0px 1px 2px rgba(16, 24, 40, 0.05);
-  --shadow-sm: 0px 1px 3px rgba(16, 24, 40, 0.1), 0px 1px 2px rgba(16, 24, 40, 0.06);
-  --shadow-md: 0px 4px 8px -2px rgba(16, 24, 40, 0.1), 0px 2px 4px -2px rgba(16, 24, 40, 0.06);
-  --shadow-lg: 0px 12px 16px -4px rgba(16, 24, 40, 0.08), 0px 4px 6px -2px rgba(16, 24, 40, 0.03);
-  --shadow-xl: 0px 20px 24px -4px rgba(16, 24, 40, 0.08), 0px 8px 8px -4px rgba(16, 24, 40, 0.03);
-  --shadow-2xl: 0px 24px 48px -12px rgba(16, 24, 40, 0.18);
+	/* Shadows (lighter for light theme) */
+	--shadow-xs: 0px 1px 2px rgba(16, 24, 40, 0.05);
+	--shadow-sm: 0px 1px 3px rgba(16, 24, 40, 0.1), 0px 1px 2px rgba(16, 24, 40, 0.06);
+	--shadow-md: 0px 4px 8px -2px rgba(16, 24, 40, 0.1), 0px 2px 4px -2px rgba(16, 24, 40, 0.06);
+	--shadow-lg: 0px 12px 16px -4px rgba(16, 24, 40, 0.08), 0px 4px 6px -2px rgba(16, 24, 40, 0.03);
+	--shadow-xl: 0px 20px 24px -4px rgba(16, 24, 40, 0.08), 0px 8px 8px -4px rgba(16, 24, 40, 0.03);
+	--shadow-2xl: 0px 24px 48px -12px rgba(16, 24, 40, 0.18);
 }

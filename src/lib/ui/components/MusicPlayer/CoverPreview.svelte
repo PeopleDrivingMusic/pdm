@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Album, Artist, Track } from '$lib/db';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/ui';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
 	import {
@@ -27,21 +27,26 @@
 		playerStore.que[playerStore.currentTrackIndex]
 	);
 	let showSaveModal = $state(false);
-	let saveTrackId = $state("")
-	const coverUrl = $derived(resolveR2ImageUrl(track.imageUrl || album?.coverImageUrl || artist?.avatar));
+	let saveTrackId = $state('');
+	const coverUrl = $derived(
+		resolveR2ImageUrl(track.imageUrl || album?.coverImageUrl || artist?.avatar)
+	);
 </script>
 
 <SaveTrackModal trackId={saveTrackId} bind:show={showSaveModal}></SaveTrackModal>
 
 <div class="preview">
-	<div
-		class="track-bg"
-		style:background-image={coverUrl ? `url('${coverUrl}')` : undefined}
-	></div>
+	<div class="track-bg" style:background-image={coverUrl ? `url('${coverUrl}')` : undefined}></div>
 	<div class="info-box">
 		<Tabs type="underline" showTrack={true} tabs={views} activeTab={views[0]} />
 		<div class="artist-wrapper">
-			<a class="track-artist" href="/artist/{artist?.slug}">{artist?.name}</a>
+			{#if artist?.slug}
+				<a class="track-artist" href={resolve('/(app)/artist/[slug]', { slug: artist.slug })}>
+					{artist.name}
+				</a>
+			{:else}
+				<span class="track-artist">{artist?.name}</span>
+			{/if}
 
 			<div class="buttons-wrapper">
 				<Button variant="secondary" size="md">Follow</Button>
@@ -78,10 +83,13 @@
 				</button><button class="action-button icon-button">
 					<SvgIcon path={mdiRocketLaunchOutline} size={24} />
 				</button>
-				<button class="action-button icon-button"  onclick={() => {
+				<button
+					class="action-button icon-button"
+					onclick={() => {
 						saveTrackId = track.id;
 						showSaveModal = true;
-					}} >
+					}}
+				>
 					<SvgIcon path={mdiBookmarkOutline} size={24} />
 				</button>
 				<button class="action-button icon-button">

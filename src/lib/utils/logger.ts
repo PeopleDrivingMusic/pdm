@@ -1,4 +1,5 @@
 import { dev } from '$app/environment';
+import type { Handle } from '@sveltejs/kit';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -10,7 +11,7 @@ export interface LogEntry {
 	userId?: string;
 	sessionId?: string;
 	requestId?: string;
-	metadata?: Record<string, any>;
+	metadata?: Record<string, unknown>;
 	stack?: string;
 }
 
@@ -39,21 +40,21 @@ class Logger {
 			// In development mode - human-readable format
 			const timestamp = new Date(entry.timestamp).toLocaleString();
 			let log = `[${timestamp}] [${entry.level.toUpperCase()}]`;
-			
+
 			if (entry.component) {
 				log += ` [${entry.component}]`;
 			}
-			
+
 			log += ` ${entry.message}`;
-			
+
 			if (entry.metadata && Object.keys(entry.metadata).length > 0) {
 				log += ` | Metadata: ${JSON.stringify(entry.metadata)}`;
 			}
-			
+
 			if (entry.stack) {
 				log += `\nStack: ${entry.stack}`;
 			}
-			
+
 			return log;
 		} else {
 			// In production - JSON format for Loki
@@ -121,7 +122,13 @@ class Logger {
 	}
 
 	// Special methods for different event types
-	httpRequest(method: string, url: string, statusCode: number, duration: number, options?: Partial<LogEntry>): void {
+	httpRequest(
+		method: string,
+		url: string,
+		statusCode: number,
+		duration: number,
+		options?: Partial<LogEntry>
+	): void {
 		this.info(`HTTP ${method} ${url} - ${statusCode} (${duration}ms)`, {
 			component: 'http',
 			metadata: {
@@ -156,7 +163,11 @@ class Logger {
 		});
 	}
 
-	security(event: string, level: 'info' | 'warn' | 'error' = 'warn', options?: Partial<LogEntry>): void {
+	security(
+		event: string,
+		level: 'info' | 'warn' | 'error' = 'warn',
+		options?: Partial<LogEntry>
+	): void {
 		this.log(level, `Security event: ${event}`, {
 			component: 'security',
 			metadata: {
@@ -170,15 +181,17 @@ class Logger {
 // Singleton instance
 export const logger = new Logger();
 
-// Middleware for automatic HTTP request logging
-export function createLoggingMiddleware() {
-	return async ({ event, resolve }: { event: any; resolve: any }) => {
+// Middleware for automatic HTTP request logging. Unused — hooks.server.ts's
+// inline loggingHandle does this job; kept typed rather than removed since it's
+// not wired to anything that would need updating either way.
+export function createLoggingMiddleware(): Handle {
+	return async ({ event, resolve }) => {
 		const start = Date.now();
 		const requestId = crypto.randomUUID();
-		
+
 		// Add requestId to locals for use in handlers
 		event.locals.requestId = requestId;
-		
+
 		logger.info(`Incoming request: ${event.request.method} ${event.url.pathname}`, {
 			component: 'http',
 			requestId,
@@ -191,12 +204,10 @@ export function createLoggingMiddleware() {
 		});
 
 		let response;
-		let error;
-		
+
 		try {
 			response = await resolve(event);
 		} catch (e) {
-			error = e;
 			logger.error(`Request failed: ${event.request.method} ${event.url.pathname}`, {
 				component: 'http',
 				requestId,
@@ -209,15 +220,11 @@ export function createLoggingMiddleware() {
 			throw e;
 		} finally {
 			const duration = Date.now() - start;
-			
+
 			if (response) {
-				logger.httpRequest(
-					event.request.method,
-					event.url.pathname,
-					response.status,
-					duration,
-					{ requestId }
-				);
+				logger.httpRequest(event.request.method, event.url.pathname, response.status, duration, {
+					requestId
+				});
 			}
 		}
 

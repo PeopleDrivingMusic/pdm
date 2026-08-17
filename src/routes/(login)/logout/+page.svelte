@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { onMount } from 'svelte';
-	
+
 	let form: HTMLFormElement;
-	
+
 	onMount(() => {
 		// Automatically submit the form when the page loads
 		if (form) {
@@ -21,7 +21,7 @@
 		<h1>Logging out...</h1>
 		<p>Please wait</p>
 	</div>
-	
+
 	<form bind:this={form} method="POST" use:enhance style="display: none;">
 		<!-- The form is hidden and will be submitted automatically -->
 	</form>

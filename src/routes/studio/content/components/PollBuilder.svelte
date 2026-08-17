@@ -83,7 +83,7 @@
 
 		<div class="options">
 			<span class="options-label">Options</span>
-			{#each optionValues as value, index}
+			{#each optionValues as _, index (index)}
 				<div class="option-row">
 					<input
 						name="pollOptions"

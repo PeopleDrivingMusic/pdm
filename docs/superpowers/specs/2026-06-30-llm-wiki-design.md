@@ -18,14 +18,14 @@ query.
 
 ## 2. Decisions (from brainstorming)
 
-| Decision | Choice |
-|---|---|
-| **Scope** | Whole project — business/strategy + product/UX + technical architecture + domain concepts. |
-| **Existing docs** | Absorbed into the wiki. Wiki becomes the single source of truth. |
-| **Migration strategy** | Big-bang — all existing docs absorbed in one pass. |
-| **Workflow / tooling** | Obsidian vault: `[[wiki-links]]`, YAML frontmatter, `index.md` + `log.md`. Human browses in Obsidian while LLM edits. |
-| **Originals** | Not preserved verbatim. The essence is captured in wiki pages; git history is the fallback archive. Originals are deleted after absorption. |
-| **Language** | English (chosen for future team growth and global scale), even though some sources are RU or mixed. RU content is translated during absorption. |
+| Decision               | Choice                                                                                                                                          |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Scope**              | Whole project — business/strategy + product/UX + technical architecture + domain concepts.                                                      |
+| **Existing docs**      | Absorbed into the wiki. Wiki becomes the single source of truth.                                                                                |
+| **Migration strategy** | Big-bang — all existing docs absorbed in one pass.                                                                                              |
+| **Workflow / tooling** | Obsidian vault: `[[wiki-links]]`, YAML frontmatter, `index.md` + `log.md`. Human browses in Obsidian while LLM edits.                           |
+| **Originals**          | Not preserved verbatim. The essence is captured in wiki pages; git history is the fallback archive. Originals are deleted after absorption.     |
+| **Language**           | English (chosen for future team growth and global scale), even though some sources are RU or mixed. RU content is translated during absorption. |
 
 ## 3. Architecture — three layers
 
@@ -61,10 +61,10 @@ query.
   ```yaml
   ---
   title: Artist Subscription Model
-  type: concept        # overview|strategy|product|architecture|concept|entity|decision|idea|marketing|source
+  type: concept # overview|strategy|product|architecture|concept|entity|decision|idea|marketing|source
   tags: [monetization, subscription, core]
-  status: current      # current|draft|superseded
-  sources: [pdm-concept-v1]   # provenance
+  status: current # current|draft|superseded
+  sources: [pdm-concept-v1] # provenance
   updated: 2026-06-30
   ---
   ```
@@ -102,18 +102,18 @@ finalized during implementation **after reading each source** (only `PDM.md` has
 been read in detail so far); this spec defines the target areas and the mapping
 rules, not the final page list.
 
-| Source | Absorbed into |
-|---|---|
-| `.claude/business/PDM.md` | `strategy/economic-model`; `concepts/` (artist-subscription, fan-base-monetization, revenue-share-crowdfunding, loyalty-tiers); `product/fan-features`, `product/artist-features`; seeds `home.md` overview |
-| `.claude/business/PDM_STRATEGIC_POSITIONING.md` | `strategy/positioning` |
-| `.claude/business/PDM_SYSTEM_DESIGN.md` | `architecture/system-design` (+ split as needed) |
-| `.claude/business/PDM_CONTENT_MICROSERVICE_STRATEGY.md` | `architecture/content-microservice-strategy` + `decisions/microservice-readiness` |
-| `doc/DATABASE.md` | `architecture/data-model` + `entities/` pages |
-| `doc/LOGGING.md`, `doc/MONITORING.md` | `architecture/observability` |
-| `doc/UI-DESIGN-SYSTEM.md` | `product/design-system` |
-| `doc/PDM-frontend-wireframe.md`, `doc/PDM-PENCIL-WIREFRAME.md` | `product/wireframes` |
-| `doc/STUDIO-CONTENT-SPEC.md`, `ArtistFlow.md` | `product/studio-surfaces`, `product/studio-content` |
-| `StudioMusicPage.spec.md`, `StudioMusicPage.plan.md` | `product/studio-music` |
+| Source                                                         | Absorbed into                                                                                                                                                                                               |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.claude/business/PDM.md`                                      | `strategy/economic-model`; `concepts/` (artist-subscription, fan-base-monetization, revenue-share-crowdfunding, loyalty-tiers); `product/fan-features`, `product/artist-features`; seeds `home.md` overview |
+| `.claude/business/PDM_STRATEGIC_POSITIONING.md`                | `strategy/positioning`                                                                                                                                                                                      |
+| `.claude/business/PDM_SYSTEM_DESIGN.md`                        | `architecture/system-design` (+ split as needed)                                                                                                                                                            |
+| `.claude/business/PDM_CONTENT_MICROSERVICE_STRATEGY.md`        | `architecture/content-microservice-strategy` + `decisions/microservice-readiness`                                                                                                                           |
+| `doc/DATABASE.md`                                              | `architecture/data-model` + `entities/` pages                                                                                                                                                               |
+| `doc/LOGGING.md`, `doc/MONITORING.md`                          | `architecture/observability`                                                                                                                                                                                |
+| `doc/UI-DESIGN-SYSTEM.md`                                      | `product/design-system`                                                                                                                                                                                     |
+| `doc/PDM-frontend-wireframe.md`, `doc/PDM-PENCIL-WIREFRAME.md` | `product/wireframes`                                                                                                                                                                                        |
+| `doc/STUDIO-CONTENT-SPEC.md`, `ArtistFlow.md`                  | `product/studio-surfaces`, `product/studio-content`                                                                                                                                                         |
+| `StudioMusicPage.spec.md`, `StudioMusicPage.plan.md`           | `product/studio-music`                                                                                                                                                                                      |
 
 Entities to extract across sources: Artist, ArtistAccount/ArtistSession, User,
 Track, Album, Subscription, Post/ContentMedia, Fan, Playlist, Purchase, Genre.
@@ -130,8 +130,8 @@ single `migrate` entry describing the big-bang pass and the source→page mappin
   so they point at the new wiki pages.
 - **`.claude/README.md`** — its instruction ("store business context under
   `.claude/business`") is superseded; replace it with a pointer to the wiki.
-- **Boundary with `memory/`** — the wiki holds *project* knowledge (product,
-  architecture, domain). `memory/` holds facts about the *user*, feedback, and
+- **Boundary with `memory/`** — the wiki holds _project_ knowledge (product,
+  architecture, domain). `memory/` holds facts about the _user_, feedback, and
   cross-session working context. No duplication between them.
 
 ## 9. Out of scope (YAGNI)
@@ -153,4 +153,7 @@ single `migrate` entry describing the big-bang pass and the source→page mappin
   correctly ingest a new source, answer a query, or run a lint pass.
 - CLAUDE.md and `.claude/README.md` point at the wiki; no dangling references to
   deleted originals.
+
+```
+
 ```

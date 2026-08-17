@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('$lib/server/entitlement', () => ({
 	EntitlementService: { subscribe: vi.fn(), unsubscribe: vi.fn() }

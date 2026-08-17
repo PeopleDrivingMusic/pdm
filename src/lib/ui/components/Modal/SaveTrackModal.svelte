@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { mdiPlus, mdiCheck, mdiMusic } from '@mdi/js';
+	import { mdiPlus, mdiMusic } from '@mdi/js';
 	import Modal from './Modal.svelte';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
 	import Button from '$lib/ui/Button.svelte';
@@ -132,7 +132,8 @@
 								<div class="playlist-content">
 									<div class="playlist-name">{playlist.name}</div>
 									<div class="playlist-meta">
-										{playlist.trackCount} {playlist.trackCount === 1 ? 'track' : 'tracks'}
+										{playlist.trackCount}
+										{playlist.trackCount === 1 ? 'track' : 'tracks'}
 									</div>
 								</div>
 								<div class="playlist-action">

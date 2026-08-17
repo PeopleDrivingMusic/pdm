@@ -1,0 +1,1 @@
+npx playwright install chromium && yarn run check && yarn lint && yarn test:unit -- --run

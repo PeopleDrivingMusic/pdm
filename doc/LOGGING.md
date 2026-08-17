@@ -5,11 +5,13 @@ This project is configured with a complete logging system based on the Loki + Pr
 ## System Components
 
 ### 🔍 Loki
+
 - **Purpose**: Centralized log storage
 - **Port**: 3100
 - **Configuration**: `loki-config.yaml`
 
 ### 📊 Promtail
+
 - **Purpose**: Agent for collecting logs from various sources
 - **Configuration**: `promtail-config.yaml`
 - **Log Sources**:
@@ -18,6 +20,7 @@ This project is configured with a complete logging system based on the Loki + Pr
   - Application logs
 
 ### 📈 Grafana
+
 - **Purpose**: Log visualization and monitoring
 - **Port**: 3000
 - **Login**: admin / admin
@@ -79,9 +82,9 @@ logger.error('Error', { component: 'payment', metadata: { error: new Error('Paym
 // - User Agent and IP
 
 // Manual HTTP request logging
-logger.httpRequest('GET', '/api/users', 200, 150, { 
-  requestId: 'req-123',
-  userId: 'user-456' 
+logger.httpRequest('GET', '/api/users', 200, 150, {
+	requestId: 'req-123',
+	userId: 'user-456'
 });
 ```
 
@@ -89,10 +92,10 @@ logger.httpRequest('GET', '/api/users', 200, 150, {
 
 ```typescript
 logger.userAction('login', 'user-123', {
-  metadata: { 
-    method: 'email',
-    ip: '192.168.1.1' 
-  }
+	metadata: {
+		method: 'email',
+		ip: '192.168.1.1'
+	}
 });
 ```
 
@@ -100,10 +103,10 @@ logger.userAction('login', 'user-123', {
 
 ```typescript
 logger.dbQuery('SELECT * FROM users WHERE id = $1', 45, {
-  metadata: { 
-    params: ['123'],
-    rowCount: 1 
-  }
+	metadata: {
+		params: ['123'],
+		rowCount: 1
+	}
 });
 ```
 
@@ -111,10 +114,10 @@ logger.dbQuery('SELECT * FROM users WHERE id = $1', 45, {
 
 ```typescript
 logger.security('failed_login_attempt', 'warn', {
-  metadata: { 
-    username: 'admin',
-    ip: '192.168.1.100' 
-  }
+	metadata: {
+		username: 'admin',
+		ip: '192.168.1.100'
+	}
 });
 ```
 

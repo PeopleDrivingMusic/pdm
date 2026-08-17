@@ -1,6 +1,7 @@
 PDM Studio: Artist Interface Specification (Full Version)
+
 1. Sidebar: Navigation Links
-Dashboard: Главный хаб со сводкой по всем фронтам.
+   Dashboard: Главный хаб со сводкой по всем фронтам.
 
 Music: Управление каталогом, релизами и аналитика треков.
 
@@ -13,8 +14,8 @@ Analytics: Глубокая аналитика поведения и AI-прог
 Wallet: Доходы, роялти и вывод в крипту.
 
 2. Detailed Page Logic
-Dashboard (The Snapshot)
-What for: Быстрый замер "пульса" карьеры за 24ч / 7д.
+   Dashboard (The Snapshot)
+   What for: Быстрый замер "пульса" карьеры за 24ч / 7д.
 
 How looks: Сетка виджетов (Bento Box).
 

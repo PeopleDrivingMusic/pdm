@@ -8,7 +8,6 @@
 	import TopReferrals from './components/TopReferrals.svelte';
 
 	let copyFeedback = $state('');
-	let showQR = $state(false);
 
 	type ReferralStatus = 'active' | 'pending';
 

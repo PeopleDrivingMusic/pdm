@@ -119,7 +119,7 @@
 				{placeholder}
 			</option>
 		{/if}
-		{#each options as option}
+		{#each options as option (option.value)}
 			<option value={option.value} disabled={option.disabled}>
 				{option.label}
 			</option>
@@ -167,7 +167,7 @@
 					</button>
 				</li>
 			{/if}
-			{#each options as option}
+			{#each options as option (option.value)}
 				<li
 					id={`${id}-option-${option.value}`}
 					class="select-option"

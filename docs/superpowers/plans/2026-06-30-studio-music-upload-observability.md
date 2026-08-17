@@ -23,10 +23,12 @@
 ### Task 1: Upload pipeline metrics + collector methods
 
 **Files:**
+
 - Modify: `src/lib/utils/metrics.ts`
 - Test: `src/lib/utils/metrics.spec.ts`
 
 **Interfaces:**
+
 - Produces (prom-client, registered on the shared `register`):
   - `mediaUploadStartedTotal` Counter `{ kind }`
   - `mediaUploadFinalizedTotal` Counter `{ kind, result }`
@@ -77,27 +79,63 @@ In `src/lib/utils/metrics.ts`, add after the existing business metrics (using th
 ```ts
 export const mediaUploadStartedTotal = getMetric(
 	'media_upload_started_total',
-	() => new Counter({ name: 'media_upload_started_total', help: 'Media uploads started', labelNames: ['kind'], registers: [register] })
+	() =>
+		new Counter({
+			name: 'media_upload_started_total',
+			help: 'Media uploads started',
+			labelNames: ['kind'],
+			registers: [register]
+		})
 );
 export const mediaUploadFinalizedTotal = getMetric(
 	'media_upload_finalized_total',
-	() => new Counter({ name: 'media_upload_finalized_total', help: 'Media uploads finalized', labelNames: ['kind', 'result'], registers: [register] })
+	() =>
+		new Counter({
+			name: 'media_upload_finalized_total',
+			help: 'Media uploads finalized',
+			labelNames: ['kind', 'result'],
+			registers: [register]
+		})
 );
 export const mediaUploadFailedTotal = getMetric(
 	'media_upload_failed_total',
-	() => new Counter({ name: 'media_upload_failed_total', help: 'Media uploads failed', labelNames: ['kind', 'reason'], registers: [register] })
+	() =>
+		new Counter({
+			name: 'media_upload_failed_total',
+			help: 'Media uploads failed',
+			labelNames: ['kind', 'reason'],
+			registers: [register]
+		})
 );
 export const mediaUploadDuration = getMetric(
 	'media_upload_duration_seconds',
-	() => new Histogram({ name: 'media_upload_duration_seconds', help: 'Upload create→finalize duration', labelNames: ['kind'], buckets: [1, 5, 15, 30, 60, 120, 300, 600], registers: [register] })
+	() =>
+		new Histogram({
+			name: 'media_upload_duration_seconds',
+			help: 'Upload create→finalize duration',
+			labelNames: ['kind'],
+			buckets: [1, 5, 15, 30, 60, 120, 300, 600],
+			registers: [register]
+		})
 );
 export const mediaPendingUploads = getMetric(
 	'media_pending_uploads',
-	() => new Gauge({ name: 'media_pending_uploads', help: 'Tracks awaiting upload completion', registers: [register] })
+	() =>
+		new Gauge({
+			name: 'media_pending_uploads',
+			help: 'Tracks awaiting upload completion',
+			registers: [register]
+		})
 );
 export const r2ErrorsTotal = getMetric(
 	'r2_errors_total',
-	() => new Counter({ name: 'r2_errors_total', help: 'R2 operation errors', labelNames: ['op'], registers: [register] })
+	() =>
+		new Counter({
+			name: 'r2_errors_total',
+			help: 'R2 operation errors',
+			labelNames: ['op'],
+			registers: [register]
+		})
 );
 ```
 
@@ -130,10 +168,12 @@ git commit -m "feat(metrics): add media upload pipeline counters/histogram/gauge
 ### Task 2: `withMediaLogging` timing helper
 
 **Files:**
+
 - Create: `src/lib/server/media/logging.ts`
 - Test: `src/lib/server/media/logging.spec.ts`
 
 **Interfaces:**
+
 - Produces: `withMediaLogging<T>(op: string, fn: () => Promise<T>, ctx?: Record<string, unknown>): Promise<T>` — times `fn`, logs success at `debug` and failure at `error` (routing the failure through `MetricsCollector.recordR2Error(op)`), and re-throws.
 
 - [ ] **Step 1: Write the failing test**
@@ -158,7 +198,11 @@ describe('withMediaLogging', () => {
 		expect(logger.debug).toHaveBeenCalled();
 	});
 	it('records an R2 error and rethrows on failure', async () => {
-		await expect(withMediaLogging('headObject', async () => { throw new Error('boom'); })).rejects.toThrow('boom');
+		await expect(
+			withMediaLogging('headObject', async () => {
+				throw new Error('boom');
+			})
+		).rejects.toThrow('boom');
 		expect(MetricsCollector.recordR2Error).toHaveBeenCalledWith('headObject');
 		expect(logger.error).toHaveBeenCalled();
 	});
@@ -185,7 +229,10 @@ export async function withMediaLogging<T>(
 	const start = Date.now();
 	try {
 		const result = await fn();
-		logger.debug(`media.${op}`, { component: 'media', metadata: { ...ctx, durationMs: Date.now() - start } });
+		logger.debug(`media.${op}`, {
+			component: 'media',
+			metadata: { ...ctx, durationMs: Date.now() - start }
+		});
 		return result;
 	} catch (error) {
 		MetricsCollector.recordR2Error(op);
@@ -217,10 +264,12 @@ git commit -m "feat(media): add withMediaLogging timing+error helper"
 ### Task 3: Wire metrics into the boundary (create / finalize / fail)
 
 **Files:**
+
 - Modify: `src/lib/server/music/MusicApplicationService.ts`
 - Modify: `src/lib/server/music/MusicApplicationService.track.spec.ts` (extend assertions)
 
 **Interfaces:**
+
 - Consumes: `MetricsCollector` from `$lib/utils/metrics`.
 - Behavior: `createTrack`/`replaceTrackAudio` call `recordUploadStarted(kind)`; `finalizeTrackUpload` records duration (using the track's `createdAt`/metadata timestamp as the start), `recordUploadFinalized(kind, 'success')` + `recordMusicUpload(format, true)` on success, and `recordUploadFailed(kind, reason)` + `recordUploadFinalized(kind, 'failure')` + `recordMusicUpload(format, false)` on verify failure.
 
@@ -244,15 +293,15 @@ import { MetricsCollector } from '$lib/utils/metrics';
 Add to the success finalize test:
 
 ```ts
-		expect(MetricsCollector.recordUploadFinalized).toHaveBeenCalledWith('track-audio', 'success');
-		expect(MetricsCollector.recordMusicUpload).toHaveBeenCalledWith(expect.any(String), true);
+expect(MetricsCollector.recordUploadFinalized).toHaveBeenCalledWith('track-audio', 'success');
+expect(MetricsCollector.recordMusicUpload).toHaveBeenCalledWith(expect.any(String), true);
 ```
 
 Add to the failure finalize test:
 
 ```ts
-		expect(MetricsCollector.recordUploadFailed).toHaveBeenCalledWith('track-audio', expect.any(String));
-		expect(MetricsCollector.recordMusicUpload).toHaveBeenCalledWith(expect.any(String), false);
+expect(MetricsCollector.recordUploadFailed).toHaveBeenCalledWith('track-audio', expect.any(String));
+expect(MetricsCollector.recordMusicUpload).toHaveBeenCalledWith(expect.any(String), false);
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -263,6 +312,7 @@ Expected: FAIL — collector not yet called.
 - [ ] **Step 3: Wire the boundary**
 
 In `MusicApplicationService.ts`, `import { MetricsCollector } from '$lib/utils/metrics';`. In `createTrack` (and `replaceTrackAudio` from Plan B) after the audio target is issued: `MetricsCollector.recordUploadStarted('track-audio');`. In `finalizeTrackUpload`:
+
 - on verify failure (both audio + cover branches): `MetricsCollector.recordUploadFailed('track-audio', reason); MetricsCollector.recordUploadFinalized('track-audio', 'failure'); MetricsCollector.recordMusicUpload(audio.contentType ?? 'audio', false);`
 - on success: derive `format` from `audio.contentType`, compute `seconds = (Date.now() - new Date(track.createdAt).getTime()) / 1000`, then `MetricsCollector.observeUploadDuration('track-audio', seconds); MetricsCollector.recordUploadFinalized('track-audio', 'success'); MetricsCollector.recordMusicUpload(format, true);`
 
@@ -284,6 +334,7 @@ git commit -m "feat(music): instrument upload create/finalize with pipeline metr
 ### Task 4: Route R2Service errors through the logger/metrics
 
 **Files:**
+
 - Modify: `src/lib/db/services/R2Service.ts:274-295` (`deleteFileFromR2`)
 
 - [ ] **Step 1: Replace the swallowed console.error**
@@ -323,6 +374,7 @@ git commit -m "feat(media): route R2 delete errors through logger + r2_errors me
 ### Task 5: Grafana "Upload Pipeline" panel
 
 **Files:**
+
 - Modify: the Grafana dashboard JSON under the provisioning directory (locate in Step 1)
 
 - [ ] **Step 1: Locate the dashboard provisioning**
@@ -333,6 +385,7 @@ Expected: prints the dashboard JSON path(s) used by the Grafana provisioning mou
 - [ ] **Step 2: Add the panels**
 
 Add a row "Upload Pipeline" with panels querying the new metrics:
+
 - Started/finalized/failed rates: `rate(media_upload_started_total[5m])`, `rate(media_upload_finalized_total{result="success"}[5m])`, `rate(media_upload_failed_total[5m])`
 - p50/p95 duration: `histogram_quantile(0.95, rate(media_upload_duration_seconds_bucket[5m]))`
 - Pending gauge: `media_pending_uploads`
@@ -355,6 +408,7 @@ git commit -m "feat(observability): add Upload Pipeline Grafana panels"
 ## Self-Review
 
 **Spec coverage (Plan D = spec phase 8 / §8):**
+
 - Wire `recordMusicUpload` (previously unused) → Task 3. ✓
 - Upload counters (started/finalized/failed) + duration histogram + pending gauge + R2 error counter → Tasks 1, 3, 4. ✓
 - `withMediaLogging` timing helper + structured logs → Task 2; R2 error routing → Task 4. ✓

@@ -2,7 +2,7 @@
 	let { kind, count }: { kind: 'track' | 'album' | 'card'; count: number } = $props();
 </script>
 
-{#each Array(count) as _}
+{#each Array(count) as _, index (index)}
 	<div class="{kind}-skeleton" aria-hidden="true"></div>
 {/each}
 

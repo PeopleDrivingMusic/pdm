@@ -21,11 +21,14 @@
 	import { TrackClient } from '$lib/client/tracks';
 	import SaveTrackModal from '$lib/ui/components/Modal/SaveTrackModal.svelte';
 	import { resolveR2ImageUrl } from '$lib/utils/helpers';
+	import { resolve } from '$app/paths';
 	const currentTrack = $derived(playerStore.currentTrack);
 	const track = $derived(currentTrack?.track);
 	const artist = $derived(currentTrack?.artist);
 	const album = $derived(currentTrack?.album);
-	const coverUrl = $derived(resolveR2ImageUrl(track?.imageUrl || album?.coverImageUrl || artist?.avatar));
+	const coverUrl = $derived(
+		resolveR2ImageUrl(track?.imageUrl || album?.coverImageUrl || artist?.avatar)
+	);
 	const isLiked = $derived(currentTrack?.isLiked ?? false);
 	const socialTabs = [
 		{ id: 'lyrics', label: 'Lyrics' },
@@ -80,7 +83,7 @@
 						/>
 					</div>
 					<div class="tracks-que">
-						{#each playerStore.que as { track, artist }, index}
+						{#each playerStore.que as { track, artist } (track.id)}
 							<div class="track">
 								<Avatar
 									size="s"
@@ -89,7 +92,16 @@
 								/>
 								<div class="track-info">
 									<h3 class="track-title">{track.title}</h3>
-									<a class="track-artist" href="/artist/{artist?.slug}">{artist?.name}</a>
+									{#if artist?.slug}
+										<a
+											class="track-artist"
+											href={resolve('/(app)/artist/[slug]', { slug: artist.slug })}
+										>
+											{artist.name}
+										</a>
+									{:else}
+										<span class="track-artist">{artist?.name}</span>
+									{/if}
 								</div>
 								<div class="actions">
 									<div class="button">
@@ -108,7 +120,13 @@
 				<div class="track-info">
 					<div class="artist-info">
 						<div class="track-title">{track.title}</div>
-						<a class="track-artist" href="/artist/{artist?.slug}">{artist?.name}</a>
+						{#if artist?.slug}
+							<a class="track-artist" href={resolve('/(app)/artist/[slug]', { slug: artist.slug })}>
+								{artist.name}
+							</a>
+						{:else}
+							<span class="track-artist">{artist?.name}</span>
+						{/if}
 					</div>
 					<div class="button-wrapper">
 						<Button variant="primary" size="md">Subscribe</Button>

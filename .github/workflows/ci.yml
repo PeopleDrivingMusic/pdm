@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# `$env/static/private` and `$env/static/public` (SvelteKit) only export the
+# keys that exist in the environment at sync/build time — the keys just need
+# to exist (empty is fine), not carry real values. Without these, svelte-check
+# fails on "has no exported member", and the client project's real-Chromium
+# ESM import throws "does not provide an export named ..." at module load.
+# Mirrors .env.example.
+env:
+  CLOUDFLARE_ACCOUNT_ID: ''
+  R2_ACCESS_KEY_ID: ''
+  R2_SECRET_ACCESS_KEY: ''
+  PUBLIC_R2_IMAGES_BUCKET: ''
+  PUBLIC_PGADMIN_URL: ''
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn lint
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn run check
+
+  test-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn test:unit -- --run --project server
+
+  test-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: npx playwright install --with-deps chromium
+      - run: yarn test:unit -- --run --project client
+
+  # Single required status check for branch protection — internal jobs above can
+  # be renamed/added/split without ever having to touch the protection rule.
+  ci-summary:
+    runs-on: ubuntu-latest
+    needs: [lint, check, test-server, test-client]
+    if: always()
+    steps:
+      - name: Fail if any dependency failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

@@ -1,20 +1,20 @@
-import { generateSessionToken, createSession, setSessionTokenCookie } from "$lib/server/session";
-import { UserService } from "$lib/db/queries";
-import { google } from "$lib/server/oauth";
-import { decodeIdToken } from "arctic";
-import { logger } from "$lib/utils/logger";
-import type { RequestEvent } from "@sveltejs/kit";
-import type { OAuth2Tokens } from "arctic";
+import { generateSessionToken, createSession, setSessionTokenCookie } from '$lib/server/session';
+import { UserService } from '$lib/db/queries';
+import { google } from '$lib/server/oauth';
+import { decodeIdToken } from 'arctic';
+import { logger } from '$lib/utils/logger';
+import type { RequestEvent } from '@sveltejs/kit';
+import type { OAuth2Tokens } from 'arctic';
 
 export async function GET(event: RequestEvent): Promise<Response> {
-	const code = event.url.searchParams.get("code");
-	const state = event.url.searchParams.get("state");
-	const storedState = event.cookies.get("google_oauth_state") ?? null;
-	const codeVerifier = event.cookies.get("google_code_verifier") ?? null;
-	
+	const code = event.url.searchParams.get('code');
+	const state = event.url.searchParams.get('state');
+	const storedState = event.cookies.get('google_oauth_state') ?? null;
+	const codeVerifier = event.cookies.get('google_code_verifier') ?? null;
+
 	// Check for presence of all required parameters
 	if (code === null || state === null || storedState === null || codeVerifier === null) {
-		logger.security("OAuth callback missing required parameters", "warn", {
+		logger.security('OAuth callback missing required parameters', 'warn', {
 			requestId: event.locals.requestId,
 			metadata: {
 				hasCode: code !== null,
@@ -23,26 +23,26 @@ export async function GET(event: RequestEvent): Promise<Response> {
 				hasCodeVerifier: codeVerifier !== null
 			}
 		});
-		
+
 		return new Response(null, {
 			status: 302,
 			headers: {
-				Location: "/login?error=oauth_error"
+				Location: '/login?error=oauth_error'
 			}
 		});
 	}
-	
+
 	// Verify the state parameter to protect against CSRF
 	if (state !== storedState) {
-		logger.security("OAuth state mismatch", "warn", {
+		logger.security('OAuth state mismatch', 'warn', {
 			requestId: event.locals.requestId,
 			metadata: { state, storedState }
 		});
-		
+
 		return new Response(null, {
 			status: 302,
 			headers: {
-				Location: "/login?error=oauth_error"
+				Location: '/login?error=oauth_error'
 			}
 		});
 	}
@@ -51,33 +51,34 @@ export async function GET(event: RequestEvent): Promise<Response> {
 	try {
 		// Exchange the authorization code for tokens
 		tokens = await google.validateAuthorizationCode(code, codeVerifier);
-		
-		logger.debug("Successfully exchanged authorization code for tokens", {
-			component: "auth",
+
+		logger.debug('Successfully exchanged authorization code for tokens', {
+			component: 'auth',
 			requestId: event.locals.requestId
 		});
 	} catch (error) {
-		logger.error("Failed to validate authorization code", {
-			component: "auth",
+		logger.error('Failed to validate authorization code', {
+			component: 'auth',
 			requestId: event.locals.requestId,
 			metadata: { error }
 		});
-		
+
 		return new Response(null, {
 			status: 302,
 			headers: {
-				Location: "/login?error=oauth_error"
+				Location: '/login?error=oauth_error'
 			}
 		});
 	}
 
-	let claims: any;
+	let claims: { sub: string; email: string; name?: string; picture?: string };
 	try {
-		// Decode the ID token to obtain user information
-		claims = decodeIdToken(tokens.idToken());
-		
-		logger.debug("Successfully decoded ID token", {
-			component: "auth",
+		// Decode the ID token to obtain user information — arctic types this as a bare
+		// `object`; these are the Google OIDC claims we actually rely on below.
+		claims = decodeIdToken(tokens.idToken()) as typeof claims;
+
+		logger.debug('Successfully decoded ID token', {
+			component: 'auth',
 			requestId: event.locals.requestId,
 			metadata: {
 				sub: claims.sub,
@@ -86,16 +87,16 @@ export async function GET(event: RequestEvent): Promise<Response> {
 			}
 		});
 	} catch (error) {
-		logger.error("Failed to decode ID token", {
-			component: "auth",
+		logger.error('Failed to decode ID token', {
+			component: 'auth',
 			requestId: event.locals.requestId,
 			metadata: { error }
 		});
-		
+
 		return new Response(null, {
 			status: 302,
 			headers: {
-				Location: "/login?error=oauth_error"
+				Location: '/login?error=oauth_error'
 			}
 		});
 	}
@@ -106,16 +107,16 @@ export async function GET(event: RequestEvent): Promise<Response> {
 	const picture = claims.picture;
 
 	if (!googleUserId || !email) {
-		logger.error("Missing required claims from Google ID token", {
-			component: "auth",
+		logger.error('Missing required claims from Google ID token', {
+			component: 'auth',
 			requestId: event.locals.requestId,
 			metadata: { hasGoogleUserId: !!googleUserId, hasEmail: !!email }
 		});
-		
+
 		return new Response(null, {
 			status: 302,
 			headers: {
-				Location: "/login?error=oauth_error"
+				Location: '/login?error=oauth_error'
 			}
 		});
 	}
@@ -131,11 +132,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
 					avatarUrl: picture,
 					displayName: name || user.displayName // Update name if provided
 				});
-				
+
 				if (updatedUser) {
 					user = updatedUser;
-					logger.info("Updated user avatar from Google", {
-						component: "auth",
+					logger.info('Updated user avatar from Google', {
+						component: 'auth',
 						userId: user.id,
 						requestId: event.locals.requestId,
 						metadata: {
@@ -145,9 +146,9 @@ export async function GET(event: RequestEvent): Promise<Response> {
 					});
 				}
 			}
-			
-			logger.info("Existing user logged in via Google", {
-				component: "auth",
+
+			logger.info('Existing user logged in via Google', {
+				component: 'auth',
 				userId: user.id,
 				requestId: event.locals.requestId,
 				metadata: {
@@ -164,8 +165,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
 				avatarUrl: picture
 			});
 
-			logger.info("New user created via Google OAuth", {
-				component: "auth",
+			logger.info('New user created via Google OAuth', {
+				component: 'auth',
 				userId: user.id,
 				requestId: event.locals.requestId,
 				metadata: {
@@ -178,16 +179,16 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
 		// Ensure the user was created or found
 		if (!user) {
-			logger.error("Failed to create or retrieve user during Google OAuth", {
-				component: "auth",
+			logger.error('Failed to create or retrieve user during Google OAuth', {
+				component: 'auth',
 				requestId: event.locals.requestId,
 				metadata: { email, googleUserId }
 			});
-			
+
 			return new Response(null, {
 				status: 302,
 				headers: {
-					Location: "/login?error=oauth_error"
+					Location: '/login?error=oauth_error'
 				}
 			});
 		}
@@ -198,11 +199,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
 		setSessionTokenCookie(event, sessionToken, session.expiresAt);
 
 		// Clear OAuth cookies
-		event.cookies.delete("google_oauth_state", { path: "/" });
-		event.cookies.delete("google_code_verifier", { path: "/" });
+		event.cookies.delete('google_oauth_state', { path: '/' });
+		event.cookies.delete('google_code_verifier', { path: '/' });
 
-		logger.info("User successfully authenticated via Google OAuth", {
-			component: "auth",
+		logger.info('User successfully authenticated via Google OAuth', {
+			component: 'auth',
 			userId: user.id,
 			sessionId: session.id,
 			requestId: event.locals.requestId
@@ -211,12 +212,12 @@ export async function GET(event: RequestEvent): Promise<Response> {
 		return new Response(null, {
 			status: 302,
 			headers: {
-				Location: "/"
+				Location: '/'
 			}
 		});
 	} catch (error) {
-		logger.error("Error during Google OAuth callback processing", {
-			component: "auth",
+		logger.error('Error during Google OAuth callback processing', {
+			component: 'auth',
 			requestId: event.locals.requestId,
 			metadata: { error, email, googleUserId }
 		});
@@ -224,7 +225,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 		return new Response(null, {
 			status: 302,
 			headers: {
-				Location: "/login?error=oauth_error"
+				Location: '/login?error=oauth_error'
 			}
 		});
 	}

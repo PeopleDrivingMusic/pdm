@@ -1,4 +1,4 @@
-import { hash, verify } from "@node-rs/argon2";
+import { hash, verify } from '@node-rs/argon2';
 
 /**
  * Hashes a password using Argon2id
@@ -9,7 +9,7 @@ export async function hashPassword(password: string): Promise<string> {
 		memoryCost: 19456, // 19 MiB
 		timeCost: 2, // 2 iterations
 		outputLen: 32, // 32 bytes
-		parallelism: 1, // 1 thread
+		parallelism: 1 // 1 thread
 	});
 }
 

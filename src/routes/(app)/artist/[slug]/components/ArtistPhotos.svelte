@@ -15,7 +15,7 @@
 {:then contentResolved}
 	{#if contentResolved.photoAlbums.length}
 		<div class="gallery-grid">
-			{#each contentResolved.photoAlbums as album}
+			{#each contentResolved.photoAlbums as album (album.id)}
 				<article class="gallery-card" class:is-locked={album.isLocked}>
 					<div class="gallery-preview">
 						{#if album.photos[0]}

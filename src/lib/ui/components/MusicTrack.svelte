@@ -5,6 +5,7 @@
 	import { mdiPlay } from '@mdi/js';
 	import type { Album, Artist, Track } from '$lib/db';
 	import { resolveR2ImageUrl } from '$lib/utils/helpers';
+	import { resolve } from '$app/paths';
 
 	const {
 		track,
@@ -93,9 +94,15 @@
 	</div>
 	<div class="track-info">
 		<h3 class="track-title">{track.title}</h3>
-		<a class="track-artist" href="/artist/{artist?.slug}" onmouseenter={(e) => e.stopPropagation()}
-			>{artist?.name}</a
-		>
+		{#if artist?.slug}
+			<a
+				class="track-artist"
+				href={resolve('/(app)/artist/[slug]', { slug: artist.slug })}
+				onmouseenter={(e) => e.stopPropagation()}>{artist.name}</a
+			>
+		{:else}
+			<span class="track-artist">{artist?.name}</span>
+		{/if}
 	</div>
 </button>
 

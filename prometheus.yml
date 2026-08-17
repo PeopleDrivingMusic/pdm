@@ -7,7 +7,7 @@ global:
     environment: 'development'
 
 rule_files:
-  - "alerts/*.yml"
+  - 'alerts/*.yml'
 
 scrape_configs:
   - job_name: 'prometheus'
@@ -53,7 +53,6 @@ scrape_configs:
         target_label: container_id
         regex: ([0-9a-f]{12}).*
         replacement: ${1}
-
 # Remote write configuration for sending metrics (optional)
 # remote_write:
 #   - url: "http://remote-storage:9090/api/v1/write"

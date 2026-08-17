@@ -41,7 +41,7 @@
 				<div class="posts-list">
 					{#each contentResolved.posts as post (post.id)}
 						{#snippet music()}
-							{#each post.musicAttachments as item}
+							{#each post.musicAttachments as item (item.id)}
 								{@const trackEntry = item.type === 'track' ? trackMap.get(item.id) : undefined}
 								<PostMusicAttachment
 									attachment={item}

@@ -19,13 +19,13 @@ services:
       POSTGRES_PASSWORD: root
       POSTGRES_DB: pdm_db
     ports:
-      - "5433:5432"
+      - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
+      test: ['CMD-SHELL', 'pg_isready -U admin']
       interval: 30s
       timeout: 10s
       retries: 5
@@ -33,25 +33,25 @@ services:
       - app
       - monitoring
     labels:
-      - "service=postgres"
-      - "prometheus.io/scrape=false" # Disable scraping postgres itself, use exporter
+      - 'service=postgres'
+      - 'prometheus.io/scrape=false' # Disable scraping postgres itself, use exporter
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
     container_name: pdm-postgres-exporter
     environment:
-      DATA_SOURCE_NAME: "postgresql://admin:root@postgres:5432/pdm_db?sslmode=disable"
+      DATA_SOURCE_NAME: 'postgresql://admin:root@postgres:5432/pdm_db?sslmode=disable'
     ports:
-      - "9187:9187"
+      - '9187:9187'
     depends_on:
       - postgres
     networks:
       - monitoring
     restart: unless-stopped
     labels:
-      - "service=postgres-exporter"
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=9187"
+      - 'service=postgres-exporter'
+      - 'prometheus.io/scrape=true'
+      - 'prometheus.io/port=9187'
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -60,7 +60,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@pdm.com
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
-      - "8081:80"
+      - '8081:80'
     depends_on:
       - postgres
     restart: unless-stopped
@@ -68,14 +68,14 @@ services:
       - app
       - monitoring
     labels:
-      - "service=pgadmin"
-      - "prometheus.io/scrape=false"
+      - 'service=pgadmin'
+      - 'prometheus.io/scrape=false'
 
   prometheus:
     image: prom/prometheus:v2.55.1
     container_name: pdm-prometheus
     ports:
-      - "9090:9090"
+      - '9090:9090'
     volumes:
       - prometheus_data:/prometheus
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
@@ -89,15 +89,15 @@ services:
     networks:
       - monitoring
     labels:
-      - "service=prometheus"
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=9090"
+      - 'service=prometheus'
+      - 'prometheus.io/scrape=true'
+      - 'prometheus.io/port=9090'
 
   node-exporter:
     image: prom/node-exporter:v1.8.2
     container_name: pdm-node-exporter
     ports:
-      - "9100:9100"
+      - '9100:9100'
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -111,15 +111,15 @@ services:
     networks:
       - monitoring
     labels:
-      - "service=node-exporter"
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=9100"
+      - 'service=node-exporter'
+      - 'prometheus.io/scrape=true'
+      - 'prometheus.io/port=9100'
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: pdm-cadvisor
     ports:
-      - "8080:8080"
+      - '8080:8080'
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -133,15 +133,15 @@ services:
     networks:
       - monitoring
     labels:
-      - "service=cadvisor"
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=8080"
+      - 'service=cadvisor'
+      - 'prometheus.io/scrape=true'
+      - 'prometheus.io/port=8080'
 
   loki:
     image: grafana/loki:3.4.1
     container_name: pdm-loki
     ports:
-      - "3100:3100"
+      - '3100:3100'
     volumes:
       - loki_data:/loki
       - ./loki-config.yaml:/etc/loki/local-config.yaml
@@ -150,9 +150,9 @@ services:
     networks:
       - monitoring
     labels:
-      - "service=loki"
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=3100"
+      - 'service=loki'
+      - 'prometheus.io/scrape=true'
+      - 'prometheus.io/port=3100'
 
   promtail:
     image: grafana/promtail:3.4.1
@@ -167,14 +167,14 @@ services:
     depends_on:
       - loki
     labels:
-      - "service=promtail"
-      - "prometheus.io/scrape=false"
+      - 'service=promtail'
+      - 'prometheus.io/scrape=false'
 
   grafana:
     image: grafana/grafana:11.4.0
     container_name: pdm-grafana
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
@@ -189,9 +189,9 @@ services:
       - loki
       - prometheus
     labels:
-      - "service=grafana"
-      - "prometheus.io/scrape=true"
-      - "prometheus.io/port=3000"
+      - 'service=grafana'
+      - 'prometheus.io/scrape=true'
+      - 'prometheus.io/port=3000'
 
   # app:
   #   build:

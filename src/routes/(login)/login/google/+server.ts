@@ -1,33 +1,33 @@
-import { generateState, generateCodeVerifier } from "arctic";
-import { google } from "$lib/server/oauth";
-import { logger } from "$lib/utils/logger";
-import type { RequestEvent } from "@sveltejs/kit";
+import { generateState, generateCodeVerifier } from 'arctic';
+import { google } from '$lib/server/oauth';
+import { logger } from '$lib/utils/logger';
+import type { RequestEvent } from '@sveltejs/kit';
 
 export async function GET(event: RequestEvent): Promise<Response> {
 	try {
 		const state = generateState();
 		const codeVerifier = generateCodeVerifier();
-		const url = google.createAuthorizationURL(state, codeVerifier, ["openid", "profile", "email"]);
+		const url = google.createAuthorizationURL(state, codeVerifier, ['openid', 'profile', 'email']);
 
 		// Save state and codeVerifier in cookies for verification in the callback
-		event.cookies.set("google_oauth_state", state, {
-			path: "/",
+		event.cookies.set('google_oauth_state', state, {
+			path: '/',
 			httpOnly: true,
 			maxAge: 60 * 10, // 10 minutes
-			sameSite: "lax",
-			secure: !event.url.hostname.includes('localhost')
-		});
-		
-		event.cookies.set("google_code_verifier", codeVerifier, {
-			path: "/",
-			httpOnly: true,
-			maxAge: 60 * 10, // 10 minutes
-			sameSite: "lax",
+			sameSite: 'lax',
 			secure: !event.url.hostname.includes('localhost')
 		});
 
-		logger.info("Google OAuth flow initiated", {
-			component: "auth",
+		event.cookies.set('google_code_verifier', codeVerifier, {
+			path: '/',
+			httpOnly: true,
+			maxAge: 60 * 10, // 10 minutes
+			sameSite: 'lax',
+			secure: !event.url.hostname.includes('localhost')
+		});
+
+		logger.info('Google OAuth flow initiated', {
+			component: 'auth',
 			requestId: event.locals.requestId,
 			metadata: {
 				state,
@@ -42,8 +42,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
 			}
 		});
 	} catch (error) {
-		logger.error("Failed to initiate Google OAuth flow", {
-			component: "auth",
+		logger.error('Failed to initiate Google OAuth flow', {
+			component: 'auth',
 			requestId: event.locals.requestId,
 			metadata: { error }
 		});
@@ -51,7 +51,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 		return new Response(null, {
 			status: 302,
 			headers: {
-				Location: "/login?error=oauth_error"
+				Location: '/login?error=oauth_error'
 			}
 		});
 	}

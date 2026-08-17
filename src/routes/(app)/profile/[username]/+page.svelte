@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Component } from 'svelte';
 	import { Tabs } from '$lib/ui';
 	import type { PageData } from './$types';
 	import ProfileHeader from './ProfileHeader.svelte';
@@ -12,7 +13,7 @@
 	let { data }: Props = $props();
 	const { profileUser, user: currentUser } = $derived(data);
 
-	const viewsMap: { [key: string]: any } = {
+	const viewsMap: Record<string, Component> = {
 		overview: Overview,
 		affiliate: Affiliate
 	};

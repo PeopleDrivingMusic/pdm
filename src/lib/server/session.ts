@@ -1,11 +1,11 @@
-import { encodeBase32LowerCaseNoPadding, encodeHexLowerCase } from "@oslojs/encoding";
-import { sha256 } from "@oslojs/crypto/sha2";
-import { db } from "$lib/db";
-import { sessions, users, type User, type Session } from "$lib/db/schema";
-import { eq, and } from "drizzle-orm";
-import type { RequestEvent } from "@sveltejs/kit";
-import { dev } from "$app/environment";
-import { logger } from "$lib/utils/logger";
+import { encodeBase32LowerCaseNoPadding, encodeHexLowerCase } from '@oslojs/encoding';
+import { sha256 } from '@oslojs/crypto/sha2';
+import { db } from '$lib/db';
+import { sessions, users, type User, type Session } from '$lib/db/schema';
+import { eq } from 'drizzle-orm';
+import type { RequestEvent } from '@sveltejs/kit';
+import { dev } from '$app/environment';
+import { logger } from '$lib/utils/logger';
 
 export function generateSessionToken(): string {
 	const bytes = new Uint8Array(20);
@@ -26,8 +26,8 @@ export async function createSession(token: string, userId: string): Promise<Sess
 
 	try {
 		await db.insert(sessions).values(session);
-		logger.info("Session created successfully", {
-			component: "auth",
+		logger.info('Session created successfully', {
+			component: 'auth',
 			userId,
 			sessionId,
 			metadata: {
@@ -36,8 +36,8 @@ export async function createSession(token: string, userId: string): Promise<Sess
 		});
 		return session;
 	} catch (error) {
-		logger.error("Failed to create session", {
-			component: "auth",
+		logger.error('Failed to create session', {
+			component: 'auth',
 			userId,
 			metadata: { error }
 		});
@@ -47,7 +47,7 @@ export async function createSession(token: string, userId: string): Promise<Sess
 
 export async function validateSessionToken(token: string): Promise<SessionValidationResult> {
 	const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
-	
+
 	try {
 		const result = await db
 			.select({
@@ -59,19 +59,19 @@ export async function validateSessionToken(token: string): Promise<SessionValida
 			.where(eq(sessions.id, sessionId));
 
 		if (result.length < 1) {
-			logger.debug("Session not found", {
-				component: "auth",
+			logger.debug('Session not found', {
+				component: 'auth',
 				metadata: { sessionId }
 			});
 			return { session: null, user: null };
 		}
 
 		const { user, session } = result[0];
-		
+
 		if (Date.now() >= session.expiresAt.getTime()) {
 			await db.delete(sessions).where(eq(sessions.id, sessionId));
-			logger.info("Expired session deleted", {
-				component: "auth",
+			logger.info('Expired session deleted', {
+				component: 'auth',
 				userId: user.id,
 				sessionId,
 				metadata: {
@@ -90,9 +90,9 @@ export async function validateSessionToken(token: string): Promise<SessionValida
 					expiresAt: session.expiresAt
 				})
 				.where(eq(sessions.id, sessionId));
-			
-			logger.debug("Session renewed", {
-				component: "auth",
+
+			logger.debug('Session renewed', {
+				component: 'auth',
 				userId: user.id,
 				sessionId,
 				metadata: {
@@ -101,16 +101,17 @@ export async function validateSessionToken(token: string): Promise<SessionValida
 			});
 		}
 
-		logger.debug("Session validated successfully", {
-			component: "auth",
+		logger.debug('Session validated successfully', {
+			component: 'auth',
 			userId: user.id,
 			sessionId
 		});
-		const {hashedPassword, ...safeUserData} = user
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- rest-destructure to strip hashedPassword off the SafeUser we return (see app.d.ts)
+		const { hashedPassword, ...safeUserData } = user;
 		return { session, user: safeUserData };
 	} catch (error) {
-		logger.error("Failed to validate session", {
-			component: "auth",
+		logger.error('Failed to validate session', {
+			component: 'auth',
 			metadata: { error, sessionId }
 		});
 		return { session: null, user: null };
@@ -120,13 +121,13 @@ export async function validateSessionToken(token: string): Promise<SessionValida
 export async function invalidateSession(sessionId: string): Promise<void> {
 	try {
 		await db.delete(sessions).where(eq(sessions.id, sessionId));
-		logger.info("Session invalidated", {
-			component: "auth",
+		logger.info('Session invalidated', {
+			component: 'auth',
 			sessionId
 		});
 	} catch (error) {
-		logger.error("Failed to invalidate session", {
-			component: "auth",
+		logger.error('Failed to invalidate session', {
+			component: 'auth',
 			metadata: { error, sessionId }
 		});
 		throw error;
@@ -134,16 +135,16 @@ export async function invalidateSession(sessionId: string): Promise<void> {
 }
 
 export function setSessionTokenCookie(event: RequestEvent, token: string, expiresAt: Date): void {
-	event.cookies.set("session", token, {
+	event.cookies.set('session', token, {
 		httpOnly: true,
-		sameSite: "lax",
+		sameSite: 'lax',
 		expires: expiresAt,
-		path: "/",
+		path: '/',
 		secure: !dev
 	});
-	
-	logger.debug("Session cookie set", {
-		component: "auth",
+
+	logger.debug('Session cookie set', {
+		component: 'auth',
 		requestId: event.locals.requestId,
 		metadata: {
 			expiresAt
@@ -152,16 +153,16 @@ export function setSessionTokenCookie(event: RequestEvent, token: string, expire
 }
 
 export function deleteSessionTokenCookie(event: RequestEvent): void {
-	event.cookies.set("session", "", {
+	event.cookies.set('session', '', {
 		httpOnly: true,
-		sameSite: "lax",
+		sameSite: 'lax',
 		maxAge: 0,
-		path: "/",
+		path: '/',
 		secure: !dev
 	});
-	
-	logger.debug("Session cookie deleted", {
-		component: "auth",
+
+	logger.debug('Session cookie deleted', {
+		component: 'auth',
 		requestId: event.locals.requestId
 	});
 }

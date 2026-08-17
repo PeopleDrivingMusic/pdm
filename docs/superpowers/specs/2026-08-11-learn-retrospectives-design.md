@@ -29,16 +29,16 @@ this change what the model actually does next time?
 
 ## 2. Decisions (from brainstorming)
 
-| Decision | Choice |
-|---|---|
-| **Subject** | The model's own performance in the session — process, not PDM domain knowledge. |
-| **Approach** | Hybrid: `learn/` is the evidence layer; recurring lessons are promoted into `memory/` or `CLAUDE.md`, which are the layers that actually bind. |
-| **Promotion** | Never automatic. The model proposes a formulated rule; the founder approves; only then is it written. |
-| **Triggers** | Multiple, by design: `/retro` command (primary), a `CLAUDE.md` rule making the model offer it, and a session-start debt check as backstop. |
-| **Granularity** | One retro per closed unit of work (slice / PR / feature), not per session. |
-| **Quality bar** | No lesson, no file. Routine "went fine as usual" is not recorded. |
-| **Language** | English, per the `WIKI.md` convention, so all of `.claude/` stays homogeneous. Conversation stays in Russian. |
-| **Repo** | `.claude/` is gitignored in the main repo and versioned in `pdm-claude`; all of `learn/` commits via `git -C .claude`. |
+| Decision        | Choice                                                                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Subject**     | The model's own performance in the session — process, not PDM domain knowledge.                                                                |
+| **Approach**    | Hybrid: `learn/` is the evidence layer; recurring lessons are promoted into `memory/` or `CLAUDE.md`, which are the layers that actually bind. |
+| **Promotion**   | Never automatic. The model proposes a formulated rule; the founder approves; only then is it written.                                          |
+| **Triggers**    | Multiple, by design: `/retro` command (primary), a `CLAUDE.md` rule making the model offer it, and a session-start debt check as backstop.     |
+| **Granularity** | One retro per closed unit of work (slice / PR / feature), not per session.                                                                     |
+| **Quality bar** | No lesson, no file. Routine "went fine as usual" is not recorded.                                                                              |
+| **Language**    | English, per the `WIKI.md` convention, so all of `.claude/` stays homogeneous. Conversation stays in Russian.                                  |
+| **Repo**        | `.claude/` is gitignored in the main repo and versioned in `pdm-claude`; all of `learn/` commits via `git -C .claude`.                         |
 
 ## 3. Architecture — three levels
 
@@ -75,23 +75,27 @@ title: Comments & fan chat — PR5 UI
 type: retro
 branch: feature/comments-and-fan-chat--pr5-ui
 tags: [tdd, ui, review]
-status: current         # current | promoted | superseded
-promoted: []            # links to rules grown from this retro
+status: current # current | promoted | superseded
+promoted: [] # links to rules grown from this retro
 updated: 2026-08-11
 ---
 
 ## SUMMARY
+
 Two to four sentences: what was done, how it ended. This block, condensed to one
 line, is what travels up into the digest.
 
 ## WHAT WAS GOOD
+
 - <what worked> — **why:** <the mechanism, not praise>
 
 ## WHAT WAS BAD
+
 - <what did not work> — **why:** <root cause>
   — **cost:** <what it cost: rework, wasted turns, lost time>
 
 ## HOW TO CONVERT BAD => GOOD
+
 - <checkable action, imperative> → **target:** CLAUDE.md | memory | skill | none
 ```
 
@@ -161,20 +165,25 @@ number is what triggers promotion.
 
 ```markdown
 # Learnings — rolling digest
+
 <!-- Maintained by /retro. Hard cap: 60 lines. -->
 
 ## Active rules (promoted)
+
 - Strict TDD, sliced PRs → memory/strict-tdd-workflow.md (survived x7)
 
 ## Recurring — promotion candidates
+
 - x3 Starts writing code before the slice scope is agreed
-      → [[2026-08-11-comments]] [[2026-08-04-gating]] [[2026-07-28-upload]]
+  → [[2026-08-11-comments]] [[2026-08-04-gating]] [[2026-07-28-upload]]
 - x2 Does not check for an existing equivalent in src/lib/ui/ → [[...]] [[...]]
 
 ## Recent lessons (last 5)
+
 - 2026-08-11 Comments PR5 UI — one-line SUMMARY → [[2026-08-11-comments-fan-chat]]
 
 ## Retired
+
 - <rule that stuck and no longer needs restating>
 ```
 
@@ -199,11 +208,11 @@ exceeds the cap, the oldest entries are compressed to one line each or retired.
 On trigger, the model sees the entry in Recurring at session start and comes to
 the founder with an already-formulated rule. On approval it is written to:
 
-| Target | When |
-|---|---|
-| `memory/` (`type: feedback`) | How the founder and the model work together |
-| `CLAUDE.md` | An operational rule about this repository |
-| A skill | A multi-step procedure worth invoking by name |
+| Target                       | When                                          |
+| ---------------------------- | --------------------------------------------- |
+| `memory/` (`type: feedback`) | How the founder and the model work together   |
+| `CLAUDE.md`                  | An operational rule about this repository     |
+| A skill                      | A multi-step procedure worth invoking by name |
 
 After promotion: **every** detail retro linked from that Recurring entry — not
 just the most recent one — gets `status: promoted` and a link to the new rule in
@@ -268,12 +277,12 @@ not remove it. Retros should be read with that discount applied.
 
 `WIKI.md` already defines a boundary this layer must not blur:
 
-- **`.claude/wiki/`** — knowledge about the *project*: product, architecture,
+- **`.claude/wiki/`** — knowledge about the _project_: product, architecture,
   domain, strategy. Technical lessons about PDM itself belong here (usually
   `decisions/`), not in `learn/`.
 - **`.claude/memory/`** — facts about the user, feedback, cross-session working
   context. This is where promoted process rules land.
-- **`.claude/learn/`** — evidence about *how the work went*, and the counters that
+- **`.claude/learn/`** — evidence about _how the work went_, and the counters that
   justify promotion. It holds narrative that memory's one-fact-per-file format
   cannot.
 
