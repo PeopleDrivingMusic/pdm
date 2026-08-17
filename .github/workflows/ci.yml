@@ -42,6 +42,7 @@ jobs:
             db:
               - 'drizzle/**'
               - 'src/lib/db/**'
+              - 'drizzle.config.ts'
 
   lint:
     runs-on: ubuntu-latest
@@ -121,13 +122,18 @@ jobs:
           fi
           FAILED=0
           for f in $NEW_FILES; do
-            if grep -qi 'data-loss-ok:' "$f"; then
-              echo "Skipping $f (acknowledged via a 'data-loss-ok:' comment)"
+            # Requires a real SQL line comment with a non-empty reason -- a bare
+            # substring match (e.g. inside a string literal) doesn't count.
+            if grep -qE -- '^[[:space:]]*--[[:space:]]*data-loss-ok:[[:space:]]*[^[:space:]]' "$f"; then
+              echo "Skipping $f (acknowledged via a '-- data-loss-ok:' comment)"
               continue
             fi
-            HITS=$(grep -inE 'drop column|drop table|drop schema|truncate|alter column.*type|set not null' "$f" || true)
+            # Normalize whitespace/newlines to single spaces first so a statement
+            # drizzle-kit (or a human) wrapped across lines still matches.
+            NORMALIZED=$(tr '\n\t' '  ' < "$f" | tr -s ' ')
+            HITS=$(echo "$NORMALIZED" | grep -ioE 'drop[[:space:]]+column|drop[[:space:]]+table|drop[[:space:]]+schema|truncate|alter[[:space:]]+column[^;]*[[:space:]]type|set[[:space:]]+not[[:space:]]+null' || true)
             if [ -n "$HITS" ]; then
-              echo "::warning file=$f::Potentially destructive statement(s) — review for data loss, or add a '-- data-loss-ok: <reason>' comment anywhere in this file to acknowledge and unblock."
+              echo "::warning file=$f::Potentially destructive statement(s) — review for data loss, or add a '-- data-loss-ok: <reason>' line comment to acknowledge and unblock."
               echo "$HITS"
               FAILED=1
             fi
