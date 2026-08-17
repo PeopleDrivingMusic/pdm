@@ -215,7 +215,9 @@ export async function uploadAudio(
 	});
 }
 
-export function deleteFile(_relativePath: string): boolean {
+// Unused stub, no callers in the codebase — file deletion for uploads goes through
+// R2Service's deleteFileFromR2 instead.
+export function deleteFile(): boolean {
 	return true;
 }
 

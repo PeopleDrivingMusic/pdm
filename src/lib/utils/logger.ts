@@ -201,12 +201,10 @@ export function createLoggingMiddleware() {
 		});
 
 		let response;
-		let error;
 
 		try {
 			response = await resolve(event);
 		} catch (e) {
-			error = e;
 			logger.error(`Request failed: ${event.request.method} ${event.url.pathname}`, {
 				component: 'http',
 				requestId,

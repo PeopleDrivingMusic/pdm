@@ -4,24 +4,18 @@
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
 	import { mdiSkipPrevious, mdiPause, mdiPlay, mdiSkipNext } from '@mdi/js';
 
-	let isUserSeeking = $state(false);
-
-	const { isPlaying, currentTime, currentTrack, que, currentTrackIndex, duration } =
-		$derived(playerStore);
+	const { isPlaying, currentTime, que, currentTrackIndex, duration } = $derived(playerStore);
 
 	function togglePlay() {
 		playerStore.isPlaying = !isPlaying;
 	}
 
 	function handleProgressChange(progress: number) {
-		isUserSeeking = true;
 		if (!duration) {
-			isUserSeeking = false;
 			return;
 		}
 		const newTime = (progress / 100) * duration;
 		playerStore.currentTime = newTime;
-		isUserSeeking = false;
 	}
 
 	function skipPrevious() {
@@ -38,12 +32,6 @@
 		}
 	}
 
-	function formatTime(seconds: number) {
-		if (!seconds || isNaN(seconds)) return '0:00';
-		const mins = Math.floor(seconds / 60);
-		const secs = Math.floor(seconds % 60);
-		return `${mins}:${secs.toString().padStart(2, '0')}`;
-	}
 </script>
 
 <div class="main-wrapper">

@@ -1143,7 +1143,6 @@ export class ArtistPublicContentService {
 
 			const postIds = postRows.map((post) => post.id);
 			const photoAlbumIds = albumRows.map((album) => album.id);
-			const videoIds = videoRows.map((video) => video.id);
 			const collectionIds = collectionRows.map((collection) => collection.id);
 
 			const [
@@ -1294,7 +1293,6 @@ export class ArtistPublicContentService {
 				photosByAlbum.set(row.albumId, rows);
 			}
 
-			const videosById = new Map(videoRows.map((video) => [video.id, video]));
 			const collectionItemsByCollection = new Map<string, typeof collectionItemRows>();
 			for (const row of collectionItemRows) {
 				const rows = collectionItemsByCollection.get(row.collectionId) ?? [];

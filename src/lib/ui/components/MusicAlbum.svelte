@@ -23,6 +23,9 @@
 	</div>
 	<div class="album-info">
 		<h3 class="album-title">{album?.title}</h3>
+		{#if artist}
+			<div class="artist">{artist.name}</div>
+		{/if}
 		<div class="date">{album?.releaseDate?.getFullYear()}</div>
 	</div>
 </button>
@@ -60,6 +63,10 @@
 				@include text-xl();
 				color: var(--text-primary);
 				text-align: left;
+			}
+			.artist {
+				@include text-sm();
+				color: var(--text-secondary);
 			}
 			.date {
 				@include text-sm();

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Album, Artist, Track } from '$lib/db';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/ui';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
 	import {
@@ -40,7 +40,13 @@
 	<div class="info-box">
 		<Tabs type="underline" showTrack={true} tabs={views} activeTab={views[0]} />
 		<div class="artist-wrapper">
-			<a class="track-artist" href="/artist/{artist?.slug}">{artist?.name}</a>
+			{#if artist?.slug}
+				<a class="track-artist" href={resolve('/artist/[slug]', { slug: artist.slug })}>
+					{artist.name}
+				</a>
+			{:else}
+				<span class="track-artist">{artist?.name}</span>
+			{/if}
 
 			<div class="buttons-wrapper">
 				<Button variant="secondary" size="md">Follow</Button>

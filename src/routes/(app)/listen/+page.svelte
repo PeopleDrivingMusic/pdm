@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
 	import type { PageProps } from './$types';
 	import MusicTrack from '$lib/ui/components/MusicTrack.svelte';
 	import AlbumCard from './components/AlbumCard.svelte';
@@ -11,18 +10,12 @@
 		mdiClockOutline,
 		mdiTrendingUp,
 		mdiCompass,
-		mdiMusicBoxMultiple,
 		mdiAlbum,
 		mdiPlaylistMusic
 	} from '@mdi/js';
 	import Aurora from '$lib/ui/backgrounds/Aurora.svelte';
 
-	interface Props {
-		data: any;
-	}
-
-	let { data }: Props = $props();
-	$inspect(data);
+	let { data }: PageProps = $props();
 
 	// Mock data for albums
 	const albums = [
@@ -173,6 +166,7 @@
 							<p class="section-subtitle">{section.subtitle}</p>
 						</div>
 					</div>
+					<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- `/listen/[id]` isn't a real route yet; this "View All" link is part of this page's still-mock section data. -->
 					<a href={`/listen/${section.id}`} class="section-header__link"> View All </a>
 				</div>
 
@@ -184,7 +178,7 @@
 					{#if section.type === 'tracks'}
 						<div class="tracks-scroll">
 							{#if data.tracks.length}
-								{#each data.tracks.slice(0, 6) as track}
+								{#each data.tracks.slice(0, 6) as track (track.tracks.id)}
 									<div class="track-item">
 										<MusicTrack
 											isLiked={track.isLiked}

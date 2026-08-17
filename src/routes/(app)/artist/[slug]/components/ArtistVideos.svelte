@@ -17,7 +17,7 @@
 	{@const videoItems = [...contentResolved.videoCollections, ...contentResolved.videos]}
 	{#if videoItems.length}
 		<div class="video-grid">
-			{#each videoItems as item}
+			{#each videoItems as item (`${item.type}-${item.id}`)}
 				<article class="video-card" class:is-locked={item.isLocked}>
 					<div class="video-preview">
 						{#if item.type === 'video' && item.thumbnailUrl}

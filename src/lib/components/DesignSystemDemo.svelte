@@ -84,7 +84,7 @@
 
 		<h3>Brand Colors</h3>
 		<div class="color-grid">
-			{#each colorTokens as color}
+			{#each colorTokens as color (color.name)}
 				<div class="color-swatch">
 					<div class="color-preview" style="background-color: var({color.value})"></div>
 					<div class="color-info">
@@ -97,7 +97,7 @@
 
 		<h3>Background Colors</h3>
 		<div class="color-grid">
-			{#each backgroundTokens as color}
+			{#each backgroundTokens as color (color.name)}
 				<div class="color-swatch">
 					<div class="color-preview" style="background-color: var({color.value})"></div>
 					<div class="color-info">
@@ -110,7 +110,7 @@
 
 		<h3>Text Colors</h3>
 		<div class="color-grid">
-			{#each textTokens as color}
+			{#each textTokens as color (color.name)}
 				<div class="color-swatch">
 					<div class="color-preview" style="background-color: var({color.value})"></div>
 					<div class="color-info">
@@ -156,7 +156,7 @@
 	<section>
 		<h2>Spacing System</h2>
 		<div class="spacing-demo">
-			{#each spacingTokens as space}
+			{#each spacingTokens as space (space.name)}
 				<div class="spacing-item">
 					<div
 						class="spacing-visual"

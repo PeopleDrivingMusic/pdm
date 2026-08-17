@@ -95,7 +95,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 };
 
-export const GET: RequestHandler = async ({ request, locals, url }) => {
+export const GET: RequestHandler = async ({ locals, url }) => {
 	try {
 		const userId = locals.user?.id;
 

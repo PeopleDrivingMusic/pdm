@@ -8,7 +8,7 @@ export const load = async ({ fetch }: LoadEvent) => {
 		return {
 			dbHealth
 		};
-	} catch (error) {
+	} catch {
 		return {
 			dbHealth: {
 				status: 'error',

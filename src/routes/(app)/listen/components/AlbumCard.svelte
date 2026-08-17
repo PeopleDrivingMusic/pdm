@@ -19,6 +19,7 @@
 	let isFavorite = $state(false);
 </script>
 
+<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- `/album/[id]` isn't a real route yet (this card is a listen-page prototype with no detail page behind it); resolve() would fail svelte-check against a route that doesn't exist. -->
 <a href={`/album/${album.id}`} class="album-card">
 	<div class="album-card__cover">
 		<img src={album.cover} alt={album.title} />
@@ -39,6 +40,8 @@
 			<span>{album.year}</span>
 			<span>•</span>
 			<span>{album.trackCount} tracks</span>
+			<span>•</span>
+			<span>{album.duration}</span>
 		</div>
 	</div>
 </a>

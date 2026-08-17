@@ -13,7 +13,7 @@
 	{@const latestPhotos = contentResolved.photoAlbums.flatMap((album) => album.photos).slice(0, 6)}
 	{#if latestPhotos.length}
 		<div class="mini-photo-grid">
-			{#each latestPhotos as photo}
+			{#each latestPhotos as photo (photo.id)}
 				<img
 					src={photo.thumbnailUrl || photo.fileUrl}
 					alt={photo.alt || photo.caption || 'Artist photo'}

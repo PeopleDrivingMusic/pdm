@@ -2,7 +2,7 @@ import { encodeBase32LowerCaseNoPadding, encodeHexLowerCase } from '@oslojs/enco
 import { sha256 } from '@oslojs/crypto/sha2';
 import { db } from '$lib/db';
 import { sessions, users, type User, type Session } from '$lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { RequestEvent } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { logger } from '$lib/utils/logger';
@@ -106,6 +106,7 @@ export async function validateSessionToken(token: string): Promise<SessionValida
 			userId: user.id,
 			sessionId
 		});
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars -- rest-destructure to strip hashedPassword off the SafeUser we return (see app.d.ts)
 		const { hashedPassword, ...safeUserData } = user;
 		return { session, user: safeUserData };
 	} catch (error) {

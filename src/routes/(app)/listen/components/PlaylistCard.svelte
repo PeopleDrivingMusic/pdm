@@ -16,14 +16,30 @@
 	const { playlist }: Props = $props();
 
 	let isFavorite = $state(false);
+
+	function toggleFavorite(event: MouseEvent) {
+		event.preventDefault();
+		event.stopPropagation();
+		isFavorite = !isFavorite;
+	}
 </script>
 
+<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- `/playlist/[id]` isn't a real route yet (this card is a listen-page prototype with no detail page behind it); resolve() would fail svelte-check against a route that doesn't exist. -->
 <a href={`/playlist/${playlist.id}`} class="playlist-card">
 	<div class="playlist-card__cover">
 		<img src={playlist.cover} alt={playlist.title} />
 		<div class="playlist-card__overlay">
 			<button class="playlist-card__play" onclick={() => console.log('Play playlist')}>
 				<SvgIcon path={mdiPlay} size={24} />
+			</button>
+			<button
+				class="playlist-card__favorite"
+				class:is-favorite={isFavorite}
+				aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+				aria-pressed={isFavorite}
+				onclick={toggleFavorite}
+			>
+				<SvgIcon path={isFavorite ? mdiHeart : mdiHeartOutline} size={18} />
 			</button>
 		</div>
 	</div>
@@ -115,6 +131,37 @@
 		&:hover {
 			background-color: var(--color-brand-600);
 			transform: scale(1.1);
+		}
+	}
+
+	.playlist-card__favorite {
+		position: absolute;
+		top: var(--space-2);
+		right: var(--space-2);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		border: none;
+		background: rgba(0, 0, 0, 0.45);
+		color: var(--color-white);
+		cursor: pointer;
+		opacity: 0;
+		transition: all var(--duration-normal) var(--easing-ease-out);
+
+		.playlist-card:hover & {
+			opacity: 1;
+		}
+
+		&.is-favorite {
+			opacity: 1;
+			color: var(--color-brand-500);
+		}
+
+		&:hover {
+			background: rgba(0, 0, 0, 0.65);
 		}
 	}
 

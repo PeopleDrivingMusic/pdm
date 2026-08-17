@@ -28,7 +28,7 @@
 		<div>
 			<h3>Tracks</h3>
 			<div class="options">
-				{#each tracks as track}
+				{#each tracks as track (track.id)}
 					<label class="option">
 						<input
 							type="checkbox"
@@ -58,7 +58,7 @@
 		<div>
 			<h3>Albums</h3>
 			<div class="options">
-				{#each albums as album}
+				{#each albums as album (album.id)}
 					<label class="option">
 						<input
 							type="checkbox"

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { mdiPlus, mdiCheck, mdiMusic } from '@mdi/js';
+	import { mdiPlus, mdiMusic } from '@mdi/js';
 	import Modal from './Modal.svelte';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
 	import Button from '$lib/ui/Button.svelte';

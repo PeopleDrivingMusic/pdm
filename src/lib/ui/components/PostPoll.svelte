@@ -54,7 +54,7 @@
 	</div>
 
 	<div class="poll-options">
-		{#each poll.options as option}
+		{#each poll.options as option (option.id)}
 			<form method="POST" action="?/votePoll" use:enhance>
 				<input type="hidden" name="pollId" value={poll.id} />
 				<input type="hidden" name="optionId" value={option.id} />

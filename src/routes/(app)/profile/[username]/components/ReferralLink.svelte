@@ -9,10 +9,9 @@
 		copyToClipboard: () => void;
 		shareReferralLink: () => void;
 		copyFeedback: string;
-		showQR: boolean;
 	}
 
-	const { link, qrCode, copyToClipboard, shareReferralLink, copyFeedback } = $props();
+	const { link, qrCode, copyToClipboard, shareReferralLink, copyFeedback }: Props = $props();
 	let showQR = $state(false);
 </script>
 

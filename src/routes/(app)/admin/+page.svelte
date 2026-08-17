@@ -83,6 +83,7 @@
 		<div class="actions-card">
 			<h2>Database Actions</h2>
 			<div class="actions-grid">
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- PUBLIC_PGADMIN_URL is an external absolute URL (pgAdmin on its own port), not a SvelteKit route; the rule can't trace an imported $env value back to a literal to confirm that itself. -->
 				<a href={PUBLIC_PGADMIN_URL} target="_blank" class="action-btn"> Open pgAdmin </a>
 				<button class="action-btn" onclick={() => window.open('/api/db/health', '_blank')}>
 					View Raw Health Check

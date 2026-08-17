@@ -1,4 +1,4 @@
-import { createLoggingMiddleware, logger } from '$lib/utils/logger';
+import { logger } from '$lib/utils/logger';
 import { MetricsCollector } from '$lib/utils/metrics';
 import { validateSessionToken } from '$lib/server/session';
 import type { Handle, HandleServerError } from '@sveltejs/kit';
@@ -69,7 +69,6 @@ const loggingHandle: Handle = async ({ event, resolve }) => {
 	});
 
 	let response;
-	let error;
 
 	try {
 		response = await resolve(event);
@@ -93,7 +92,6 @@ const loggingHandle: Handle = async ({ event, resolve }) => {
 			}
 		);
 	} catch (e) {
-		error = e;
 		const duration = Date.now() - start;
 
 		// Record metrics for error

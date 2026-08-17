@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import Avatar from '$lib/ui/Avatar.svelte';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
 	import { mdiLoginVariant, mdiMagnify } from '@mdi/js/mdi.js';
@@ -52,7 +53,7 @@
 		</div>
 	{/if}
 	<div class="nav-wrapper">
-		{#each items as item}
+		{#each items as item, index (item.href ?? item.label ?? index)}
 			{#if item.section}
 				<div class="divider">
 					<div class="line"></div>
@@ -60,11 +61,12 @@
 			{:else if item.space}
 				<div class="nav-space"></div>
 			{:else}
+				<!-- eslint-disable svelte/no-navigation-without-resolve -- Sidebar is a generic nav-item component; `item.href` is a caller-supplied string spanning several distinct route trees (listener app, studio), not a single typed route manifest resolve() can check. -->
 				<a
+					href={item.href}
 					class="sidebar-item"
 					class:active={(item.href !== '/' && pathname.startsWith(item.href || '')) ||
 						item.href === pathname}
-					href={item.href}
 					title={item.label}
 				>
 					{#if item.icon}
@@ -76,10 +78,12 @@
 						<span class="label">{item.label}</span>
 					{/if}
 				</a>
+				<!-- eslint-enable svelte/no-navigation-without-resolve -->
 			{/if}
 		{/each}
 	</div>
 	{#if account}
+		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- caller-supplied profile href (dynamic /profile/[username] built by the parent layout), same generic-nav-prop reasoning as item.href above. -->
 		<a class="avatar-wrapper" href={account.profileHref || '#'}>
 			<div class="avatar">
 				<Avatar name={account.name} src={account.avatarUrl || ''} size="s" />
@@ -89,7 +93,7 @@
 			{/if}
 		</a>
 	{:else if showLogin}
-		<a class="avatar-wrapper" href="/login" title="Log in">
+		<a class="avatar-wrapper" href={resolve('/login')} title="Log in">
 			<div class="avatar login-icon">
 				<SvgIcon path={mdiLoginVariant} size={24} />
 			</div>

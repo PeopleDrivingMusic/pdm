@@ -13,7 +13,7 @@ import {
 	genres,
 	albumTracks
 } from './schema';
-import { eq, like, and, or, desc, count, sql, inArray } from 'drizzle-orm';
+import { eq, like, and, or, desc, count, sql } from 'drizzle-orm';
 import type {
 	User,
 	NewUser,
@@ -28,9 +28,7 @@ import type {
 	ArtistAccount,
 	NewArtistAccount,
 	Genre,
-	NewGenre,
-	AlbumTrack,
-	NewAlbumTrack
+	AlbumTrack
 } from './index';
 import { logger } from '$lib/utils/logger';
 import { deleteFileFromR2 } from './services/R2Service';
@@ -379,7 +377,7 @@ export class TrackService {
 	static async getTracksByArtist({ artistId = '', userId = '', limit = 50 }) {
 		return await withDbLogging('TrackService.getTracksByArtist', async () => {
 			try {
-				let query = db
+				const query = db
 					.select({
 						track: tracks,
 						isLiked: sql<boolean>`CASE WHEN ${userFavorites.id} IS NOT NULL THEN true ELSE false END`
@@ -425,16 +423,10 @@ export class TrackService {
 			.limit(limit);
 	}
 
-	static async getPopularTracks({
-		limit = 10,
-		offset = 0,
-		userId = '',
-		artist = true,
-		album = true
-	}) {
+	static async getPopularTracks({ limit = 10, offset = 0, userId = '' }) {
 		return await withDbLogging('TrackService.getPopularTracks', async () => {
 			try {
-				let query = db
+				const query = db
 					.select({
 						tracks,
 						artists: artists,
@@ -510,7 +502,7 @@ export class TrackService {
 	static async likeTrack(userId: string, trackId: string, needCheck = true): Promise<boolean> {
 		return await withDbLogging('TrackService.likeTrack', async () => {
 			try {
-				let isLiked = needCheck ? await this.isTrackLikedByUser(userId, trackId) : false;
+				const isLiked = needCheck ? await this.isTrackLikedByUser(userId, trackId) : false;
 
 				if (isLiked) {
 					return false;
@@ -556,7 +548,7 @@ export class TrackService {
 	static async unlikeTrack(userId: string, trackId: string, needCheck = true): Promise<boolean> {
 		return await withDbLogging('TrackInteractionService.unlikeTrack', async () => {
 			try {
-				let isLiked = needCheck ? await this.isTrackLikedByUser(userId, trackId) : true;
+				const isLiked = needCheck ? await this.isTrackLikedByUser(userId, trackId) : true;
 
 				if (isLiked) {
 					// Upsert track stat -

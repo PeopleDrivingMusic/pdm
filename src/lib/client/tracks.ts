@@ -12,7 +12,7 @@ export class TrackClient {
 			const data = await response.json();
 
 			return data.success;
-		} catch (error) {
+		} catch {
 			return false;
 		}
 	}
@@ -32,7 +32,7 @@ export class TrackClient {
 			const data = await response.json();
 
 			return data.success;
-		} catch (error) {
+		} catch {
 			return false;
 		}
 	}
@@ -52,7 +52,7 @@ export class TrackClient {
 			const data = await response.json();
 
 			return data.success;
-		} catch (error) {
+		} catch {
 			return false;
 		}
 	}

@@ -10,7 +10,7 @@
 		onClose?: () => void;
 	}
 
-	const { type = 'info' as NotificationType, message, onClose } = $props();
+	const { type = 'info' as NotificationType, message, onClose }: Props = $props();
 
 	const iconMap: Record<NotificationType, string> = {
 		success: mdiCheckCircle,

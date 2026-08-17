@@ -16,7 +16,7 @@
 {:then contentResolved}
 	{#if contentResolved.feed.length}
 		<div class="feed-list">
-			{#each contentResolved.feed as item}
+			{#each contentResolved.feed as item (item.id)}
 				<article class="feed-card" class:is-locked={item.isLocked}>
 					<div class="feed-icon">
 						<SvgIcon path={contentIcon(item.type)} size={22} />
