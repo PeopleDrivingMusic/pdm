@@ -146,7 +146,7 @@ export class PlaylistService {
 					throw new Error('Playlist not found or not owned by user');
 				}
 
-				const updateData: Record<string, any> = {
+				const updateData: Partial<typeof playlists.$inferInsert> = {
 					updatedAt: new Date()
 				};
 

@@ -1,10 +1,12 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
+
 	interface Props {
 		href?: string;
 		color?: 'primary' | 'secondary';
 		underline?: boolean;
 		onclick?: (e: MouseEvent) => void;
-		children?: () => any;
+		children?: Snippet;
 	}
 
 	let { href, color = 'primary', underline = true, onclick, children }: Props = $props();

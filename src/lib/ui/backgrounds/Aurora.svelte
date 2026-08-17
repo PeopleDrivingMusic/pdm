@@ -178,6 +178,7 @@ void main() {
 		});
 
 		const mesh = new Mesh(gl, { geometry, program });
+		// eslint-disable-next-line svelte/no-dom-manipulating -- ogl's WebGL canvas goes into an intentionally-empty wrapper div; Svelte never renders anything inside it.
 		containerEl.appendChild(gl.canvas);
 
 		let lastTime = 0;
@@ -238,6 +239,7 @@ void main() {
 			cancelAnimationFrame(animateId);
 			resizeObserver?.disconnect();
 			if (containerEl && gl.canvas.parentNode === containerEl) {
+				// eslint-disable-next-line svelte/no-dom-manipulating -- teardown for the manual append above.
 				containerEl.removeChild(gl.canvas);
 			}
 			gl.getExtension('WEBGL_lose_context')?.loseContext();

@@ -71,10 +71,11 @@ export async function GET(event: RequestEvent): Promise<Response> {
 		});
 	}
 
-	let claims: any;
+	let claims: { sub: string; email: string; name?: string; picture?: string };
 	try {
-		// Decode the ID token to obtain user information
-		claims = decodeIdToken(tokens.idToken());
+		// Decode the ID token to obtain user information — arctic types this as a bare
+		// `object`; these are the Google OIDC claims we actually rely on below.
+		claims = decodeIdToken(tokens.idToken()) as typeof claims;
 
 		logger.debug('Successfully decoded ID token', {
 			component: 'auth',

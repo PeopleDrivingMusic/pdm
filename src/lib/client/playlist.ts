@@ -84,7 +84,7 @@ export class PlaylistClient {
 		playlistId: string,
 		limit = 50,
 		offset = 0
-	): Promise<any[] | null> {
+	): Promise<unknown[] | null> {
 		try {
 			const params = new URLSearchParams({
 				action: 'tracks',

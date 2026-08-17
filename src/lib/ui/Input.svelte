@@ -8,7 +8,7 @@
 		disabled?: boolean;
 		id?: string;
 		name?: string;
-		onInput?: (e: Event) => any;
+		onInput?: (e: Event) => void;
 		error?: boolean;
 		min?: number;
 		max?: number;

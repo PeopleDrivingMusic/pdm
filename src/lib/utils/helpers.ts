@@ -226,8 +226,11 @@ export async function extractTrackMetadata(file: File): Promise<TrackMetadata> {
 		}
 
 		return { duration, title, coverImageFile };
-	} catch (error: any) {
-		console.error('Failed to parse track metadata:', error?.message || error);
+	} catch (error) {
+		console.error(
+			'Failed to parse track metadata:',
+			error instanceof Error ? error.message : error
+		);
 		return {
 			duration: null,
 			title: file.name.replace(/\.[^/.]+$/, ''),

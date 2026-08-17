@@ -3,7 +3,13 @@
 	import { mdiAccountGroup, mdiCurrencyUsd, mdiTrendingUp, mdiCalendarMonth } from '@mdi/js';
 
 	interface Props {
-		referralData: any;
+		referralData: {
+			totalReferrals: number;
+			activeReferrals: number;
+			totalEarnings: number;
+			monthlyEarnings: number;
+			commissionRate: number;
+		};
 	}
 
 	const { referralData }: Props = $props();

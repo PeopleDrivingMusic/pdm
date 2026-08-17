@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { fade, scale } from 'svelte/transition';
 	import { mdiClose } from '@mdi/js';
 	import SvgIcon from '$lib/ui/SvgIcon.svelte';
@@ -10,8 +11,8 @@
 		outerclose?: boolean;
 		backdrop?: boolean;
 		title?: string;
-		header?: any;
-		children?: any;
+		header?: Snippet;
+		children?: Snippet;
 		onclose?: () => void;
 	}
 

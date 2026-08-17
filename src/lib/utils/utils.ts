@@ -7,7 +7,7 @@ export function slugify(value: string) {
 
 export async function getUniqueSlug(
 	base: string,
-	checker: (slug: string) => Promise<any>
+	checker: (slug: string) => Promise<unknown>
 ): Promise<string> {
 	let slug = base || 'artist';
 	let suffix = 1;

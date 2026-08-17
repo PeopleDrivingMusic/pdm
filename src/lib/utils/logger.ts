@@ -1,4 +1,5 @@
 import { dev } from '$app/environment';
+import type { Handle } from '@sveltejs/kit';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -10,7 +11,7 @@ export interface LogEntry {
 	userId?: string;
 	sessionId?: string;
 	requestId?: string;
-	metadata?: Record<string, any>;
+	metadata?: Record<string, unknown>;
 	stack?: string;
 }
 
@@ -180,9 +181,11 @@ class Logger {
 // Singleton instance
 export const logger = new Logger();
 
-// Middleware for automatic HTTP request logging
-export function createLoggingMiddleware() {
-	return async ({ event, resolve }: { event: any; resolve: any }) => {
+// Middleware for automatic HTTP request logging. Unused — hooks.server.ts's
+// inline loggingHandle does this job; kept typed rather than removed since it's
+// not wired to anything that would need updating either way.
+export function createLoggingMiddleware(): Handle {
+	return async ({ event, resolve }) => {
 		const start = Date.now();
 		const requestId = crypto.randomUUID();
 

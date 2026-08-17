@@ -7,6 +7,7 @@
 	import ContentTypeTabs, { type ContentTabId } from './ContentTypeTabs.svelte';
 	import CollectionCreateOverlay from './CollectionCreateOverlay.svelte';
 	import type { ContentStatus, ContentVisibility } from '$lib/db/content-visibility';
+	import type { PageData } from '../$types';
 
 	type CollectionStatus = ContentStatus;
 	type CollectionVisibility = ContentVisibility;
@@ -41,7 +42,7 @@
 	}
 
 	interface Props {
-		data: any;
+		data: PageData;
 		form?: { error?: string; success?: boolean } | null;
 	}
 
