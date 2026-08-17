@@ -37,3 +37,6 @@ coverage/
 
 # Claude Code (local config + AI-maintained wiki)
 .claude/
+
+# playwright-mcp session output (page snapshots), not project source
+.playwright-mcp/
