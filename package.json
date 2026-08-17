@@ -65,7 +65,7 @@
 		"vitest-browser-svelte": "^0.1.0"
 	},
 	"lint-staged": {
-		"*.{js,ts,svelte}": [
+		"*.{js,mjs,ts,svelte}": [
 			"eslint --fix",
 			"prettier --write"
 		],
