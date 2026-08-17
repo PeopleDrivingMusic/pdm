@@ -72,7 +72,8 @@ export const contentMedia = contentDbSchema.table(
 			foreignColumns: [artists.id],
 			name: 'content_media_artist_id_artists_id_fk'
 		}),
-		index('content_media_artist_id_type_idx').on(table.artistId, table.type)
+		index('content_media_artist_id_type_idx').on(table.artistId, table.type),
+		index('content_media_metadata_gin_idx').using('gin', table.metadata)
 	]
 );
 

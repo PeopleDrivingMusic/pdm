@@ -43,8 +43,8 @@ yarn test:e2e             # playwright e2e (e2e/ dir)
 
 yarn db:up                # start Postgres + pgAdmin via docker-compose
 yarn db:generate          # generate migration from schema changes
-yarn db:migrate           # apply migrations
-yarn db:push              # push schema directly (dev only)
+yarn db:migrate           # apply migrations — use this, not db:push (see below)
+yarn db:push              # AVOID against the shared dev DB — see below
 yarn db:studio            # drizzle studio
 yarn logging:up           # start Grafana/Loki/Promtail/Prometheus stack
 ```
@@ -116,3 +116,4 @@ Reusable primitives in `src/lib/ui/` (`Button`, `Input`, `Avatar`, `FileUpload`,
 - Keep secret-dependent code in `src/lib/server/` (or `.server.ts` files); it must never reach the client bundle.
 - Indentation is **tabs** (see `.prettierrc`); run `yarn format` before committing.
 - When changing DB shape: edit the domain schema file → update `schema.ts` aggregator + relations + type exports → `yarn db:generate` → review the SQL in `drizzle/migrations/` → `yarn db:migrate`.
+- **Don't use `db:push` against the shared dev DB.** `db:push` applies `schema.ts` directly and writes nothing to `drizzle.__drizzle_migrations`, so it silently reintroduces the exact drift issue #25 (`db:generate`/`db:migrate` desynced from the DB) fixed on 2026-08-17 — CI now has a `db-migrate` job that would catch the resulting drift, but only after you've already pushed. `db:push` is still fine against a throwaway/disposable DB for quick experiments; just never the tracked dev DB the team shares.
