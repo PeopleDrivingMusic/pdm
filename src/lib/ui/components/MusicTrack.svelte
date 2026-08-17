@@ -97,9 +97,8 @@
 		{#if artist?.slug}
 			<a
 				class="track-artist"
-				href={resolve('/artist/[slug]', { slug: artist.slug })}
-				onmouseenter={(e) => e.stopPropagation()}
-				>{artist.name}</a
+				href={resolve('/(app)/artist/[slug]', { slug: artist.slug })}
+				onmouseenter={(e) => e.stopPropagation()}>{artist.name}</a
 			>
 		{:else}
 			<span class="track-artist">{artist?.name}</span>

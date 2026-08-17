@@ -41,7 +41,7 @@
 		<Tabs type="underline" showTrack={true} tabs={views} activeTab={views[0]} />
 		<div class="artist-wrapper">
 			{#if artist?.slug}
-				<a class="track-artist" href={resolve('/artist/[slug]', { slug: artist.slug })}>
+				<a class="track-artist" href={resolve('/(app)/artist/[slug]', { slug: artist.slug })}>
 					{artist.name}
 				</a>
 			{:else}

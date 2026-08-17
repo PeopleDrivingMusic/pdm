@@ -93,7 +93,10 @@
 								<div class="track-info">
 									<h3 class="track-title">{track.title}</h3>
 									{#if artist?.slug}
-										<a class="track-artist" href={resolve('/artist/[slug]', { slug: artist.slug })}>
+										<a
+											class="track-artist"
+											href={resolve('/(app)/artist/[slug]', { slug: artist.slug })}
+										>
 											{artist.name}
 										</a>
 									{:else}
@@ -118,7 +121,7 @@
 					<div class="artist-info">
 						<div class="track-title">{track.title}</div>
 						{#if artist?.slug}
-							<a class="track-artist" href={resolve('/artist/[slug]', { slug: artist.slug })}>
+							<a class="track-artist" href={resolve('/(app)/artist/[slug]', { slug: artist.slug })}>
 								{artist.name}
 							</a>
 						{:else}

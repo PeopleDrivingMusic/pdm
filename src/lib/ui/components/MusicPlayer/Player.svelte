@@ -31,7 +31,6 @@
 			playerStore.currentTrackIndex += 1;
 		}
 	}
-
 </script>
 
 <div class="main-wrapper">
