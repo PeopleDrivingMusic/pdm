@@ -83,8 +83,18 @@ jobs:
       - run: yarn install --frozen-lockfile
       - run: yarn test:unit -- --run --project server
 
+  # Runs inside Microsoft's Playwright image instead of `npx playwright
+  # install --with-deps` on a bare ubuntu-latest runner: that install step's
+  # `apt-get` hit real, repeated multi-minute hangs on the runner's regional
+  # mirror (azure.archive.ubuntu.com) -- observed 2026-08-18. The image ships
+  # the browser + its OS deps pre-baked, so no apt-get here at all.
+  # Keep the tag's version in lockstep with playwright/@playwright/test's
+  # resolved version in yarn.lock (currently 1.56.1) -- a mismatch between
+  # the image's bundled browser and the installed test runner can break tests.
   test-client:
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
     steps:
       - uses: actions/checkout@v4
         with:
@@ -94,7 +104,6 @@ jobs:
           node-version: 22
           cache: yarn
       - run: yarn install --frozen-lockfile
-      - run: npx playwright install --with-deps chromium
       - run: yarn test:unit -- --run --project client
 
   # Static check on any newly-added migration SQL — no Postgres needed, so it
