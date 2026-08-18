@@ -51,10 +51,13 @@ implements it task-by-task; read both.
 **Create:**
 
 - `src/lib/db/services/ChatRepository.ts` — thin Drizzle repository over `messages.chat`.
-- `src/lib/server/chat/mask.ts` — pure masking function (real DTO → teaser).
-- `src/lib/server/chat/mask.spec.ts`
-- `src/lib/server/chat/events.ts` — `publishChatMessage` (wraps `sql.notify`).
-- `src/lib/server/chat/events.spec.ts`
+- `src/lib/db/services/ChatRepository.spec.ts`
+- `src/lib/server/chat/broadcast.ts` — the room's event shape: `publishChatMessage`
+  (wraps `sql.notify`) + `maskChatEvent` (pure masking function, real DTO → teaser).
+  One file, not two: neither is more than a few lines alone, they're symmetric halves
+  of the same `ChatMessagePublished` shape, and nothing else in the codebase imports
+  one without the other.
+- `src/lib/server/chat/broadcast.spec.ts`
 - `src/lib/server/chat/ChatService.ts` — application boundary (list/create/delete).
 - `src/lib/server/chat/ChatService.spec.ts`
 - `src/lib/server/chat/index.ts` — barrel export.
@@ -84,10 +87,10 @@ implements it task-by-task; read both.
   `compilerOptions.experimental.async`.
 - `src/lib/db/schemas/messages.ts` — add the `chat` table, drop the Slice-2 placeholder
   comment.
-- `src/lib/db/schema.ts` — export/import `chat`, add `chatRelations`, add
-  `Chat`/`NewChat` types, add `chat` to the aggregator object.
+- `src/lib/db/schema.ts` — export/import `chat`, add `chatRelations`, add the `Chat`
+  type, add `chat` to the aggregator object.
 - `src/lib/db/index.ts` — export the raw `client` (currently commented out) so
-  `events.ts`/`listener.ts` can call `.notify`/`.listen` directly.
+  `broadcast.ts`/`listener.ts` can call `.notify`/`.listen` directly.
 - `src/lib/messages/types.ts` — add `ChatAuthor`, `ChatDTO`, `ChatTeaser`, `ChatFrame`,
   `ChatErrorCode`.
 - `src/routes/(app)/+layout.server.ts` — add `subscribedArtistIds`.
@@ -110,8 +113,8 @@ implements it task-by-task; read both.
 
 **Interfaces:**
 
-- Produces: `chat` table (Drizzle table object), `Chat`/`NewChat` types — used by
-  Task 2's `ChatRepository`.
+- Produces: `chat` table (Drizzle table object), the `Chat` type — used by Task 2's
+  `ChatRepository`.
 
 - [ ] **Step 1: Enable remote functions in `svelte.config.js`**
 
@@ -141,38 +144,22 @@ export default config;
 
 - [ ] **Step 2: Add the `chat` table to `src/lib/db/schemas/messages.ts`**
 
-Replace the trailing placeholder comment (the file currently ends with a `NOTE:`
-comment describing `messages.chat` as future work) with the real table:
+`comments` already exists in this file and is unchanged — do not touch it. Two edits
+only: add the `artists` import, and replace the trailing placeholder `NOTE:` comment
+(the file currently ends with a comment describing `messages.chat` as future work)
+with the real table.
+
+Add to the existing import line:
 
 ```ts
 import { pgSchema, uuid, varchar, text, timestamp, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { artists } from './artist';
+```
 
-export const messagesDbSchema = pgSchema('messages');
+Replace the trailing `NOTE:` comment with:
 
-// Content comments — polymorphic over posts/tracks. Public read, free write.
-export const comments = messagesDbSchema.table(
-	'comments',
-	{
-		id: uuid('id').primaryKey().defaultRandom(),
-		targetType: varchar('target_type', { length: 16 }).notNull(),
-		targetId: uuid('target_id').notNull(),
-		authorId: uuid('author_id')
-			.notNull()
-			.references(() => users.id, { onDelete: 'cascade' }),
-		body: text('body').notNull(),
-		parentId: uuid('parent_id'),
-		createdAt: timestamp('created_at').defaultNow().notNull(),
-		editedAt: timestamp('edited_at'),
-		deletedAt: timestamp('deleted_at')
-	},
-	(t) => [
-		index('comments_target_idx').on(t.targetType, t.targetId, t.createdAt),
-		index('comments_author_idx').on(t.authorId)
-	]
-);
-
+```ts
 // Subscriber-only, artist-scoped fan chat. Flat — no target_type, no parent_id.
 export const chat = messagesDbSchema.table(
 	'chat',
@@ -232,8 +219,12 @@ Add type exports next to `Comment`/`NewComment` (around line 368):
 
 ```ts
 export type Chat = typeof chat.$inferSelect;
-export type NewChat = typeof chat.$inferInsert;
 ```
+
+(No `NewChat` — unlike `Comment`/`NewComment`, nothing in this plan inserts through an
+explicit insert-shaped type; `ChatRepository.create` (Task 2) passes an inline object
+straight to `.values()` and Drizzle infers it. Add `NewChat` later if something
+actually needs it.)
 
 - [ ] **Step 4: Type-check**
 
@@ -267,16 +258,130 @@ git commit -m "feat(chat): add messages.chat table + enable remote functions"
 **Files:**
 
 - Create: `src/lib/db/services/ChatRepository.ts`
+- Create: `src/lib/db/services/ChatRepository.spec.ts`
 
 **Interfaces:**
 
 - Consumes: `chat`, `users`, `Chat` from `../schema` (Task 1); `db`, `withDbLogging`
   from `../index`.
-- Produces: `ChatRepository.create(input)`, `.getById(id)`, `.listForArtist(input)`,
+- Produces: `ChatRepository.create(input)`, `.getById(id)`, `.getMessages(input)`,
   `.softDelete(id)` — consumed by `ChatService` (Task 5). `ChatMessageWithAuthor`
   interface — consumed by `ChatService`'s `toDTO`.
 
-- [ ] **Step 1: Write `ChatRepository`**
+- [ ] **Step 1: Write the failing tests**
+
+`CommentRepository` has no dedicated spec in this codebase (its behavior is pinned by
+`e2e/comments.spec.ts` instead), but `LikeRepository.spec.ts` shows the mocked-chain
+pattern this repo uses when a repository's query shape is worth pinning directly —
+in particular, catching a `.values()` call keyed by the wrong property name, which is
+exactly the bug class its own comment describes. `ChatRepository` gets that same
+direct coverage rather than deferring everything to Task 14's e2e.
+
+```ts
+// src/lib/db/services/ChatRepository.spec.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+/** Same thenable chain stand-in as `LikeRepository.spec.ts`, extended with the
+ *  extra chain methods `ChatRepository` calls (`innerJoin`, `orderBy`, `limit`, `set`). */
+function makeChain(result: unknown, onCall?: (method: string, args: unknown[]) => void) {
+	const chain: Record<string, unknown> = {
+		then: (resolve: (value: unknown) => void) => resolve(result)
+	};
+	for (const method of [
+		'where',
+		'from',
+		'innerJoin',
+		'orderBy',
+		'limit',
+		'set',
+		'returning',
+		'values'
+	]) {
+		chain[method] = (...args: unknown[]) => {
+			onCall?.(method, args);
+			return chain;
+		};
+	}
+	return chain;
+}
+
+const dbMock = vi.hoisted(() => ({
+	insert: vi.fn(),
+	select: vi.fn(),
+	update: vi.fn()
+}));
+
+vi.mock('../index', () => ({
+	db: dbMock,
+	withDbLogging: (_name: string, fn: () => unknown) => fn()
+}));
+
+import { ChatRepository } from './ChatRepository';
+
+beforeEach(() => vi.clearAllMocks());
+
+describe('ChatRepository.create', () => {
+	it('inserts a chat message keyed by the TS property name, not the db column name', async () => {
+		let valuesCall: unknown;
+		dbMock.insert.mockReturnValue(
+			makeChain([{ id: 'm1' }], (method, args) => {
+				if (method === 'values') valuesCall = args[0];
+			})
+		);
+
+		await ChatRepository.create({ artistId: 'a1', authorId: 'u1', body: 'hi' });
+
+		expect(valuesCall).toEqual({ artistId: 'a1', authorId: 'u1', body: 'hi' });
+	});
+});
+
+describe('ChatRepository.getMessages', () => {
+	it('returns the rows resolved by the select chain', async () => {
+		dbMock.select.mockReturnValue(makeChain([{ id: 'm1', body: 'hey' }]));
+
+		const rows = await ChatRepository.getMessages({ artistId: 'a1' });
+
+		expect(rows).toEqual([{ id: 'm1', body: 'hey' }]);
+	});
+
+	it('clamps limit into the [1, 100] range', async () => {
+		let limitArg: unknown;
+		dbMock.select.mockReturnValue(
+			makeChain([], (method, args) => {
+				if (method === 'limit') limitArg = args[0];
+			})
+		);
+
+		await ChatRepository.getMessages({ artistId: 'a1', limit: 500 });
+		expect(limitArg).toBe(100);
+
+		await ChatRepository.getMessages({ artistId: 'a1', limit: -5 });
+		expect(limitArg).toBe(1);
+	});
+});
+
+describe('ChatRepository.softDelete', () => {
+	it('sets deletedAt via the update chain', async () => {
+		let setArg: unknown;
+		dbMock.update.mockReturnValue(
+			makeChain(undefined, (method, args) => {
+				if (method === 'set') setArg = args[0];
+			})
+		);
+
+		await ChatRepository.softDelete('m1');
+
+		expect((setArg as { deletedAt: unknown })?.deletedAt).toBeInstanceOf(Date);
+	});
+});
+```
+
+- [ ] **Step 2: Run tests, verify they fail**
+
+Run: `yarn test:unit -- --run src/lib/db/services/ChatRepository.spec.ts`
+Expected: FAIL — `./ChatRepository` does not exist yet.
+
+- [ ] **Step 3: Implement `ChatRepository`**
 
 ```ts
 import { and, desc, eq, isNull, lt } from 'drizzle-orm';
@@ -294,9 +399,9 @@ export interface ChatMessageWithAuthor {
 }
 
 /**
- * Thin Drizzle repository over `messages.chat`. Behavior (keyset ordering,
- * soft-delete filtering) is pinned by e2e against a real DB, same as
- * `CommentRepository` — the boundary (`ChatService`) is unit-tested with this mocked.
+ * Thin Drizzle repository over `messages.chat`. Query-shape correctness (insert
+ * keys, limit clamping, soft-delete) is pinned directly by the mocked-chain spec;
+ * the real keyset ordering against Postgres is additionally pinned by Task 14's e2e.
  */
 export class ChatRepository {
 	static async create(input: { artistId: string; authorId: string; body: string }): Promise<Chat> {
@@ -316,12 +421,12 @@ export class ChatRepository {
 		});
 	}
 
-	static async listForArtist(input: {
+	static async getMessages(input: {
 		artistId: string;
 		limit?: number;
 		before?: Date;
 	}): Promise<ChatMessageWithAuthor[]> {
-		return withDbLogging('ChatRepository.listForArtist', async () => {
+		return withDbLogging('ChatRepository.getMessages', async () => {
 			const conditions = [eq(chat.artistId, input.artistId), isNull(chat.deletedAt)];
 			if (input.before) conditions.push(lt(chat.createdAt, input.before));
 
@@ -351,15 +456,20 @@ export class ChatRepository {
 }
 ```
 
-- [ ] **Step 2: Type-check**
+- [ ] **Step 4: Run tests, verify they pass**
+
+Run: `yarn test:unit -- --run src/lib/db/services/ChatRepository.spec.ts`
+Expected: PASS (all 4 cases)
+
+- [ ] **Step 5: Type-check**
 
 Run: `yarn check`
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/db/services/ChatRepository.ts
+git add src/lib/db/services/ChatRepository.ts src/lib/db/services/ChatRepository.spec.ts
 git commit -m "feat(chat): add ChatRepository"
 ```
 
@@ -376,7 +486,7 @@ git commit -m "feat(chat): add ChatRepository"
 **Interfaces:**
 
 - Produces: `ChatAuthor`, `ChatDTO`, `ChatTeaser`, `ChatFrame`, `ChatErrorCode` —
-  consumed by every later task (`mask.ts`, `ChatService`, `chat.remote.ts`,
+  consumed by every later task (`broadcast.ts`, `ChatService`, `chat.remote.ts`,
   `ChatWidget.svelte`, `client/chat.ts`).
 
 - [ ] **Step 1: Append to `src/lib/messages/types.ts`**
@@ -436,23 +546,23 @@ git add src/lib/messages/types.ts
 git commit -m "feat(chat): add chat DTO and frame types"
 ```
 
-### Task 4: `events.ts` (publish) + `mask.ts` (mask)
+### Task 4: `broadcast.ts` (publish + mask)
 
 **Files:**
 
 - Modify: `src/lib/db/index.ts`
-- Create: `src/lib/server/chat/events.ts`
-- Create: `src/lib/server/chat/events.spec.ts`
-- Create: `src/lib/server/chat/mask.ts`
-- Create: `src/lib/server/chat/mask.spec.ts`
+- Create: `src/lib/server/chat/broadcast.ts`
+- Create: `src/lib/server/chat/broadcast.spec.ts`
 
 **Interfaces:**
 
 - Consumes: `client` from `$lib/db` (uncommented export); `ChatDTO`, `ChatFrame` from
   `$lib/messages/types`.
 - Produces: `publishChatMessage(artistId, message)`, `ChatMessagePublished` type —
-  consumed by `ChatService.create` (Task 5) and `listener.ts` (Task 8).
+  consumed by `ChatService.create` (Task 5) and `listener.ts` (Task 9).
   `maskChatEvent(event, viewerIsSubscriber)` — consumed by `chat.remote.ts` (Task 10).
+  Both live in one file, not two: they're symmetric halves of the same room-event
+  shape (write it safely / read it safely) and neither is more than a few lines alone.
 
 - [ ] **Step 1: Export the raw client from `src/lib/db/index.ts`**
 
@@ -472,10 +582,10 @@ to:
 export { client };
 ```
 
-- [ ] **Step 2: Write the failing test for `events.ts`**
+- [ ] **Step 2: Write the failing tests**
 
 ```ts
-// src/lib/server/chat/events.spec.ts
+// src/lib/server/chat/broadcast.spec.ts
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('$lib/db', () => ({
@@ -483,7 +593,8 @@ vi.mock('$lib/db', () => ({
 }));
 
 import { client } from '$lib/db';
-import { publishChatMessage } from './events';
+import { publishChatMessage, maskChatEvent } from './broadcast';
+import type { ChatMessagePublished } from './broadcast';
 
 describe('publishChatMessage', () => {
 	it('notifies the artist-scoped channel with a JSON-encoded message event', () => {
@@ -504,60 +615,20 @@ describe('publishChatMessage', () => {
 		);
 	});
 });
-```
-
-- [ ] **Step 3: Run test, verify it fails**
-
-Run: `yarn test:unit -- --run src/lib/server/chat/events.spec.ts`
-Expected: FAIL — `./events` has no exported member `publishChatMessage`.
-
-- [ ] **Step 4: Implement `events.ts`**
-
-```ts
-// src/lib/server/chat/events.ts
-import { client } from '$lib/db';
-import type { ChatDTO } from '$lib/messages/types';
-
-export interface ChatMessagePublished {
-	kind: 'message';
-	message: ChatDTO;
-}
-
-/** Publish a newly created chat message to every live listener of the room. Fire
- *  and forget from the caller's perspective — NOTIFY delivery is best-effort by
- *  design; the message itself is already durably committed by the time this runs. */
-export function publishChatMessage(artistId: string, message: ChatDTO): void {
-	const event: ChatMessagePublished = { kind: 'message', message };
-	void client.notify(`chat_room_${artistId}`, JSON.stringify(event));
-}
-```
-
-- [ ] **Step 5: Run test, verify it passes**
-
-Run: `yarn test:unit -- --run src/lib/server/chat/events.spec.ts`
-Expected: PASS
-
-- [ ] **Step 6: Write the failing tests for `mask.ts`**
-
-```ts
-// src/lib/server/chat/mask.spec.ts
-import { describe, it, expect } from 'vitest';
-import { maskChatEvent } from './mask';
-import type { ChatMessagePublished } from './events';
-
-const event: ChatMessagePublished = {
-	kind: 'message',
-	message: {
-		id: 'm1',
-		body: 'real body text',
-		createdAt: '2026-08-18T00:00:00.000Z',
-		author: { id: 'u1', name: 'Real Fan', avatar: 'https://example.test/a.png' },
-		isArtist: false,
-		canDelete: true
-	}
-};
 
 describe('maskChatEvent', () => {
+	const event: ChatMessagePublished = {
+		kind: 'message',
+		message: {
+			id: 'm1',
+			body: 'real body text',
+			createdAt: '2026-08-18T00:00:00.000Z',
+			author: { id: 'u1', name: 'Real Fan', avatar: 'https://example.test/a.png' },
+			isArtist: false,
+			canDelete: true
+		}
+	};
+
 	it('passes the real message through for a subscriber', () => {
 		const frame = maskChatEvent(event, true);
 		expect(frame).toEqual({ type: 'message', message: event.message });
@@ -579,17 +650,30 @@ describe('maskChatEvent', () => {
 });
 ```
 
-- [ ] **Step 7: Run tests, verify they fail**
+- [ ] **Step 3: Run tests, verify they fail**
 
-Run: `yarn test:unit -- --run src/lib/server/chat/mask.spec.ts`
-Expected: FAIL — `./mask` has no exported member `maskChatEvent`.
+Run: `yarn test:unit -- --run src/lib/server/chat/broadcast.spec.ts`
+Expected: FAIL — `./broadcast` does not exist yet.
 
-- [ ] **Step 8: Implement `mask.ts`**
+- [ ] **Step 4: Implement `broadcast.ts`**
 
 ```ts
-// src/lib/server/chat/mask.ts
-import type { ChatFrame } from '$lib/messages/types';
-import type { ChatMessagePublished } from './events';
+// src/lib/server/chat/broadcast.ts
+import { client } from '$lib/db';
+import type { ChatDTO, ChatFrame } from '$lib/messages/types';
+
+export interface ChatMessagePublished {
+	kind: 'message';
+	message: ChatDTO;
+}
+
+/** Publish a newly created chat message to every live listener of the room. Fire
+ *  and forget from the caller's perspective — NOTIFY delivery is best-effort by
+ *  design; the message itself is already durably committed by the time this runs. */
+export function publishChatMessage(artistId: string, message: ChatDTO): void {
+	const event: ChatMessagePublished = { kind: 'message', message };
+	void client.notify(`chat_room_${artistId}`, JSON.stringify(event));
+}
 
 /**
  * The access boundary for realtime chat content. A non-subscriber must never
@@ -607,15 +691,15 @@ export function maskChatEvent(event: ChatMessagePublished, viewerIsSubscriber: b
 }
 ```
 
-- [ ] **Step 9: Run tests, verify they pass**
+- [ ] **Step 5: Run tests, verify they pass**
 
-Run: `yarn test:unit -- --run src/lib/server/chat/mask.spec.ts src/lib/server/chat/events.spec.ts`
-Expected: PASS (both files)
+Run: `yarn test:unit -- --run src/lib/server/chat/broadcast.spec.ts`
+Expected: PASS (all cases)
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/db/index.ts src/lib/server/chat/events.ts src/lib/server/chat/events.spec.ts src/lib/server/chat/mask.ts src/lib/server/chat/mask.spec.ts
+git add src/lib/db/index.ts src/lib/server/chat/broadcast.ts src/lib/server/chat/broadcast.spec.ts
 git commit -m "feat(chat): add NOTIFY publisher and server-side masking"
 ```
 
@@ -631,8 +715,9 @@ git commit -m "feat(chat): add NOTIFY publisher and server-side masking"
 
 - Consumes: `ChatRepository` (Task 2), `containsUrl`/`resolveTargetOwnerUserId`/
   `MAX_MESSAGE_LENGTH` from `$lib/server/messages/policy`, `EntitlementService` from
-  `$lib/server/entitlement`, `publishChatMessage` (Task 4), `ChatDTO` (Task 3).
-- Produces: `ChatService.listForArtist(input)`, `.create(input)`, `.delete(input)` —
+  `$lib/server/entitlement`, `publishChatMessage` from `./broadcast` (Task 4), `ChatDTO`
+  (Task 3).
+- Produces: `ChatService.getMessages(input)`, `.create(input)`, `.delete(input)` —
   consumed by the REST endpoints (Task 6) and the `resolveIsArtistOwner` logic reused
   conceptually in `chat.remote.ts` (Task 10, via the same `resolveTargetOwnerUserId`
   helper, not via `ChatService` directly).
@@ -647,7 +732,7 @@ vi.mock('$lib/db/services/ChatRepository', () => ({
 	ChatRepository: {
 		create: vi.fn(),
 		getById: vi.fn(),
-		listForArtist: vi.fn(),
+		getMessages: vi.fn(),
 		softDelete: vi.fn()
 	}
 }));
@@ -658,14 +743,14 @@ vi.mock('$lib/server/messages/policy', async (importOriginal) => ({
 vi.mock('$lib/server/entitlement', () => ({
 	EntitlementService: { isSubscriberOf: vi.fn() }
 }));
-vi.mock('./events', () => ({
+vi.mock('./broadcast', () => ({
 	publishChatMessage: vi.fn()
 }));
 
 import { ChatRepository } from '$lib/db/services/ChatRepository';
 import { resolveTargetOwnerUserId } from '$lib/server/messages/policy';
 import { EntitlementService } from '$lib/server/entitlement';
-import { publishChatMessage } from './events';
+import { publishChatMessage } from './broadcast';
 import { ChatService } from './ChatService';
 
 beforeEach(() => {
@@ -673,19 +758,19 @@ beforeEach(() => {
 	(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
 });
 
-describe('ChatService.listForArtist', () => {
+describe('ChatService.getMessages', () => {
 	it('refuses a non-subscriber without querying the repository', async () => {
 		(EntitlementService.isSubscriberOf as any).mockResolvedValue(false);
 
-		const result = await ChatService.listForArtist({ artistId: 'a1', viewerUserId: 'u2' });
+		const result = await ChatService.getMessages({ artistId: 'a1', viewerUserId: 'u2' });
 
 		expect(result).toEqual({ ok: false, reason: 'not_subscribed' });
-		expect(ChatRepository.listForArtist).not.toHaveBeenCalled();
+		expect(ChatRepository.getMessages).not.toHaveBeenCalled();
 	});
 
 	it('returns DTOs for a subscriber, flagging the artist-authored row', async () => {
 		(EntitlementService.isSubscriberOf as any).mockResolvedValue(true);
-		(ChatRepository.listForArtist as any).mockResolvedValue([
+		(ChatRepository.getMessages as any).mockResolvedValue([
 			{
 				id: 'm1',
 				body: 'hey fans',
@@ -697,7 +782,7 @@ describe('ChatService.listForArtist', () => {
 			}
 		]);
 
-		const result = await ChatService.listForArtist({ artistId: 'a1', viewerUserId: 'u2' });
+		const result = await ChatService.getMessages({ artistId: 'a1', viewerUserId: 'u2' });
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
@@ -849,7 +934,7 @@ import {
 	MAX_MESSAGE_LENGTH
 } from '$lib/server/messages/policy';
 import { EntitlementService } from '$lib/server/entitlement';
-import { publishChatMessage } from './events';
+import { publishChatMessage } from './broadcast';
 import type { ChatDTO } from '$lib/messages/types';
 
 export type { ChatDTO };
@@ -899,7 +984,7 @@ function toDTO(
  * Returns only DTOs — no Drizzle rows leak across this seam.
  */
 export class ChatService {
-	static async listForArtist(input: {
+	static async getMessages(input: {
 		artistId: string;
 		viewerUserId: string | null;
 		before?: Date;
@@ -911,7 +996,7 @@ export class ChatService {
 		if (!isSubscriber) return { ok: false, reason: 'not_subscribed' };
 
 		const [rows, ownerUserId] = await Promise.all([
-			ChatRepository.listForArtist({ artistId: input.artistId, before: input.before }),
+			ChatRepository.getMessages({ artistId: input.artistId, before: input.before }),
 			resolveTargetOwnerUserId('artist', input.artistId)
 		]);
 
@@ -1023,7 +1108,7 @@ git commit -m "feat(chat): add ChatService application boundary"
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('$lib/server/chat', () => ({
-	ChatService: { listForArtist: vi.fn(), create: vi.fn() }
+	ChatService: { getMessages: vi.fn(), create: vi.fn() }
 }));
 vi.mock('$lib/server/security/guards', async (importOriginal) => ({
 	...(await importOriginal<typeof import('$lib/server/security/guards')>())
@@ -1049,13 +1134,13 @@ describe('GET /api/chat', () => {
 	});
 
 	it('403s when the service refuses a non-subscriber', async () => {
-		(ChatService.listForArtist as any).mockResolvedValue({ ok: false, reason: 'not_subscribed' });
+		(ChatService.getMessages as any).mockResolvedValue({ ok: false, reason: 'not_subscribed' });
 		const response = await GET(makeGetEvent({ artistId: ARTIST_ID }));
 		expect(response.status).toBe(403);
 	});
 
 	it('200s with messages for a subscriber', async () => {
-		(ChatService.listForArtist as any).mockResolvedValue({ ok: true, messages: [{ id: 'm1' }] });
+		(ChatService.getMessages as any).mockResolvedValue({ ok: true, messages: [{ id: 'm1' }] });
 		const response = await GET(makeGetEvent({ artistId: ARTIST_ID }, 'u1'));
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ messages: [{ id: 'm1' }] });
@@ -1119,7 +1204,7 @@ export const GET: RequestHandler = async (event) => {
 	const artistId = event.url.searchParams.get('artistId');
 	if (!isUuid(artistId)) return json({ error: 'invalid_request' }, { status: 400 });
 
-	const result = await ChatService.listForArtist({
+	const result = await ChatService.getMessages({
 		artistId,
 		viewerUserId: event.locals.user?.id ?? null
 	});
@@ -1610,7 +1695,7 @@ git commit -m "feat(chat): add push-based async queue for merging event sources"
 
 **Interfaces:**
 
-- Consumes: `client` from `$lib/db` (Task 4), `ChatMessagePublished` from `./events`.
+- Consumes: `client` from `$lib/db` (Task 4), `ChatMessagePublished` from `./broadcast`.
 - Produces: `subscribeToChatRoom(artistId, onMessage): Promise<() => Promise<void>>`
   — consumed by `chat.remote.ts` (Task 10).
 
@@ -1708,7 +1793,7 @@ Expected: FAIL — `./listener` does not exist yet.
 ```ts
 // src/lib/server/chat/listener.ts
 import { client } from '$lib/db';
-import type { ChatMessagePublished } from './events';
+import type { ChatMessagePublished } from './broadcast';
 
 interface RoomListener {
 	unlisten: () => Promise<void>;
@@ -1779,8 +1864,9 @@ git commit -m "feat(chat): add ref-counted Postgres LISTEN subscription manager"
 **Interfaces:**
 
 - Consumes: `EntitlementService.isSubscriberOf`, `resolveTargetOwnerUserId('artist', …)`,
-  `presence` (Task 7), `subscribeToChatRoom` (Task 9), `maskChatEvent` (Task 4),
-  `createAsyncQueue` (Task 8), `isUuid`.
+  `presence` (Task 7), `subscribeToChatRoom` (Task 9), `maskChatEvent`/
+  `ChatMessagePublished` from `./broadcast` (Task 4), `createAsyncQueue` (Task 8),
+  `isUuid`.
 - Produces: `getChatRoom(artistId): RemoteLiveQuery<ChatFrame>` — consumed by
   `ChatWidget.svelte` and `chat.svelte.ts` store (Task 12/13).
 
@@ -1843,11 +1929,11 @@ import { EntitlementService } from '$lib/server/entitlement';
 import { resolveTargetOwnerUserId } from '$lib/server/messages/policy';
 import { subscribeToChatRoom } from '$lib/server/chat/listener';
 import { presence } from '$lib/server/chat/presence';
-import { maskChatEvent } from '$lib/server/chat/mask';
+import { maskChatEvent } from '$lib/server/chat/broadcast';
 import { createAsyncQueue } from '$lib/server/chat/asyncQueue';
 import { isUuid } from '$lib/server/security/uuid';
 import type { ChatFrame } from '$lib/messages/types';
-import type { ChatMessagePublished } from '$lib/server/chat/events';
+import type { ChatMessagePublished } from '$lib/server/chat/broadcast';
 
 /**
  * Streams one artist chat room to whoever is connected. Subscribers get real
@@ -2613,7 +2699,7 @@ git commit -m "test(chat): add e2e coverage for the realtime teaser masking"
 ## Self-Review Notes
 
 - **Spec coverage:** Locked decisions 1 (transport) → Tasks 4/9/10; 2 (masking) →
-  Task 4 (`mask.ts`); 3 (teaser widget) → Tasks 11/12; 4 (presence lifecycle) →
+  Task 4 (`broadcast.ts`); 3 (teaser widget) → Tasks 11/12; 4 (presence lifecycle) →
   Tasks 7/13; 5 (data/moderation reuse) → Tasks 1/2/5; 6 (history via keyset) →
   Task 2/6; 7 (design step precedes UI) → Task 11 before Task 12. Out-of-scope items
   (rate limiting, Redis, background notifications, threading/likes) are not
@@ -2623,10 +2709,20 @@ git commit -m "test(chat): add e2e coverage for the realtime teaser masking"
   Slice 1"; this plan does exactly that (Task 1, Step 1) rather than deferring it to
   the live-query slice, since Slice 1's migration work and everything after it can
   then assume remote functions are available.
+- **File consolidation:** `events.ts` and `mask.ts` were merged into one
+  `broadcast.ts` (Task 4) — both were only a few lines, always used together, and
+  are the two ends of the same `ChatMessagePublished` shape. `presence.ts`,
+  `asyncQueue.ts`, and `listener.ts` stayed separate: each holds real internal state
+  (a `Map`/`EventEmitter`, a push-queue, a ref-counted subscription registry) and has
+  its own independent test suite, so merging them would trade cohesion for a smaller
+  file count without an actual benefit.
 - **Type consistency check:** `ChatDTO`/`ChatFrame`/`ChatErrorCode` (Task 3) are the
-  single definitions reused verbatim by `mask.ts` (Task 4), `ChatService` (Task 5),
-  `chat.remote.ts` (Task 10), `client/chat.ts` and `ChatWidget.svelte` (Task 12) —
-  no shadow/duplicate type names introduced. `ChatMessagePublished` (Task 4) is
-  reused identically by `listener.ts` (Task 9) and `chat.remote.ts` (Task 10).
-  `presence.join`/`presence.snapshot` signatures (Task 7) match their call sites in
-  `chat.remote.ts` (Task 10) exactly.
+  single definitions reused verbatim by `broadcast.ts` (Task 4), `ChatService`
+  (Task 5), `chat.remote.ts` (Task 10), `client/chat.ts` and `ChatWidget.svelte`
+  (Task 12) — no shadow/duplicate type names introduced. `ChatMessagePublished`
+  (Task 4) is reused identically by `listener.ts` (Task 9) and `chat.remote.ts`
+  (Task 10). `presence.join`/`presence.snapshot` signatures (Task 7) match their call
+  sites in `chat.remote.ts` (Task 10) exactly. `ChatRepository.getMessages` (Task 2)
+  and `ChatService.getMessages` (Task 5) share the same name across layers, matching
+  the existing `CommentRepository.listForTarget`/`CommentService.listForTarget`
+  precedent — renamed from the original `listForArtist` per review feedback.
