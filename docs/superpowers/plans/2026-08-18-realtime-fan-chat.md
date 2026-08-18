@@ -63,7 +63,12 @@ implements it task-by-task; read both.
 - `src/lib/server/chat/index.ts` — barrel export.
 - `src/lib/server/chat/presence.ts` — in-memory presence registry.
 - `src/lib/server/chat/presence.spec.ts`
-- `src/lib/server/chat/asyncQueue.ts` — push-based async queue utility.
+- `src/lib/server/chat/asyncQueue.ts` — push-based async queue utility. In-process
+  placeholder, same shape as this repo's existing `EventPublisher`/`LogEventPublisher`
+  pattern (studio-music-upload-refactor spec) — a real broker (RabbitMQ, per that
+  same precedent, though `comments-and-chat-scale-strategy.md` names NATS/Kafka for
+  this specific fanout case — worth reconciling before that swap, not now) is the
+  named future replacement once this needs to fan out across more than one instance.
 - `src/lib/server/chat/asyncQueue.spec.ts`
 - `src/lib/server/chat/listener.ts` — ref-counted `LISTEN` subscription manager.
 - `src/lib/server/chat/listener.spec.ts`
@@ -915,6 +920,29 @@ describe('ChatService.delete', () => {
 
 		expect(result).toEqual({ ok: false, reason: 'not_found' });
 	});
+
+	it('returns not_found when the message does not exist at all', async () => {
+		(ChatRepository.getById as any).mockResolvedValue(undefined);
+
+		const result = await ChatService.delete({ messageId: 'missing', userId: 'u2', artistId: 'a1' });
+
+		expect(result).toEqual({ ok: false, reason: 'not_found' });
+		expect(ChatRepository.softDelete).not.toHaveBeenCalled();
+	});
+
+	it('returns not_found for a message that was already deleted', async () => {
+		(ChatRepository.getById as any).mockResolvedValue({
+			id: 'm1',
+			artistId: 'a1',
+			authorId: 'u2',
+			deletedAt: new Date('2026-08-17T00:00:00Z')
+		});
+
+		const result = await ChatService.delete({ messageId: 'm1', userId: 'u2', artistId: 'a1' });
+
+		expect(result).toEqual({ ok: false, reason: 'not_found' });
+		expect(ChatRepository.softDelete).not.toHaveBeenCalled();
+	});
 });
 ```
 
@@ -944,8 +972,10 @@ type WriteRejection = 'empty' | 'too_long' | 'links_not_allowed';
 type ListResult = { ok: true; messages: ChatDTO[] } | { ok: false; reason: 'not_subscribed' };
 type CreateResult =
 	| { ok: true; message: ChatDTO }
-	| { ok: false; reason: WriteRejection | 'not_subscribed' };
-type DeleteResult = { ok: true } | { ok: false; reason: 'not_found' | 'forbidden' };
+	| { ok: false; reason: WriteRejection | 'not_subscribed' | 'unauthorized' };
+type DeleteResult =
+	| { ok: true }
+	| { ok: false; reason: 'not_found' | 'forbidden' | 'unauthorized' };
 
 function displayName(name: string | null, username: string | null): string {
 	return name ?? username ?? 'Listener';
@@ -1005,12 +1035,14 @@ export class ChatService {
 
 	static async create(input: {
 		artistId: string;
-		authorId: string;
+		authorId: string | null;
 		authorName: string | null;
 		authorUsername: string | null;
 		authorAvatar: string | null;
 		body: string;
 	}): Promise<CreateResult> {
+		if (!input.authorId) return { ok: false, reason: 'unauthorized' };
+
 		const isSubscriber = await EntitlementService.isSubscriberOf(input.authorId, input.artistId);
 		if (!isSubscriber) return { ok: false, reason: 'not_subscribed' };
 
@@ -1041,9 +1073,11 @@ export class ChatService {
 
 	static async delete(input: {
 		messageId: string;
-		userId: string;
+		userId: string | null;
 		artistId: string;
 	}): Promise<DeleteResult> {
+		if (!input.userId) return { ok: false, reason: 'unauthorized' };
+
 		const row = await ChatRepository.getById(input.messageId);
 		if (!row || row.deletedAt || row.artistId !== input.artistId) {
 			return { ok: false, reason: 'not_found' };
@@ -1352,6 +1386,98 @@ git add src/routes/api/chat/
 git commit -m "feat(chat): add REST endpoints for chat history/create/delete"
 ```
 
+### Task 6b: 100% coverage gate for the chat server seam
+
+**Files:**
+
+- Modify: `vitest.config.ts`
+
+**Interfaces:**
+
+- Consumes: nothing new — wires the existing v8 coverage config over the files
+  Tasks 2, 4, 5, and 6 already created.
+
+Everything server-side added so far in this plan (`ChatRepository`, `broadcast.ts`,
+`ChatService`, the REST endpoints) is pure, mockable logic with no untestable
+branches — a stricter bar than this repo's existing 90% gate is achievable here.
+`chat.remote.ts` (Task 10) is deliberately **excluded**: its generator body can't be
+invoked directly in a unit test (it needs a live SvelteKit request context — Task
+10's own integration test only exercises the raw LISTEN/NOTIFY mechanics it depends
+on, not the generator itself), so gating it at 100% would either fail CI or force a
+fake test written only to hit a number. Client-side files (`ChatWidget.svelte`,
+`client/chat.ts`) stay outside this gate too, matching the existing convention: the
+`include` list below only ever covered the server seam.
+
+- [ ] **Step 1: Add the chat paths + a per-glob 100% threshold**
+
+In `vitest.config.ts`, extend `coverage.include` and turn the flat `thresholds`
+object into one with a glob-specific override (Vitest supports per-glob-pattern
+thresholds that don't inherit the top-level numbers, so `perFile: true` has to be
+repeated on the override — see the Vitest coverage docs):
+
+```ts
+coverage: {
+	provider: 'v8',
+	include: [
+		'src/lib/server/music/**',
+		'src/lib/server/events/**',
+		'src/lib/server/media/validation.ts',
+		'src/lib/server/media/uploadTargetHandler.ts',
+		'src/lib/server/media/logging.ts',
+		'src/lib/server/security/**',
+		'src/lib/server/chat/**',
+		'src/lib/db/services/ChatRepository.ts',
+		'src/routes/api/chat/**'
+	],
+	// Barrel re-exports and type-only modules carry no testable logic.
+	exclude: ['**/index.ts', '**/types.ts'],
+	thresholds: {
+		lines: 90,
+		branches: 90,
+		functions: 90,
+		statements: 90,
+
+		'src/lib/server/chat/**': {
+			lines: 100,
+			branches: 100,
+			functions: 100,
+			statements: 100,
+			perFile: true
+		},
+		'src/lib/db/services/ChatRepository.ts': {
+			lines: 100,
+			branches: 100,
+			functions: 100,
+			statements: 100,
+			perFile: true
+		},
+		'src/routes/api/chat/**': {
+			lines: 100,
+			branches: 100,
+			functions: 100,
+			statements: 100,
+			perFile: true
+		}
+	}
+}
+```
+
+- [ ] **Step 2: Run coverage and verify the chat seam is fully hit**
+
+Run: `yarn vitest run --project server --coverage`
+Expected: PASS, with `src/lib/server/chat/**`, `ChatRepository.ts`, and
+`src/routes/api/chat/**` each reporting 100% lines/branches/functions/statements. If
+any branch is missed, it means a real code path (e.g. `ChatService.delete`'s
+`unauthorized`/`not_found`/already-deleted branches) has no test yet — add the test,
+don't relax the threshold.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add vitest.config.ts
+git commit -m "test(chat): gate the chat server seam at 100% coverage"
+```
+
 ---
 
 ## PR Slice 3 — Presence registry
@@ -1560,6 +1686,13 @@ git commit -m "feat(chat): add in-memory presence registry"
 - Produces: `createAsyncQueue<T>(): { push, close, iterate }` — consumed by
   `chat.remote.ts` (Task 10) to merge Postgres `LISTEN` events and presence events
   into one `for await` loop.
+
+**Future migration note:** this is the in-process stand-in for a real message
+broker, same posture as the existing `EventPublisher`/`LogEventPublisher` pattern in
+this codebase — ship the interface now, swap the implementation when it needs to
+survive across more than one process/instance. Do not build that swap now; just keep
+`createAsyncQueue`'s call sites (`chat.remote.ts`, Task 10) behind this small
+function so the eventual replacement is an implementation swap, not a rewrite.
 
 - [ ] **Step 1: Write the failing tests**
 

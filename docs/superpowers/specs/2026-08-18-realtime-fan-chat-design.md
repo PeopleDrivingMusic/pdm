@@ -75,7 +75,10 @@ named future trigger, not built here.
 ### Out of scope (explicitly)
 
 - Rate limiting / spam control beyond the existing link rule.
-- Multi-instance presence or message fan-out (Redis pub/sub) — named trigger, not built.
+- Multi-instance presence or message fan-out — named trigger, not built. Prior art in
+  `comments-and-chat-scale-strategy.md` names Redis pub/sub → NATS/Kafka; this repo's
+  existing `EventPublisher`/`LogEventPublisher` pattern points at RabbitMQ instead —
+  reconcile which broker at the time this trigger actually fires, not now.
 - Background/cross-page notifications for messages arriving while not on that artist's
   page (the platform-wide connection model enables this cheaply later; not this branch).
 - pgBouncer/Supavisor setup of any kind, locally or otherwise.
