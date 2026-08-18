@@ -6,7 +6,8 @@ import {
 	boolean,
 	integer,
 	jsonb,
-	uuid
+	uuid,
+	index
 } from 'drizzle-orm/pg-core';
 import { artists } from './artist';
 
@@ -37,28 +38,35 @@ export const albums = catalogDbSchema.table('albums', {
 	updatedAt: timestamp('updated_at').defaultNow().notNull()
 });
 
-export const tracks = catalogDbSchema.table('tracks', {
-	id: uuid('id').primaryKey().defaultRandom(),
-	albumId: uuid('album_id').references(() => albums.id),
-	artistId: uuid('artist_id')
-		.notNull()
-		.references(() => artists.id),
-	title: varchar('title', { length: 200 }).notNull(),
-	duration: integer('duration'),
-	audioUrl: text('audio_url'),
-	lyrics: text('lyrics'),
-	clipUrl: text('clip_url'),
-	imageUrl: text('image_url'),
-	trackNumber: integer('track_number'),
-	genre: jsonb('genres').$type<string[]>(),
-	status: varchar('status', { length: 32 }).default('draft').notNull(),
-	isPublished: boolean('is_published').default(false),
-	visibility: varchar('visibility', { length: 16 }).default('public').notNull(),
-	contentId: uuid('content_id'),
-	metadata: jsonb('metadata'),
-	createdAt: timestamp('created_at').defaultNow().notNull(),
-	updatedAt: timestamp('updated_at').defaultNow().notNull()
-});
+export const tracks = catalogDbSchema.table(
+	'tracks',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		albumId: uuid('album_id').references(() => albums.id),
+		artistId: uuid('artist_id')
+			.notNull()
+			.references(() => artists.id),
+		title: varchar('title', { length: 200 }).notNull(),
+		duration: integer('duration'),
+		audioUrl: text('audio_url'),
+		lyrics: text('lyrics'),
+		clipUrl: text('clip_url'),
+		imageUrl: text('image_url'),
+		trackNumber: integer('track_number'),
+		genre: jsonb('genres').$type<string[]>(),
+		status: varchar('status', { length: 32 }).default('draft').notNull(),
+		isPublished: boolean('is_published').default(false),
+		visibility: varchar('visibility', { length: 16 }).default('public').notNull(),
+		contentId: uuid('content_id'),
+		metadata: jsonb('metadata'),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().notNull()
+	},
+	(table) => [
+		index('tracks_artist_status_idx').on(table.artistId, table.status),
+		index('tracks_published_status_idx').on(table.isPublished, table.status)
+	]
+);
 
 export const albumTracks = catalogDbSchema.table('album_tracks', {
 	id: uuid('id').primaryKey().defaultRandom(),

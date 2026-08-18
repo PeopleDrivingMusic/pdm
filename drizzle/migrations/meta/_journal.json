@@ -5,36 +5,15 @@
 		{
 			"idx": 0,
 			"version": "7",
-			"when": 1771830374687,
-			"tag": "0000_mysterious_black_knight",
+			"when": 1786933464366,
+			"tag": "0000_baseline",
 			"breakpoints": true
 		},
 		{
 			"idx": 1,
 			"version": "7",
-			"when": 1771830618609,
-			"tag": "0001_peaceful_post",
-			"breakpoints": true
-		},
-		{
-			"idx": 2,
-			"version": "7",
-			"when": 1781100000000,
-			"tag": "0002_artist_schema_namespace",
-			"breakpoints": true
-		},
-		{
-			"idx": 3,
-			"version": "7",
-			"when": 1781101000000,
-			"tag": "0003_logical_schema_namespaces",
-			"breakpoints": true
-		},
-		{
-			"idx": 4,
-			"version": "7",
-			"when": 1784803992366,
-			"tag": "0010_finance_subscriptions",
+			"when": 1786958546561,
+			"tag": "0001_cooing_vision",
 			"breakpoints": true
 		}
 	]

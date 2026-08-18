@@ -27,6 +27,23 @@ env:
   PUBLIC_PGADMIN_URL: ''
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      db: ${{ steps.filter.outputs.db }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            db:
+              - 'drizzle/**'
+              - 'src/lib/db/**'
+              - 'drizzle.config.ts'
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -80,11 +97,100 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: yarn test:unit -- --run --project client
 
+  # Static check on any newly-added migration SQL — no Postgres needed, so it
+  # runs in parallel with db-migrate rather than as a step inside it.
+  migration-safety-lint:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.db == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Flag potentially destructive statements in new migrations
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE_SHA" ] || ! git cat-file -e "$BASE_SHA" 2>/dev/null; then
+            echo "No usable base commit to diff against (e.g. first push to a new branch) — skipping."
+            exit 0
+          fi
+          NEW_FILES=$(git diff --name-only --diff-filter=A "$BASE_SHA"...HEAD -- 'drizzle/migrations/*.sql')
+          if [ -z "$NEW_FILES" ]; then
+            echo "No new migration files in this change."
+            exit 0
+          fi
+          FAILED=0
+          for f in $NEW_FILES; do
+            # Requires a real SQL line comment with a non-empty reason -- a bare
+            # substring match (e.g. inside a string literal) doesn't count.
+            if grep -qE -- '^[[:space:]]*--[[:space:]]*data-loss-ok:[[:space:]]*[^[:space:]]' "$f"; then
+              echo "Skipping $f (acknowledged via a '-- data-loss-ok:' comment)"
+              continue
+            fi
+            # Normalize whitespace/newlines to single spaces first so a statement
+            # drizzle-kit (or a human) wrapped across lines still matches.
+            NORMALIZED=$(tr '\n\t' '  ' < "$f" | tr -s ' ')
+            HITS=$(echo "$NORMALIZED" | grep -ioE 'drop[[:space:]]+column|drop[[:space:]]+table|drop[[:space:]]+schema|truncate|alter[[:space:]]+column[^;]*[[:space:]]type|set[[:space:]]+not[[:space:]]+null' || true)
+            if [ -n "$HITS" ]; then
+              echo "::warning file=$f::Potentially destructive statement(s) — review for data loss, or add a '-- data-loss-ok: <reason>' line comment to acknowledge and unblock."
+              echo "$HITS"
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" -eq 1 ]; then
+            echo "::error::One or more new migrations contain potentially destructive statements (DROP COLUMN/TABLE/SCHEMA, TRUNCATE, a type-narrowing ALTER COLUMN, or SET NOT NULL). Review them, then add '-- data-loss-ok: <reason>' to the file to acknowledge."
+            exit 1
+          fi
+
+  # Only runs when a PR/push actually touches migrations or the schema — a
+  # plain UI/route change shouldn't pay for spinning up Postgres.
+  db-migrate:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.db == 'true'
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: pdm_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://admin:root@localhost:5432/pdm_db
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - name: Apply migrations to a fresh database
+        run: yarn db:migrate
+      - name: Verify schema.ts matches the migration journal (no drift)
+        run: |
+          yarn db:generate
+          if [ -n "$(git status --porcelain drizzle/)" ]; then
+            echo "::error::drizzle-kit generate produced changes — schema.ts and the migration journal have drifted. Run 'yarn db:generate' locally and commit the result."
+            git status --porcelain drizzle/
+            git diff drizzle/
+            exit 1
+          fi
+
   # Single required status check for branch protection — internal jobs above can
   # be renamed/added/split without ever having to touch the protection rule.
   ci-summary:
     runs-on: ubuntu-latest
-    needs: [lint, check, test-server, test-client]
+    needs: [changes, lint, check, test-server, test-client, db-migrate, migration-safety-lint]
     if: always()
     steps:
       - name: Fail if any dependency failed
