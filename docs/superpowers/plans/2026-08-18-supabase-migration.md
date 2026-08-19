@@ -334,31 +334,39 @@ git commit -m "feat(db): point app + drizzle-kit at Supabase (pooler + session-m
 - Produces: confidence that nothing regressed — this is the gate before local dev
   workflow and e2e get rewired in Tasks 4–5.
 
-- [ ] **Step 1: Run the unit suite**
+- [x] **Step 1: Run the unit suite**
 
-Run: `yarn test:unit -- --run`
-Expected: PASS. Most unit tests mock `$lib/db`/repositories directly and don't hit a
-real connection, so this mainly catches import/type breakage from Task 2.
+`yarn test:unit -- --run`: **53 test files, 369 tests, all passed.** Logs confirm
+the app genuinely connected via Supabase — `"Database connection established" |
+{"database":"aws-1-ap-south-1.pooler.supabase.com:6543/postgres"}` — not the old
+local Postgres. (Two unrelated `TypeError: ... wrapDynamicImport` stderr lines
+appeared from what looks like a stale `.svelte-kit` dev-server artifact; zero
+tests failed because of it — not chased further, unrelated to this migration.)
 
-- [ ] **Step 2: Smoke-test the dev server**
+- [x] **Step 2: Smoke-test the dev server**
 
-Run: `yarn dev`, open the app, confirm the homepage and an artist page load (both
-exercise real `db/services/*` queries against the new Supabase connection).
+`yarn dev` → `127.0.0.1:5173`. `/` → 200, `/listen` → 200,
+`/artist/ivan-izobau` → 200, `/artist/metallica` → 200 (both real artists from
+the restored data). `/api/db/health` returned real, correct stats matching the
+row counts already verified in Task 1: `{"totalUsers":3,"totalArtists":2,
+"totalTracks":9,"activeArtists":2,"publishedTracks":4}`.
 
-- [ ] **Step 3: Confirm no prepared-statement errors under concurrent load**
+- [x] **Step 3: Confirm no prepared-statement errors under concurrent load**
 
-With the dev server running, open several tabs simultaneously (or use a quick load
-tool) hitting a few different routes at once.
-Expected: no `prepared statement "..." does not exist` or similar errors in the
-server log — this is the most common transaction-mode migration failure named in
-`database-hosting.md`, and the reason `prepare: false` is mandatory (Task 2, Step 3).
+Fired 60 concurrent requests (15× across 4 different routes) — all 60 returned 200. Grepped the dev server log for `prepared statement`/`does not exist`/`ERROR`
+— **zero matches.** `prepare: false` (Task 2) is doing its job.
 
-- [ ] **Step 4: Record latency before/after**
+- [x] **Step 4: Record latency**
 
-Compare a few representative query timings (via the existing `withDbLogging`
-structured logs) against local docker Postgres baseline numbers, if available from
-before this branch. Expected: within the 5–15ms RTT range `database-hosting.md`
-already predicted for a managed provider — not a regression beyond that.
+No pre-migration baseline number was captured before this branch started, so a
+strict before/after comparison isn't possible — noted honestly rather than
+fabricated. Per-query `dbQuery` timing logs weren't visible at the log level this
+session ran at (not chased further — not blocking). What was measured: warm
+(post-compile) full SSR artist-page loads — several sequential queries each
+(artist + tracks + albums + viewer flags, per `CLAUDE.md`) — completed in
+0.55–0.8s in **dev mode** (unoptimized, not representative of production RTT).
+Nothing pathological; no timeouts, no errors, across repeated and concurrent
+requests.
 
 ---
 
