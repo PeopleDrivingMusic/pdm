@@ -376,6 +376,9 @@ requests.
 
 - Modify: `.claude/wiki/architecture/local-development.md`
 - Modify: `.env` (local dev values)
+- Modify: `package.json` (`db:up` was broken, referenced the removed
+  `postgres`/`pgadmin` docker-compose services — found and fixed along the way)
+- Modify: `CLAUDE.md` (Commands block, to match)
 
 **Interfaces:**
 
@@ -390,78 +393,66 @@ init`); `supabase/config.toml`, `supabase/migrations/`, `supabase/seed.sql`
       already exist in the repo, so this step is already satisfied for anyone
       picking up the branch fresh (they'd just run `supabase start`, next step).
 
-- [ ] **Step 2: Start the local stack**
+- [x] **Step 2: Start the local stack**
 
-Run: `supabase start`
-Expected output includes (per the current CLI docs, confirmed this session):
+`supabase start` — first run pulled ~13 Docker images (a few minutes); output
+matched what was predicted, plus extra services (`kong`, `gotrue`, `postgrest`,
+`storage-api`, `mailpit`, `imgproxy`, `logflare`, `vector`, `edge-runtime`) that
+come bundled but aren't used by this app.
 
-```
-API URL: http://127.0.0.1:54321
-DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-Studio URL: http://127.0.0.1:54323
-```
+- [x] **Step 3: Apply migrations + seed data locally**
 
-- [ ] **Step 3: Apply migrations + seed data locally**
+`supabase db reset` applied the migration + seed, but then failed at the very end
+("Restarting containers... context deadline exceeded" hitting `storage-api`'s
+bucket endpoint) — a transient timing issue on first cold start with many
+containers, not a real failure. Verified directly (`docker exec supabase_db_pdm
+psql ...`): row counts matched Task 1's cloud numbers exactly (`users.users`=3,
+`artist.artists`=2, `catalog.tracks`=9, `content.posts`=8,
+`drizzle.__drizzle_migrations`=24) — the migration/seed itself succeeded, only the
+post-reset health check timed out. `docker ps` confirmed all containers healthy
+shortly after. One container (`supabase_vector_pdm`, the Logflare log-shipper
+feeding Studio's local analytics panel) restart-loops on "Network unreachable"
+trying to reach the Docker socket — a known Windows/Docker Desktop networking
+quirk, unrelated to this migration, doesn't affect DB/Auth/Storage/Realtime/Studio
+(all confirmed healthy) — not fixed, not blocking.
 
-Simpler than the original plan (a separate `pg_restore` of a `.dump` file) — now that
-Task 1 produced real `supabase/migrations/` + `supabase/seed.sql`, the CLI's own
-reset flow handles both in one step:
+- [x] **Step 4: Point local `.env` at the local stack**
 
-```bash
-supabase db reset
-```
+Done — cloud values kept as a commented-out reference block in the same file
+(password not stored anywhere else; re-fetch from the dashboard if needed) rather
+than deleted outright, so testing against the real project stays easy later.
 
-This applies every file in `supabase/migrations/` in order, then `supabase/seed.sql`
-— exactly the mechanism `supabase start` also uses on first run. Expected: same
-tables + row counts as Task 1's cloud push. (No `.env` dependency — this is a pure
-CLI operation against the already-started local stack.)
+- [x] **Step 5: Catch up on any Drizzle migrations added after the baseline**
 
-- [ ] **Step 4: Point local `.env` at the local stack**
+`yarn db:migrate` — clean no-op as expected (two idempotent NOTICEs: schema/table
+already exist), confirming nothing's drifted since Task 1's bootstrap and the
+mechanism itself works locally.
 
-```
-DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-DIRECT_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-PUBLIC_SUPABASE_STUDIO_URL="http://127.0.0.1:54323"
-```
+- [x] **Step 6: Verify**
 
-- [ ] **Step 5: Catch up on any Drizzle migrations added after the baseline**
+`yarn dev` against the local stack: `/` → 200, `/artist/ivan-izobau` → 200,
+`/api/db/health` returned the same correct stats as Task 3's cloud run. Local
+Studio (`:54323`) responded 307 (a normal redirect to its default view) —
+confirmed reachable.
 
-Per the migration-authority decision (Global Constraints) — `supabase/migrations/`
-is frozen at the one-time bootstrap, so anything added via `yarn db:migrate` against
-the cloud project since Task 1 won't be in it yet. Needs Step 4's `DIRECT_DATABASE_URL`
-already pointed locally:
+- [x] **Step 7: Update the local-development wiki page**
 
-```bash
-yarn db:migrate
-```
+Rewrote the Database section: `supabase start`/`supabase db reset`/`yarn db:migrate`
+onboarding sequence, the migration-authority rule restated (Drizzle only, ongoing),
+and an explicit note not to reach for `supabase migration new` for routine schema
+changes.
 
-This is what keeps local and cloud identical going forward — the same
-`drizzle/migrations/*.sql` files, just applied to a different `DIRECT_DATABASE_URL`
-target each time. Expected: no-op the first time this plan runs (nothing's been
-added to Drizzle since Task 1's bootstrap yet), but this is the step a contributor
-runs every time they set up local dev from here on.
+**Extra, found along the way and fixed:** `package.json`'s `db:up` script still
+read `docker-compose up -d postgres pgadmin` — the exact services removed earlier
+on this branch. A real gap from that cleanup, not something this task set out to
+fix, but leaving it broken would have been worse. Repointed to `supabase start`,
+added a matching `db:down` (`supabase stop`) for symmetry with `logging:down`/
+`monitoring:down`/`docker:down`, and fixed `CLAUDE.md`'s Commands block to match.
 
-- [ ] **Step 6: Verify**
+- [x] **Step 8: Commit**
 
-Run: `yarn dev`, confirm the app works exactly as in Task 3 but against the local
-stack. Open `http://127.0.0.1:54323` (Studio) and confirm the schema is visible.
-
-- [ ] **Step 7: Update the local-development wiki page**
-
-Replace `docker-compose up -d` / pgAdmin instructions in
-`.claude/wiki/architecture/local-development.md` with `supabase start` /
-`supabase stop`, and note that the observability stack (`docker-compose.yml`) is
-still started separately (`yarn logging:up` or equivalent — check the page's current
-wording for the exact command name).
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add .claude/wiki/architecture/local-development.md
-git commit -m "docs: local dev via supabase start, replacing docker-compose postgres"
-```
-
-(Run from inside `.claude/`, per the nested-repo convention — `git -C .claude add ... && git -C .claude commit ...` — this file lives in the separate `pdm-claude` repo, not the main one.)
+Wiki change committed and pushed from `.claude/` (nested repo, per convention).
+`package.json`/`CLAUDE.md` committed separately in the main repo.
 
 ---
 
