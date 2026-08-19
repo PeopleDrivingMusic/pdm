@@ -52,15 +52,22 @@ migrated a second time.
    all — quoted verbatim in §5 below), but it's now unnecessary since the tables
    live in the same database. Documented here as a fallback in case DB and Realtime
    ever end up split again.
-6. **Nightly `pg_dump` → R2**, from day one (~$0), per the existing decision —
-   covers account loss/forced exit, which the free tier's total lack of PITR/backups
-   does not.
+6. **Nightly `pg_dump` with retention, to a dedicated archival storage target the
+   user provisions separately** (not the existing R2 media bucket) — from day one
+   (~$0), per the existing decision, amended per review feedback to require
+   automatic expiry of old dumps (§3.5) rather than an unbounded pile.
 7. **docker-compose cleanup** (done in this branch): `postgres` and `pgadmin`
    services removed; `postgres-exporter` repointed at `host.docker.internal:54322`
    (supabase start's local Postgres lives in a separate CLI-managed compose stack,
    not this network); the commented-out future `app` service's `DATABASE_URL`
    placeholder updated to the pooler shape; `/admin` page's pgAdmin link swapped for
    `PUBLIC_SUPABASE_STUDIO_URL`.
+8. **Every `db/services/*`/`db/queries.ts` caller rides the pooler automatically,
+   with zero per-service changes.** They all share the single `db`/`client` export
+   from `src/lib/db/index.ts` — once that one file points at the pooler, everything
+   does. Confirmed nothing in `src/` would conflict with transaction-mode pooling
+   (grepped for `.transaction(`, `pg_advisory`, `LISTEN `/`NOTIFY `, raw `.unsafe(` —
+   zero matches; every existing query is a plain single-statement call).
 
 ### Out of scope (explicitly)
 
@@ -149,19 +156,37 @@ export default defineConfig({
 `drizzle-kit` runs DDL needing session state — must go through the direct connection
 (5432), never the transaction-mode pooler (6543).
 
-### 3.4 Baseline migration
+### 3.4 Baseline migration and dev data
 
-The existing `drizzle/migrations/*.sql` files apply as-is against the new (empty)
-Supabase database — this is a fresh target, not a data migration, so it's
-`yarn db:migrate` against `DIRECT_DATABASE_URL`, not a `pg_dump`/`pg_restore` from
-the local docker Postgres. (There is no meaningful local data worth carrying over —
-confirm this before running, but the project has no production users yet.)
+**Revised per review feedback — this is a real data carry-over, not a fresh
+baseline apply.** The Supabase database is empty, but the _local_ Docker Postgres
+has real dev fixtures worth keeping so testing doesn't restart from zero. The move
+is a `pg_dump`/`pg_restore` (schema + data), scoped to PDM's own 7 Postgres schemas
+only (`users`, `artist`, `content`, `catalog`, `engagement`, `finance`, `messages`)
+— never a blanket dump of the whole local database, which would collide with
+Supabase's own reserved schemas/roles (`auth`, `storage`, `realtime`, `public`,
+`anon`/`authenticated`/`service_role`). The same dump seeds both the cloud project
+and local `supabase start` (§4), so all three environments start from the same
+populated state. Mechanics (exact commands) live in the plan, not re-derived here.
 
 ### 3.5 Nightly backup
 
-A scheduled job (`pg_dump` piped to R2, per the existing decision) — mechanism
-(cron host, script) is decided in the plan, not re-derived here; this spec only
-locks that it must exist from day one, not deferred to a later PITR trigger.
+A scheduled job (`pg_dump` to a dedicated storage target) with **automatic
+retention/expiry** — not just an ever-growing pile of dumps. Two things changed from
+the original decision doc's "R2" framing, per review feedback:
+
+- **Not the existing R2 media bucket.** The user is provisioning a separate,
+  dedicated archival storage target themselves (likely a distinct R2 bucket on the
+  Infrequent Access storage class, but not assumed — confirmed with them before the
+  plan's backup task is implemented).
+- **Retention is load-bearing, not optional.** Old dumps must expire (prefer a
+  native bucket lifecycle rule over hand-rolled deletion logic) so backup storage
+  doesn't grow unbounded. Retention window (days) is picked with the user at
+  implementation time.
+
+Cron host/script mechanism is decided in the plan, not re-derived here; this spec
+only locks that a nightly backup with retention must exist from day one, not
+deferred to a later PITR trigger.
 
 ## 4. Local Development Workflow
 

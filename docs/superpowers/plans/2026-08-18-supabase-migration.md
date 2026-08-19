@@ -58,52 +58,103 @@ ${POSTGRES_CONTAINER}` dependency; clone the `pdm_e2e` schema by running
 
 ---
 
-## Task 1: Verify the target Supabase project and apply the baseline migration
+## Task 1: Carry the local dev data into Supabase (schema + data, not a fresh baseline)
 
-**Files:** none (infrastructure step against the live Supabase project)
+**Files:** none (infrastructure step against the local Docker Postgres and the live
+Supabase project)
 
 **Interfaces:**
 
-- Consumes: existing `drizzle/migrations/*.sql` (unchanged), the Supabase MCP tools
-  already connected to project `falcoioeiutzoselpnhe`.
-- Produces: a Supabase Postgres instance with PDM's full schema applied — everything
-  downstream depends on this existing before app code is repointed at it.
+- Consumes: the running local `pdm-postgres` container (still present — only the
+  `docker-compose.yml` _service definition_ was removed this branch, the container
+  and its `postgres_data` volume are untouched until someone tears them down), the
+  Supabase MCP tools already connected to project `falcoioeiutzoselpnhe`.
+- Produces: a Supabase Postgres instance with PDM's real dev data already in it — so
+  local `supabase start` (Task 4) and the cloud project both start from the same
+  populated state, not an empty one. Testing doesn't restart from zero.
 
-- [ ] **Step 1: Confirm the project is still the right one and still empty**
+**Correction from the first pass of this plan:** the original Task 1 planned a bare
+`yarn db:migrate` against an empty Supabase database (true — `list_tables` returned
+`[]`) — but that only recreates the _schema_, not the dev fixtures (test users,
+artists, sample tracks, etc.) that already exist in the local Docker Postgres. Per
+review feedback, this needs to be a real `pg_dump`/restore, not a migration replay.
+
+**Also important:** the dump must be **scoped to PDM's own schemas only** — `users`,
+`artist`, `content`, `catalog`, `engagement`, `finance`, `messages` (the complete
+list, confirmed via `grep pgSchema( src/lib/db/schemas/`). Supabase's Postgres
+already has its own reserved schemas and roles (`auth`, `storage`, `realtime`,
+`public`, plus `anon`/`authenticated`/`service_role`) — a blanket `pg_dump` of the
+whole local database (or `pg_dumpall`) would try to touch those and could collide
+with what Supabase already manages. Never dump/restore outside the 7 schemas above.
+
+- [ ] **Step 1: Confirm the local container is up and has the expected schemas**
+
+Run: `docker ps --filter "name=pdm-postgres"` (start it via the previous
+`docker-compose up -d postgres` invocation if it's not running — the service
+definition was removed from `docker-compose.yml` on this branch, so bring it up from
+git history if needed, e.g. `git show main:docker-compose.yml > /tmp/old-compose.yml
+&& docker compose -f /tmp/old-compose.yml up -d postgres`, or restore from the
+`postgres_data` volume directly).
+Expected: container running, and `psql $DATABASE_URL -c '\dn'` lists all 7 schemas.
+
+- [ ] **Step 2: Dump the 7 PDM schemas (schema + data)**
+
+```bash
+pg_dump "$DATABASE_URL" \
+  --schema=users --schema=artist --schema=content --schema=catalog \
+  --schema=engagement --schema=finance --schema=messages \
+  --no-owner --no-privileges --format=custom \
+  --file=pdm-dev-dump.dump
+```
+
+`--no-owner --no-privileges` because the local dump's roles (`admin`) don't exist on
+Supabase and shouldn't be recreated there — Supabase's own `postgres` role owns
+everything post-restore. `--format=custom` so `pg_restore` can run with
+`--if-exists --clean` safely if this needs to be re-run.
+
+- [ ] **Step 3: Confirm the target is still empty, then get the direct-connection string**
 
 Run (MCP): `list_tables` for project `falcoioeiutzoselpnhe`.
 Expected: `[]` (matches the check already done in conversation — reconfirm since
-time may have passed).
+time may have passed; if it's _not_ empty, stop — that means someone else already
+restored into it, don't overwrite blindly).
 
-- [ ] **Step 2: Get the direct-connection string**
+Run (MCP): `get_project` for `falcoioeiutzoselpnhe`, or read the direct-connection
+string from the Supabase dashboard's Database Settings page. Do not hardcode the
+password into any committed file — it goes into local `.env` only (Task 2, Step 2).
 
-Run (MCP): `get_project` for `falcoioeiutzoselpnhe`, or read it from the Supabase
-dashboard's Database Settings page. Do not hardcode the password into any committed
-file — it goes into local `.env` only (Step 4 of Task 2).
+- [ ] **Step 4: Restore into the Supabase project**
 
-- [ ] **Step 3: Apply the baseline migration**
+```bash
+pg_restore --no-owner --no-privileges \
+  -d "postgresql://postgres:[password]@db.falcoioeiutzoselpnhe.supabase.co:5432/postgres" \
+  pdm-dev-dump.dump
+```
 
-Run: `DIRECT_DATABASE_URL="<the direct connection string>" yarn db:migrate`
-(temporarily set inline, or exported in the shell — not yet wired into
-`drizzle.config.ts`, that's Task 2).
-Expected: all files in `drizzle/migrations/` apply cleanly against the fresh Supabase
-database.
+(Direct connection, port 5432 — same reasoning as `drizzle-kit`: this is DDL +
+session-level work, not something the transaction-mode pooler supports.)
 
-- [ ] **Step 4: Verify**
+- [ ] **Step 5: Verify**
 
 Run (MCP): `list_tables` again for the same project.
-Expected: every table from `src/lib/db/schema.ts`'s aggregator present, grouped
-under the `users`/`artist`/`content`/`catalog`/`engagement`/`finance`/`messages`
-schemas.
+Expected: every table from `src/lib/db/schema.ts`'s aggregator present, under the
+same 7 schemas, **with row counts matching the local dump** (spot-check a couple —
+e.g. `select count(*) from users.users` — against the local source).
 
-- [ ] **Step 5: Run advisors**
+- [ ] **Step 6: Run advisors**
 
 Run (MCP): `get_advisors` for the project.
-Expected: no unexpected findings. RLS is not yet enabled on any exposed table at
+Expected: no unexpected findings. RLS is not yet enabled on any of these tables at
 this point (that's the fan-chat plan's job once it resumes) — if the advisor flags
-missing RLS on `public`-schema tables, note it but don't fix it in this task; PDM's
-tables aren't in the `public` schema (they're in per-domain schemas per
-`data-model.md`), so this is expected to be quiet, but confirm rather than assume.
+missing RLS, note it but don't fix it in this task; confirm rather than assume it'll
+be quiet.
+
+- [ ] **Step 7: Keep the dump file for Task 4**
+
+`pdm-dev-dump.dump` is reused as-is to seed local `supabase start` — don't delete it
+until Task 4 finishes. Don't commit it to git (it contains real dev data + is a
+binary artifact) — add `pdm-dev-dump.dump` to `.gitignore` if it isn't already
+covered by an existing `*.dump`/binary-artifact pattern.
 
 ---
 
@@ -117,10 +168,26 @@ tables aren't in the `public` schema (they're in per-domain schemas per
 
 **Interfaces:**
 
-- Consumes: the applied schema from Task 1.
+- Consumes: the restored schema+data from Task 1.
 - Produces: `db`/`client` (from `src/lib/db/index.ts`) now talking to Supabase
   through the pooler — every existing `db/services/*` and `db/queries.ts` caller is
   unaffected, since none of them touch connection config directly.
+
+**Do every `db/services/*` call go through the pooler? Yes, automatically, no
+per-service changes needed.** Every DB service and query in the app
+(`src/lib/db/services/*`, `src/lib/db/queries.ts`, `ContentApplicationService`, etc.)
+imports the same single `db`/`client` singleton exported from `src/lib/db/index.ts`
+— there's no per-service connection config anywhere else to update. Once this one
+file points at the pooler, every caller does too, transparently.
+
+Checked for anything that would specifically _not_ survive transaction-mode pooling
+(a physical connection is only held for one transaction's duration, so it can't
+support session-level state across separate requests): grepped the whole `src/`
+tree for `.transaction(`, `pg_advisory`, `LISTEN `/`NOTIFY `, and raw `.unsafe(` —
+**zero matches anywhere.** Nothing in the current codebase relies on multi-statement
+sessions, advisory locks, or Postgres pub/sub, so there's nothing that needs special
+handling — every existing query is a plain single-statement call, exactly what
+transaction-mode pooling is built for.
 
 - [ ] **Step 1: Split `.env.example`'s `DATABASE_URL` into two vars**
 
@@ -277,10 +344,21 @@ DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 Studio URL: http://127.0.0.1:54323
 ```
 
-- [ ] **Step 3: Apply the baseline migration locally**
+- [ ] **Step 3: Restore the same dump from Task 1 into the local stack**
 
-Run: `DIRECT_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" yarn db:migrate`
-Expected: same schema as Task 1 produced against the cloud project.
+Reuses `pdm-dev-dump.dump` from Task 1, Step 7 — so local dev and the cloud project
+start from the same populated data, not an empty schema:
+
+```bash
+pg_restore --no-owner --no-privileges \
+  -d "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+  pdm-dev-dump.dump
+```
+
+Expected: same tables + row counts as Task 1's cloud restore. (`yarn db:migrate`
+against the local `DIRECT_DATABASE_URL` is _not_ needed here — the dump already
+carries the full schema; running migrations afterward would be redundant, and only
+matters again the next time a _new_ migration is generated post-restore.)
 
 - [ ] **Step 4: Point local `.env` at the local stack**
 
@@ -388,7 +466,7 @@ git commit -m "fix(e2e): migrate the test db instead of docker-exec pg_dump clon
 
 ---
 
-## Task 6: Nightly backup (`pg_dump` → R2)
+## Task 6: Nightly backup + retention (`pg_dump` → dedicated archival storage)
 
 **Files:**
 
@@ -398,31 +476,60 @@ git commit -m "fix(e2e): migrate the test db instead of docker-exec pg_dump clon
 
 **Interfaces:**
 
-- Consumes: `DIRECT_DATABASE_URL`, R2 credentials already used by `R2Service`.
-- Produces: a nightly `pdm-backup-<date>.sql.gz` object in R2 — the exit path named
-  in the spec (§3.5) and the existing decision doc.
+- Consumes: `DIRECT_DATABASE_URL`, credentials for a **new, separate** storage
+  target — **not** the existing R2 media bucket (`PUBLIC_R2_IMAGES_BUCKET`/
+  `CLOUDFLARE_ACCOUNT_ID`/`R2_ACCESS_KEY_ID`). Per review feedback, the user is
+  provisioning this storage themselves (their words: "что-то типа архивного, а не
+  R2" — likely R2's own Infrequent Access storage class on a dedicated bucket
+  distinct from the media bucket, rather than a different provider entirely, but
+  **don't assume — confirm the actual bucket/endpoint/credentials with the user
+  before writing Step 2**, since this task can't be completed blind).
+- Produces: a nightly `pdm-backup-<date>.dump` object in that storage, **with
+  automatic expiry** — not just an unbounded pile of dumps.
 
-- [ ] **Step 1: Read `scheduled-jobs.md`** to find the existing cron mechanism
+**Correction from the first pass of this plan:** the original version only wrote the
+backup, with no cleanup — per review feedback, old dumps need to expire or R2 (or
+whatever target) fills up with backup clutter indefinitely.
+
+- [ ] **Step 1: Confirm the actual storage target with the user** — bucket name,
+      endpoint, credentials, and specifically whether it's a separate R2 bucket
+      (Infrequent Access class) or something else entirely. Do not proceed to Step 2
+      on an assumption.
+
+- [ ] **Step 2: Read `scheduled-jobs.md`** to find the existing cron mechanism
       (`pg_cron`? an external scheduler? a Vercel Cron Job, now that hosting is
       confirmed as Vercel?) rather than inventing a new one.
 
-- [ ] **Step 2: Write the backup script**, shape depends on Step 1's finding — likely
-      a small Node script (`pg_dump` isn't available as a JS API; shell out to it, or
-      use Supabase's own scheduled-backup feature if the found mechanism is "just use
-      what Supabase provides" — check `get_project`/dashboard for whether Pro-tier daily
-      backups already cover this before building a second, redundant mechanism. Free
-      tier has **no** built-in backups (per `database-hosting.md`), so this is
-      load-bearing while on Free.
+- [ ] **Step 3: Write the backup script**, shape depends on Step 2's finding — likely
+      a small Node script (`pg_dump` isn't available as a JS API; shell out to it).
+      Check `get_project`/dashboard first for whether Supabase's own Pro-tier daily
+      backups already cover this, before building a second, redundant mechanism —
+      Free tier has **no** built-in backups (per `database-hosting.md`), so this is
+      load-bearing only while on Free; if/when the project moves to Pro, revisit
+      whether this script is still needed at all.
 
-- [ ] **Step 3: Verify** by running it once manually and restoring the dump into a
-      scratch database (`createdb pdm_backup_test && psql pdm_backup_test < dump.sql`),
-      confirming row counts match the source.
+- [ ] **Step 4: Configure retention — prefer a bucket lifecycle rule over a
+      hand-rolled delete step.** If the target is R2 (or any S3-compatible store),
+      it supports native object-expiration lifecycle rules — configuring "expire
+      objects with prefix `pdm-backup-` after N days" on the bucket itself is
+      zero-maintenance and can't have an off-by-one bug that deletes the wrong
+      thing. Only fall back to deleting old objects from inside the backup script
+      itself if the chosen target has no lifecycle-rule support. Pick N (e.g. 14 or
+      30 days) with the user before finalizing — not decided in this plan.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Verify** by running the backup once manually and restoring the dump
+      into a scratch database (`createdb pdm_backup_test && pg_restore -d
+    pdm_backup_test pdm-backup-test.dump`), confirming row counts match the
+      source. Separately verify the retention rule actually fires — either by
+      checking the lifecycle-rule config took effect (dashboard/API), or, if
+      script-based, by running the delete path against a fake old-dated test object
+      rather than waiting N real days to find out.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add <backup script path>
-git commit -m "feat(db): nightly pg_dump to R2 (Supabase free tier has no backups)"
+git commit -m "feat(db): nightly pg_dump with retention to dedicated archival storage"
 ```
 
 ---
@@ -484,8 +591,16 @@ before running.)
   `docker-compose.yml`'s `postgres` service was removed (already done, this branch)
   — Task 5 exists specifically because this was found by reading the actual file,
   not inferred from the spec.
-- **Ordering:** Task 1 (baseline apply) must complete before Task 2 (repoint app) —
-  reversing them would point the app at Supabase before any schema exists there.
-  Task 4 (local `supabase start`) depends on Task 2's connection-string shape being
-  settled first, so the local `.env` values in Task 4 Step 4 match the pattern Task
-  2 already established.
+- **Ordering:** Task 1 (dump + restore) must complete before Task 2 (repoint app) —
+  reversing them would point the app at Supabase before any data exists there.
+  Task 4 (local `supabase start`) depends on both Task 1 (reuses its dump file) and
+  Task 2 (connection-string shape) being settled first.
+- **Second-pass corrections from review feedback (this revision):** Task 1 changed
+  from an empty `yarn db:migrate` to a real schema-scoped `pg_dump`/`pg_restore`
+  carrying local dev data into Supabase (and Task 4 now restores that same dump
+  locally, instead of a second empty migrate); Task 6 gained retention/expiry and a
+  dedicated (non-media) storage target instead of writing backups with no cleanup
+  into the R2 bucket already used for media; Task 2 gained an explicit answer,
+  backed by a grep across `src/`, to "do `db/services/*` calls go through the
+  pooler too" (yes, automatically, and nothing in the codebase conflicts with
+  transaction-mode pooling).
