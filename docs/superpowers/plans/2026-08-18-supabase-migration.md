@@ -25,8 +25,11 @@ plan implements it task-by-task; read both.
 - `prepare: false` is set unconditionally, not branched by environment (spec §3.2).
 - `drizzle-kit` migrations always go through `DIRECT_DATABASE_URL` (port 5432),
   never the pooler (spec §3.3).
-- No data migration — the Supabase project is empty; this is a fresh baseline
-  apply, not a `pg_dump`/`pg_restore` from local (spec §3.4).
+- The Supabase project itself is empty, but local dev data is **not** discarded —
+  Task 1 is a schema-scoped `pg_dump`/`pg_restore` from local Docker Postgres, not
+  a fresh `yarn db:migrate` baseline (spec §3.4, revised).
+- Backup storage is a dedicated target the user provisions separately, with
+  retention/expiry — never the R2 media bucket (spec §3.5, revised).
 - Local dev uses `supabase start`, not docker-compose Postgres — already removed
   from `docker-compose.yml` on this branch (spec §1.2, §4).
 
@@ -519,7 +522,7 @@ whatever target) fills up with backup clutter indefinitely.
 
 - [ ] **Step 5: Verify** by running the backup once manually and restoring the dump
       into a scratch database (`createdb pdm_backup_test && pg_restore -d
-    pdm_backup_test pdm-backup-test.dump`), confirming row counts match the
+  pdm_backup_test pdm-backup-test.dump`), confirming row counts match the
       source. Separately verify the retention rule actually fires — either by
       checking the lifecycle-rule config took effect (dashboard/API), or, if
       script-based, by running the delete path against a fake old-dated test object
