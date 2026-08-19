@@ -41,7 +41,8 @@ yarn test:unit            # vitest watch mode
 yarn test:unit -- --run src/path/to/file.spec.ts   # single unit test file
 yarn test:e2e             # playwright e2e (e2e/ dir)
 
-yarn db:up                # start Postgres + pgAdmin via docker-compose
+yarn db:up                # start local Supabase (Postgres + Realtime + Studio) via `supabase start`
+yarn db:down               # stop it (`supabase stop`)
 yarn db:generate          # generate migration from schema changes
 yarn db:migrate           # apply migrations — use this, not db:push (see below)
 yarn db:push              # AVOID against the shared dev DB — see below
