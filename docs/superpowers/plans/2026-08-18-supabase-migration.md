@@ -214,25 +214,39 @@ sessions, advisory locks, or Postgres pub/sub, so there's nothing that needs spe
 handling — every existing query is a plain single-statement call, exactly what
 transaction-mode pooling is built for.
 
-- [ ] **Step 1: Split `.env.example`'s `DATABASE_URL` into two vars**
+- [x] **Step 1: Split `.env.example`'s `DATABASE_URL` into two vars**
+
+**Correction from what this step originally guessed:** the actual pooler hostname is
+**not** `db.{ref}.supabase.co` — it's a separate shared pooler host
+(`aws-1-ap-south-1.pooler.supabase.com` for this project's region), with the
+project ref folded into the _username_ (`postgres.{ref}`), confirmed directly from
+the Supabase dashboard's "Connect" panel:
 
 ```
-# Supabase — transaction-mode pooler (app queries)
-DATABASE_URL="postgresql://postgres:{password}@db.{ref}.supabase.co:6543/postgres?sslmode=require"
-# Supabase — direct connection (drizzle-kit migrations only)
-DIRECT_DATABASE_URL="postgresql://postgres:{password}@db.{ref}.supabase.co:5432/postgres?sslmode=require"
+DATABASE_URL="postgresql://postgres.{project-ref}:{password}@{pooler-host}:6543/postgres"
+DIRECT_DATABASE_URL="postgresql://postgres.{project-ref}:{password}@{pooler-host}:5432/postgres"
 ```
 
-Remove the now-unused `DB_HOST`/`DB_PORT`/`DB_USERNAME`/`DB_PASSWORD`/`DB_NAME`
+**Second correction:** `DIRECT_DATABASE_URL` above is the **session-mode pooler**
+(port 5432, same pooler host), not the dashboard's literal "Direct connection" host
+(`db.{ref}.supabase.co:5432`) — that host is **IPv6-only** and was unreachable
+("Network is unreachable") from this machine/network when tested, exactly the risk
+`database-hosting.md` already named ("Direct connections are IPv6-first... An
+IPv4-only host needs session mode"). Session mode on the pooler host is IPv4 and
+supports everything `drizzle-kit` needs; confirmed working (`select version()`
+succeeded, `yarn db:generate` reports zero drift against `schema.ts`).
+
+Removed the now-unused `DB_HOST`/`DB_PORT`/`DB_USERNAME`/`DB_PASSWORD`/`DB_NAME`
 block (confirmed unread by any file under `src/` — spec §2).
 
-- [ ] **Step 2: Set the same two vars in local `.env`**
+- [x] **Step 2: Set the same two vars in local `.env`**
 
-For local dev (once Task 4 sets up `supabase start`), both point at
-`127.0.0.1:54322` — see spec §3.1. For now, point them at the real Supabase project
-(from Task 1) so Task 3's verification runs against a real target.
+Pointed at the real Supabase project for now (both pooler URLs above, with the
+real password from the dashboard) so Task 3's verification runs against a real
+target — will be repointed at `127.0.0.1:54322` once Task 4 sets up
+`supabase start`.
 
-- [ ] **Step 3: Update `src/lib/db/index.ts`**
+- [x] **Step 3: Update `src/lib/db/index.ts`**
 
 ```ts
 const client = postgres(process.env.DATABASE_URL!, {
@@ -262,7 +276,7 @@ const client = postgres(process.env.DATABASE_URL!, {
 (Only the first two lines of the options object change — `max: 1` becomes the env-
 driven pool size, and `prepare: false` is added. Everything else is untouched.)
 
-- [ ] **Step 4: Update `drizzle.config.ts`**
+- [x] **Step 4: Update `drizzle.config.ts`**
 
 ```ts
 export default defineConfig({
@@ -277,23 +291,23 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
-Run: `yarn check`
-Expected: no type errors (env var name changes don't affect types directly, but
-confirms nothing else broke).
+`yarn check` (the yarn script) turned out not to actually invoke `svelte-check` on
+this machine — a pre-existing tooling quirk unrelated to this change (worth a
+separate look, not fixed here). Ran `npx svelte-check --tsconfig ./tsconfig.json`
+directly instead: **0 errors**, 68 pre-existing warnings (unused CSS selectors,
+deprecated `on:submit`, etc.) — none related to this change.
 
-Run: `yarn db:generate`
-Expected: no diff — schema already matches what Task 1 applied, so this should
-produce an empty migration (delete it if drizzle-kit creates an empty file; if it
-proposes _any_ real change, stop and investigate before proceeding — that means
-Task 1's baseline apply and the current `schema.ts` have drifted).
+`yarn db:generate` against the session-mode `DIRECT_DATABASE_URL`: **"No schema
+changes, nothing to migrate"** — confirms Task 1's push matches `schema.ts` exactly,
+zero drift.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/db/index.ts drizzle.config.ts .env.example
-git commit -m "feat(db): point app + drizzle-kit at Supabase (pooler + direct)"
+git commit -m "feat(db): point app + drizzle-kit at Supabase (pooler + session-mode)"
 ```
 
 (`.env` itself is gitignored — not committed.)
@@ -354,7 +368,7 @@ already predicted for a managed provider — not a regression beyond that.
   without touching the shared cloud project.
 
 - [x] **Step 1: Initialize the local Supabase config** — done in Task 1 (`supabase
-  init`); `supabase/config.toml`, `supabase/migrations/`, `supabase/seed.sql`
+init`); `supabase/config.toml`, `supabase/migrations/`, `supabase/seed.sql`
       already exist in the repo, so this step is already satisfied for anyone
       picking up the branch fresh (they'd just run `supabase start`, next step).
 

@@ -109,12 +109,21 @@ migrated a second time.
 
 ### 3.1 Connection strings
 
-Two env vars replace the current single `DATABASE_URL`:
+**Corrected against the real dashboard values (the original draft guessed the
+hostname wrong).** Two env vars replace the current single `DATABASE_URL`, both on
+the shared regional pooler host, not `db.{ref}.supabase.co`:
 
 ```
-DATABASE_URL="postgresql://postgres:[password]@db.falcoioeiutzoselpnhe.supabase.co:6543/postgres?sslmode=require"
-DIRECT_DATABASE_URL="postgresql://postgres:[password]@db.falcoioeiutzoselpnhe.supabase.co:5432/postgres?sslmode=require"
+DATABASE_URL="postgresql://postgres.falcoioeiutzoselpnhe:[password]@aws-1-ap-south-1.pooler.supabase.com:6543/postgres"
+DIRECT_DATABASE_URL="postgresql://postgres.falcoioeiutzoselpnhe:[password]@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
 ```
+
+`DIRECT_DATABASE_URL` is the pooler's **session mode** (port 5432, same host), not
+the dashboard's literal "Direct connection" (`db.falcoioeiutzoselpnhe.supabase.co:5432`)
+— that host is IPv6-only and was unreachable from this machine/network when tested
+("Network is unreachable"), exactly the risk `database-hosting.md` already named.
+Session mode is IPv4 and covers everything `drizzle-kit` needs; confirmed by a
+successful connection and `yarn db:generate` reporting zero drift.
 
 Local dev keeps the same two-var shape, pointed at `supabase start`'s stack instead
 (both `DATABASE_URL` and `DIRECT_DATABASE_URL` can be the same local URL — there's no
