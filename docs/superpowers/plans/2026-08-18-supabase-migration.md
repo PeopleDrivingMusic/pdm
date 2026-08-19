@@ -26,8 +26,9 @@ plan implements it task-by-task; read both.
 - `drizzle-kit` migrations always go through `DIRECT_DATABASE_URL` (port 5432),
   never the pooler (spec §3.3).
 - The Supabase project itself is empty, but local dev data is **not** discarded —
-  Task 1 is a schema-scoped `pg_dump`/`pg_restore` from local Docker Postgres, not
-  a fresh `yarn db:migrate` baseline (spec §3.4, revised).
+  Task 1 pushes a schema-scoped `pg_dump` via `supabase db push --include-seed`
+  (tracked in `supabase_migrations.schema_migrations`), not a fresh `yarn db:migrate`
+  baseline and not a manual `execute_sql` replay (spec §3.4, twice-revised).
 - Backup storage is a dedicated target the user provisions separately, with
   retention/expiry — never the R2 media bucket (spec §3.5, revised).
 - Local dev uses `supabase start`, not docker-compose Postgres — already removed
@@ -353,7 +354,7 @@ already predicted for a managed provider — not a regression beyond that.
   without touching the shared cloud project.
 
 - [x] **Step 1: Initialize the local Supabase config** — done in Task 1 (`supabase
-    init`); `supabase/config.toml`, `supabase/migrations/`, `supabase/seed.sql`
+  init`); `supabase/config.toml`, `supabase/migrations/`, `supabase/seed.sql`
       already exist in the repo, so this step is already satisfied for anyone
       picking up the branch fresh (they'd just run `supabase start`, next step).
 
