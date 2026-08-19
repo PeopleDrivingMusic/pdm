@@ -61,103 +61,124 @@ ${POSTGRES_CONTAINER}` dependency; clone the `pdm_e2e` schema by running
 
 ---
 
-## Task 1: Carry the local dev data into Supabase (schema + data, not a fresh baseline)
+## Task 1: Carry the local dev data into Supabase, properly tracked via `supabase db push`
 
-**Files:** none (infrastructure step against the local Docker Postgres and the live
-Supabase project)
+**Files:**
+
+- Create: `supabase/config.toml`, `supabase/migrations/<timestamp>_baseline.sql`,
+  `supabase/seed.sql` (all via the Supabase CLI, not hand-written from scratch)
 
 **Interfaces:**
 
 - Consumes: the running local `pdm-postgres` container (still present — only the
-  `docker-compose.yml` _service definition_ was removed this branch, the container
-  and its `postgres_data` volume are untouched until someone tears them down), the
-  Supabase MCP tools already connected to project `falcoioeiutzoselpnhe`.
-- Produces: a Supabase Postgres instance with PDM's real dev data already in it — so
-  local `supabase start` (Task 4) and the cloud project both start from the same
-  populated state, not an empty one. Testing doesn't restart from zero.
+  `docker-compose.yml` _service definition_ was removed this branch), the Supabase
+  CLI authenticated against the PDM account (separate from any personal-account CLI
+  session already on the machine), the Supabase MCP tools for verification.
+- Produces: a Supabase Postgres instance with PDM's real dev data in it, **and** a
+  `supabase/` directory in the repo (migration + seed file) that `supabase start`/
+  `db reset` (Task 4) and any future `db push` reuse — not a one-off manual load.
 
-**Correction from the first pass of this plan:** the original Task 1 planned a bare
-`yarn db:migrate` against an empty Supabase database (true — `list_tables` returned
-`[]`) — but that only recreates the _schema_, not the dev fixtures (test users,
-artists, sample tracks, etc.) that already exist in the local Docker Postgres. Per
-review feedback, this needs to be a real `pg_dump`/restore, not a migration replay.
+**Second correction (this revision) — the real "normal world" way, not manual
+`execute_sql` chunking.** The first version of this task (and an earlier live
+attempt) loaded schema + data by hand-chunking a `pg_dump` into ~12 pieces and
+replaying each through the `execute_sql` MCP tool — a workaround for not having the
+database password, not a recommended pattern. Per direct review feedback, redone via
+the standard Supabase CLI migration flow instead:
 
-**Also important:** the dump must be **scoped to PDM's own schemas only** — `users`,
-`artist`, `content`, `catalog`, `engagement`, `finance`, `messages` (the complete
-list, confirmed via `grep pgSchema( src/lib/db/schemas/`). Supabase's Postgres
-already has its own reserved schemas and roles (`auth`, `storage`, `realtime`,
-`public`, plus `anon`/`authenticated`/`service_role`) — a blanket `pg_dump` of the
-whole local database (or `pg_dumpall`) would try to touch those and could collide
-with what Supabase already manages. Never dump/restore outside the 7 schemas above.
+1. **`supabase login --name pdm`** — the CLI may already be authenticated to a
+   _different_ personal account on the same machine (this happened live: it listed
+   unrelated projects — `Izobov's Project`, `AI Travel Agent`, etc.). `--profile`
+   requires a pre-existing config and fails with "Unsupported Config Type" — use
+   `--name` instead. Non-interactive shells can't do the browser flow
+   ("Cannot use automatic login flow inside non-TTY environments") — this step has
+   to be run by the user directly in their own terminal, not via an agent-run Bash
+   call. Verify with `supabase projects list`.
+2. **`supabase link --project-ref falcoioeiutzoselpnhe`** — no password prompt in
+   practice; the authenticated session covers it.
+3. **`supabase init`** — creates `supabase/config.toml` + `.gitignore` (excludes
+   `.temp/`, which holds the linked-project cache/pooler-url, not secrets — safe to
+   leave ungitignored-checked, it's already covered).
+4. **Generate the migration (schema-only) and seed file (data-only) separately** —
+   don't reuse the earlier mixed schema+data dump as-is; regenerate clean:
 
-- [ ] **Step 1: Confirm the local container is up and has the expected schemas**
+   ```bash
+   MSYS_NO_PATHCONV=1 docker exec pdm-postgres pg_dump -U admin -d pdm_db \
+     --schema=users --schema=artist --schema=content --schema=catalog \
+     --schema=engagement --schema=finance --schema=messages --schema=drizzle \
+     --no-owner --no-privileges --schema-only \
+     --file=/tmp/pdm-schema-only.sql
+   MSYS_NO_PATHCONV=1 docker cp pdm-postgres:/tmp/pdm-schema-only.sql ./pdm-schema-only.sql
 
-Run: `docker ps --filter "name=pdm-postgres"` (start it via the previous
-`docker-compose up -d postgres` invocation if it's not running — the service
-definition was removed from `docker-compose.yml` on this branch, so bring it up from
-git history if needed, e.g. `git show main:docker-compose.yml > /tmp/old-compose.yml
-&& docker compose -f /tmp/old-compose.yml up -d postgres`, or restore from the
-`postgres_data` volume directly).
-Expected: container running, and `psql $DATABASE_URL -c '\dn'` lists all 7 schemas.
+   MSYS_NO_PATHCONV=1 docker exec pdm-postgres pg_dump -U admin -d pdm_db \
+     --schema=users --schema=artist --schema=content --schema=catalog \
+     --schema=engagement --schema=finance --schema=messages --schema=drizzle \
+     --no-owner --no-privileges --data-only --inserts --column-inserts \
+     --file=/tmp/pdm-data-only.sql
+   MSYS_NO_PATHCONV=1 docker cp pdm-postgres:/tmp/pdm-data-only.sql ./pdm-data-only.sql
+   ```
 
-- [ ] **Step 2: Dump the 7 PDM schemas (schema + data)**
+   Strip the `\restrict`/`\unrestrict` psql meta-commands both files start/end with
+   (`grep -v "restrict"` — confirmed the only lines containing that word) before
+   using either file — they aren't valid outside an actual `psql` session and the
+   CLI's migration runner doesn't expect them either.
 
-```bash
-pg_dump "$DATABASE_URL" \
-  --schema=users --schema=artist --schema=content --schema=catalog \
-  --schema=engagement --schema=finance --schema=messages \
-  --no-owner --no-privileges --format=custom \
-  --file=pdm-dev-dump.dump
-```
+5. **`supabase migration new baseline`** → copy the cleaned schema-only dump into
+   the generated `supabase/migrations/<timestamp>_baseline.sql`. Copy the cleaned
+   data-only dump into `supabase/seed.sql`.
+6. **`supabase db push --dry-run`** first (no password prompt, previews what would
+   apply), then **`supabase db push --include-seed`**. `--include-seed` is the
+   documented mechanism for loading `seed.sql` into a **dev/staging** remote —
+   confirmed via Supabase's own docs (never on production, which this project isn't
+   yet).
 
-`--no-owner --no-privileges` because the local dump's roles (`admin`) don't exist on
-Supabase and shouldn't be recreated there — Supabase's own `postgres` role owns
-everything post-restore. `--format=custom` so `pg_restore` can run with
-`--if-exists --clean` safely if this needs to be re-run.
+**A real gap this caught, worth keeping as a documented lesson:** the first push
+attempt failed — `function public.set_artist_active_on_approved() does not exist`.
+The `--schema=...` scoping (7 app schemas + `drizzle`) missed a trigger function that
+lives in `public` (confirmed via `\df public.*` locally: one real function plus 10
+`uuid-ossp` extension functions, which aren't needed — the schema uses
+`gen_random_uuid()`, core in Postgres 13+, confirmed via
+`grep -c uuid_generate\|gen_random_uuid` returning `0`/`30`). The function is already
+tracked in Drizzle's own `drizzle/migrations/0000_baseline.sql` — pulled the
+canonical definition from there and inserted it into the Supabase migration file,
+directly before the `CREATE TRIGGER` statement that depends on it. `supabase db push`
+runs each migration file in a transaction — the failed attempt rolled back cleanly
+(`information_schema.schemata` confirmed empty after), so no partial-state cleanup
+was needed before retrying.
 
-- [ ] **Step 3: Confirm the target is still empty, then get the direct-connection string**
+- [x] **Step 1: `supabase login --name pdm`** (run by the user directly, not via Bash)
 
-Run (MCP): `list_tables` for project `falcoioeiutzoselpnhe`.
-Expected: `[]` (matches the check already done in conversation — reconfirm since
-time may have passed; if it's _not_ empty, stop — that means someone else already
-restored into it, don't overwrite blindly).
+- [x] **Step 2: `supabase link --project-ref falcoioeiutzoselpnhe`**
 
-Run (MCP): `get_project` for `falcoioeiutzoselpnhe`, or read the direct-connection
-string from the Supabase dashboard's Database Settings page. Do not hardcode the
-password into any committed file — it goes into local `.env` only (Task 2, Step 2).
+- [x] **Step 3: `supabase init`**
 
-- [ ] **Step 4: Restore into the Supabase project**
+- [x] **Step 4: Generate schema-only + data-only dumps, strip psql meta-commands**
 
-```bash
-pg_restore --no-owner --no-privileges \
-  -d "postgresql://postgres:[password]@db.falcoioeiutzoselpnhe.supabase.co:5432/postgres" \
-  pdm-dev-dump.dump
-```
+- [x] **Step 5: `supabase migration new baseline`, populate it + `seed.sql`**
 
-(Direct connection, port 5432 — same reasoning as `drizzle-kit`: this is DDL +
-session-level work, not something the transaction-mode pooler supports.)
+- [x] **Step 6: `supabase db push --include-seed`** — failed once (missing `public`
+      function), fixed by adding the function definition (sourced from
+      `drizzle/migrations/0000_baseline.sql`) before the trigger, retried, succeeded.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 7: Verify**
 
-Run (MCP): `list_tables` again for the same project.
-Expected: every table from `src/lib/db/schema.ts`'s aggregator present, under the
-same 7 schemas, **with row counts matching the local dump** (spot-check a couple —
-e.g. `select count(*) from users.users` — against the local source).
+Row counts compared directly against the local source for `users.users`,
+`artist.artists`, `catalog.tracks`, `content.posts`,
+`drizzle.__drizzle_migrations`, `artist.artist_onboarding_requests` — **exact match
+on every table** (3, 2, 9, 8, 24, 2 respectively).
 
-- [ ] **Step 6: Run advisors**
+- [x] **Step 8: Run advisors**
 
-Run (MCP): `get_advisors` for the project.
-Expected: no unexpected findings. RLS is not yet enabled on any of these tables at
-this point (that's the fan-chat plan's job once it resumes) — if the advisor flags
-missing RLS, note it but don't fix it in this task; confirm rather than assume it'll
-be quiet.
+`get_advisors(type: "security")` — clean, zero findings. `get_advisors(type:
+"performance")` — INFO-level only: unindexed foreign keys and a few unused indexes,
+all pre-existing schema design from before this migration, not introduced by it and
+not a blocker for this task. Worth a future indexing pass, not urgent.
 
-- [ ] **Step 7: Keep the dump file for Task 4**
+- [x] **Step 9: Clean up temp files**
 
-`pdm-dev-dump.dump` is reused as-is to seed local `supabase start` — don't delete it
-until Task 4 finishes. Don't commit it to git (it contains real dev data + is a
-binary artifact) — add `pdm-dev-dump.dump` to `.gitignore` if it isn't already
-covered by an existing `*.dump`/binary-artifact pattern.
+Deleted all intermediate `pdm-chunk-*.sql`, `pdm-part-*.sql`, `pdm-remainder.sql`,
+`pdm-dev-dump*.sql`, `pdm-schema-only.sql`, `pdm-data-only.sql` — their content now
+lives properly in `supabase/migrations/` and `supabase/seed.sql`, which **are**
+committed (Task 1's actual deliverable, not scratch files).
 
 ---
 
@@ -331,10 +352,10 @@ already predicted for a managed provider — not a regression beyond that.
 - Produces: a local Postgres + Realtime + Studio stack any contributor can start
   without touching the shared cloud project.
 
-- [ ] **Step 1: Initialize the local Supabase config (if not already present)**
-
-Run: `supabase init` (skip if `supabase/config.toml` already exists in the repo —
-check first with `Glob`).
+- [x] **Step 1: Initialize the local Supabase config** — done in Task 1 (`supabase
+    init`); `supabase/config.toml`, `supabase/migrations/`, `supabase/seed.sql`
+      already exist in the repo, so this step is already satisfied for anyone
+      picking up the branch fresh (they'd just run `supabase start`, next step).
 
 - [ ] **Step 2: Start the local stack**
 
@@ -347,21 +368,19 @@ DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
 Studio URL: http://127.0.0.1:54323
 ```
 
-- [ ] **Step 3: Restore the same dump from Task 1 into the local stack**
+- [ ] **Step 3: Apply migrations + seed data locally**
 
-Reuses `pdm-dev-dump.dump` from Task 1, Step 7 — so local dev and the cloud project
-start from the same populated data, not an empty schema:
+Simpler than the original plan (a separate `pg_restore` of a `.dump` file) — now that
+Task 1 produced real `supabase/migrations/` + `supabase/seed.sql`, the CLI's own
+reset flow handles both in one step:
 
 ```bash
-pg_restore --no-owner --no-privileges \
-  -d "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-  pdm-dev-dump.dump
+supabase db reset
 ```
 
-Expected: same tables + row counts as Task 1's cloud restore. (`yarn db:migrate`
-against the local `DIRECT_DATABASE_URL` is _not_ needed here — the dump already
-carries the full schema; running migrations afterward would be redundant, and only
-matters again the next time a _new_ migration is generated post-restore.)
+This applies every file in `supabase/migrations/` in order, then `supabase/seed.sql`
+— exactly the mechanism `supabase start` also uses on first run. Expected: same
+tables + row counts as Task 1's cloud push.
 
 - [ ] **Step 4: Point local `.env` at the local stack**
 

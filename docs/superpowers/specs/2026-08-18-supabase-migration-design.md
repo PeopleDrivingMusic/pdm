@@ -158,16 +158,31 @@ export default defineConfig({
 
 ### 3.4 Baseline migration and dev data
 
-**Revised per review feedback — this is a real data carry-over, not a fresh
-baseline apply.** The Supabase database is empty, but the _local_ Docker Postgres
-has real dev fixtures worth keeping so testing doesn't restart from zero. The move
-is a `pg_dump`/`pg_restore` (schema + data), scoped to PDM's own 7 Postgres schemas
-only (`users`, `artist`, `content`, `catalog`, `engagement`, `finance`, `messages`)
-— never a blanket dump of the whole local database, which would collide with
-Supabase's own reserved schemas/roles (`auth`, `storage`, `realtime`, `public`,
-`anon`/`authenticated`/`service_role`). The same dump seeds both the cloud project
-and local `supabase start` (§4), so all three environments start from the same
-populated state. Mechanics (exact commands) live in the plan, not re-derived here.
+**Revised twice — final mechanism is `supabase db push`, not manual SQL replay.**
+First revision (per review feedback): this is a real data carry-over, not a fresh
+baseline apply — the Supabase database is empty, but the _local_ Docker Postgres has
+real dev fixtures worth keeping so testing doesn't restart from zero. Second
+revision (per direct review of a live attempt): the _mechanism_ for that carry-over
+is the standard Supabase CLI flow — `supabase link` → `supabase migration new` →
+populate `supabase/migrations/<ts>_baseline.sql` (schema-only `pg_dump`) and
+`supabase/seed.sql` (data-only `pg_dump --inserts`) → `supabase db push
+--include-seed` — tracked in `supabase_migrations.schema_migrations`, not a
+one-off manual `execute_sql`/`pg_restore` replay. `--include-seed` is documented as
+dev/staging-only, which matches this project's current single-project state (§1.1).
+
+Scoped to PDM's own 7 Postgres schemas plus `drizzle` (`users`, `artist`, `content`,
+`catalog`, `engagement`, `finance`, `messages`, `drizzle`) — never a blanket dump of
+the whole local database, which would collide with Supabase's own reserved
+schemas/roles (`auth`, `storage`, `realtime`, `public`,
+`anon`/`authenticated`/`service_role`). One real gap that scoping caused and the
+first push attempt caught: a trigger function
+(`public.set_artist_active_on_approved()`) lives in `public`, outside the 7+1
+schemas — pulled from `drizzle/migrations/0000_baseline.sql` (the canonical source)
+and added to the migration file directly. The failed first attempt rolled back
+cleanly (Supabase migrations run transactionally), so no cleanup was needed before
+retrying. The same `supabase/migrations/` + `seed.sql` seed both the cloud project
+and local `supabase start` (§4) via `supabase db reset` — one source, three
+environments. Mechanics (exact commands) live in the plan, not re-derived here.
 
 ### 3.5 Nightly backup
 
