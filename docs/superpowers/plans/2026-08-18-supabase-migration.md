@@ -33,6 +33,16 @@ plan implements it task-by-task; read both.
   retention/expiry — never the R2 media bucket (spec §3.5, revised).
 - Local dev uses `supabase start`, not docker-compose Postgres — already removed
   from `docker-compose.yml` on this branch (spec §1.2, §4).
+- **Migration authority, decided after Task 2 (locked in conversation):** Drizzle
+  (`yarn db:generate`/`yarn db:migrate` against `DIRECT_DATABASE_URL`) is the _only_
+  tool used for schema changes from this point forward — cloud or local, same
+  `drizzle/migrations/*.sql` files applied directly to whichever Postgres
+  `DIRECT_DATABASE_URL` points at. `supabase/migrations/` +
+  `supabase_migrations.schema_migrations` were a **one-time bootstrap only** (Task
+  1. and are not touched again — there is no second database to keep in sync
+     (Supabase's Postgres _is_ the database now), so the only place this actually
+     matters is local dev: Task 4's `supabase db reset` replays the frozen baseline,
+     then `yarn db:migrate` catches local up on anything Drizzle has added since.
 
 ---
 
@@ -395,7 +405,8 @@ supabase db reset
 
 This applies every file in `supabase/migrations/` in order, then `supabase/seed.sql`
 — exactly the mechanism `supabase start` also uses on first run. Expected: same
-tables + row counts as Task 1's cloud push.
+tables + row counts as Task 1's cloud push. (No `.env` dependency — this is a pure
+CLI operation against the already-started local stack.)
 
 - [ ] **Step 4: Point local `.env` at the local stack**
 
@@ -405,12 +416,29 @@ DIRECT_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 PUBLIC_SUPABASE_STUDIO_URL="http://127.0.0.1:54323"
 ```
 
-- [ ] **Step 5: Verify**
+- [ ] **Step 5: Catch up on any Drizzle migrations added after the baseline**
+
+Per the migration-authority decision (Global Constraints) — `supabase/migrations/`
+is frozen at the one-time bootstrap, so anything added via `yarn db:migrate` against
+the cloud project since Task 1 won't be in it yet. Needs Step 4's `DIRECT_DATABASE_URL`
+already pointed locally:
+
+```bash
+yarn db:migrate
+```
+
+This is what keeps local and cloud identical going forward — the same
+`drizzle/migrations/*.sql` files, just applied to a different `DIRECT_DATABASE_URL`
+target each time. Expected: no-op the first time this plan runs (nothing's been
+added to Drizzle since Task 1's bootstrap yet), but this is the step a contributor
+runs every time they set up local dev from here on.
+
+- [ ] **Step 6: Verify**
 
 Run: `yarn dev`, confirm the app works exactly as in Task 3 but against the local
 stack. Open `http://127.0.0.1:54323` (Studio) and confirm the schema is visible.
 
-- [ ] **Step 6: Update the local-development wiki page**
+- [ ] **Step 7: Update the local-development wiki page**
 
 Replace `docker-compose up -d` / pgAdmin instructions in
 `.claude/wiki/architecture/local-development.md` with `supabase start` /
@@ -418,7 +446,7 @@ Replace `docker-compose up -d` / pgAdmin instructions in
 still started separately (`yarn logging:up` or equivalent — check the page's current
 wording for the exact command name).
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add .claude/wiki/architecture/local-development.md
