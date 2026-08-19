@@ -479,25 +479,31 @@ git commit -m "fix(e2e): migrate the test db instead of docker-exec pg_dump clon
 
 **Interfaces:**
 
-- Consumes: `DIRECT_DATABASE_URL`, credentials for a **new, separate** storage
-  target — **not** the existing R2 media bucket (`PUBLIC_R2_IMAGES_BUCKET`/
-  `CLOUDFLARE_ACCOUNT_ID`/`R2_ACCESS_KEY_ID`). Per review feedback, the user is
-  provisioning this storage themselves (their words: "что-то типа архивного, а не
-  R2" — likely R2's own Infrequent Access storage class on a dedicated bucket
-  distinct from the media bucket, rather than a different provider entirely, but
-  **don't assume — confirm the actual bucket/endpoint/credentials with the user
-  before writing Step 2**, since this task can't be completed blind).
-- Produces: a nightly `pdm-backup-<date>.dump` object in that storage, **with
+- Consumes: `DIRECT_DATABASE_URL`, credentials for the **`bd-dump` R2 bucket**
+  (account `09959f0d1512f7913baacf1ebd4b1337`, endpoint
+  `https://09959f0d1512f7913baacf1ebd4b1337.r2.cloudflarestorage.com/bd-dump`) —
+  confirmed by the user, a bucket dedicated to this purpose, separate from the
+  existing media bucket (`PUBLIC_R2_IMAGES_BUCKET`/`CLOUDFLARE_ACCOUNT_ID`/
+  `R2_ACCESS_KEY_ID`). Needs its own R2 API token (Access Key ID + Secret Access
+  Key) — not yet in hand as of this revision, confirm before Step 3.
+- Produces: a nightly `pdm-backup-<date>.dump` object in that bucket, **with
   automatic expiry** — not just an unbounded pile of dumps.
 
 **Correction from the first pass of this plan:** the original version only wrote the
-backup, with no cleanup — per review feedback, old dumps need to expire or R2 (or
-whatever target) fills up with backup clutter indefinitely.
+backup, with no cleanup — per review feedback, old dumps need to expire or the
+bucket fills up with backup clutter indefinitely.
 
-- [ ] **Step 1: Confirm the actual storage target with the user** — bucket name,
-      endpoint, credentials, and specifically whether it's a separate R2 bucket
-      (Infrequent Access class) or something else entirely. Do not proceed to Step 2
-      on an assumption.
+**Second correction (this revision):** the storage target is settled — R2 bucket
+`bd-dump`, separate account/bucket from media, per the user directly. What's still
+open is the R2 API token for that bucket specifically.
+
+- [ ] **Step 1: Get an R2 API token scoped to the `bd-dump` bucket** — Object
+      Read & Write, scoped to that bucket only (not account-wide, matching the
+      least-privilege pattern `R2Service`'s existing media credentials already
+      follow). New env vars, e.g. `BACKUP_R2_ACCOUNT_ID`, `BACKUP_R2_ACCESS_KEY_ID`,
+      `BACKUP_R2_SECRET_ACCESS_KEY`, `BACKUP_R2_BUCKET=bd-dump` — kept separate from
+      the existing `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` (media) so a scoped
+      token compromise on one doesn't expose the other.
 
 - [ ] **Step 2: Read `scheduled-jobs.md`** to find the existing cron mechanism
       (`pg_cron`? an external scheduler? a Vercel Cron Job, now that hosting is
@@ -522,7 +528,7 @@ whatever target) fills up with backup clutter indefinitely.
 
 - [ ] **Step 5: Verify** by running the backup once manually and restoring the dump
       into a scratch database (`createdb pdm_backup_test && pg_restore -d
-  pdm_backup_test pdm-backup-test.dump`), confirming row counts match the
+pdm_backup_test pdm-backup-test.dump`), confirming row counts match the
       source. Separately verify the retention rule actually fires — either by
       checking the lifecycle-rule config took effect (dashboard/API), or, if
       script-based, by running the delete path against a fake old-dated test object

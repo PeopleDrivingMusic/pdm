@@ -52,10 +52,10 @@ migrated a second time.
    all — quoted verbatim in §5 below), but it's now unnecessary since the tables
    live in the same database. Documented here as a fallback in case DB and Realtime
    ever end up split again.
-6. **Nightly `pg_dump` with retention, to a dedicated archival storage target the
-   user provisions separately** (not the existing R2 media bucket) — from day one
-   (~$0), per the existing decision, amended per review feedback to require
-   automatic expiry of old dumps (§3.5) rather than an unbounded pile.
+6. **Nightly `pg_dump` with retention, to a dedicated R2 bucket (`bd-dump`,
+   separate from the media bucket)** — from day one (~$0), per the existing
+   decision, amended per review feedback to require automatic expiry of old dumps
+   (§3.5) rather than an unbounded pile.
 7. **docker-compose cleanup** (done in this branch): `postgres` and `pgadmin`
    services removed; `postgres-exporter` repointed at `host.docker.internal:54322`
    (supabase start's local Postgres lives in a separate CLI-managed compose stack,
@@ -175,10 +175,11 @@ A scheduled job (`pg_dump` to a dedicated storage target) with **automatic
 retention/expiry** — not just an ever-growing pile of dumps. Two things changed from
 the original decision doc's "R2" framing, per review feedback:
 
-- **Not the existing R2 media bucket.** The user is provisioning a separate,
-  dedicated archival storage target themselves (likely a distinct R2 bucket on the
-  Infrequent Access storage class, but not assumed — confirmed with them before the
-  plan's backup task is implemented).
+- **Not the existing R2 media bucket.** Confirmed target: R2 bucket `bd-dump`
+  (account `09959f0d1512f7913baacf1ebd4b1337`), separate from the media bucket —
+  the user provisioned it directly rather than adding a second storage provider,
+  keeping the infrastructure surface from sprawling. A dedicated, bucket-scoped R2
+  API token for it is still needed (plan Task 6, Step 1).
 - **Retention is load-bearing, not optional.** Old dumps must expire (prefer a
   native bucket lifecycle rule over hand-rolled deletion logic) so backup storage
   doesn't grow unbounded. Retention window (days) is picked with the user at
