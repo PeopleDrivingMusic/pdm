@@ -5,46 +5,26 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
   grafana_data:
   loki_data:
   prometheus_data:
 
 services:
-  postgres:
-    image: postgres:15
-    container_name: pdm-postgres
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: root
-      POSTGRES_DB: pdm_db
-    ports:
-      - '5433:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d
-    restart: unless-stopped
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U admin']
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    networks:
-      - app
-      - monitoring
-    labels:
-      - 'service=postgres'
-      - 'prometheus.io/scrape=false' # Disable scraping postgres itself, use exporter
+  # Local Postgres + Studio now come from `supabase start` (Supabase CLI), not this
+  # compose file — see docs/superpowers/plans/<date>-supabase-migration.md. That
+  # stack runs its own Postgres on 127.0.0.1:54322 and Studio on 127.0.0.1:54323,
+  # replacing the `postgres`/`pgadmin` services that used to live here.
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
     container_name: pdm-postgres-exporter
     environment:
-      DATA_SOURCE_NAME: 'postgresql://admin:root@postgres:5432/pdm_db?sslmode=disable'
+      # Points at `supabase start`'s local Postgres, which runs in its own
+      # CLI-managed compose stack outside this network — reached via the host,
+      # not a docker-network hostname.
+      DATA_SOURCE_NAME: 'postgresql://postgres:postgres@host.docker.internal:54322/postgres?sslmode=disable'
     ports:
       - '9187:9187'
-    depends_on:
-      - postgres
     networks:
       - monitoring
     restart: unless-stopped
@@ -52,24 +32,6 @@ services:
       - 'service=postgres-exporter'
       - 'prometheus.io/scrape=true'
       - 'prometheus.io/port=9187'
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: pdm-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@pdm.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - '8081:80'
-    depends_on:
-      - postgres
-    restart: unless-stopped
-    networks:
-      - app
-      - monitoring
-    labels:
-      - 'service=pgadmin'
-      - 'prometheus.io/scrape=false'
 
   prometheus:
     image: prom/prometheus:v2.55.1
@@ -202,12 +164,12 @@ services:
   #     - "4173:4173"
   #   environment:
   #     - NODE_ENV=production
-  #     - DATABASE_URL=postgresql://admin:root@postgres:5432/pdm_db
+  #     # Supabase transaction-mode pooler — see database-hosting.md / the
+  #     # Supabase migration plan for DIRECT_DATABASE_URL (migrations) and the
+  #     # required prepare:false + max settings.
+  #     - DATABASE_URL=postgresql://postgres:[password]@db.<ref>.supabase.co:6543/postgres
   #     - LOKI_URL=http://loki:3100
   #     - PROMETHEUS_METRICS_ENABLED=true
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
   #   restart: unless-stopped
   #   networks:
   #     - app

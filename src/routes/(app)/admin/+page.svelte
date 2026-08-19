@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { PUBLIC_PGADMIN_URL } from '$env/static/public';
+	import { PUBLIC_SUPABASE_STUDIO_URL } from '$env/static/public';
 
 	let { data } = $props();
 	let refreshing = $state(false);
@@ -83,8 +83,10 @@
 		<div class="actions-card">
 			<h2>Database Actions</h2>
 			<div class="actions-grid">
-				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- PUBLIC_PGADMIN_URL is an external absolute URL (pgAdmin on its own port), not a SvelteKit route; the rule can't trace an imported $env value back to a literal to confirm that itself. -->
-				<a href={PUBLIC_PGADMIN_URL} target="_blank" class="action-btn"> Open pgAdmin </a>
+				<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- PUBLIC_SUPABASE_STUDIO_URL is an external absolute URL (Supabase Studio, local or hosted), not a SvelteKit route; the rule can't trace an imported $env value back to a literal to confirm that itself. -->
+				<a href={PUBLIC_SUPABASE_STUDIO_URL} target="_blank" class="action-btn">
+					Open Supabase Studio
+				</a>
 				<button class="action-btn" onclick={() => window.open('/api/db/health', '_blank')}>
 					View Raw Health Check
 				</button>
@@ -105,7 +107,7 @@
 					<strong>Schemas:</strong> users, artist, catalog, content, engagement, finance
 				</p>
 				<p><strong>ORM:</strong> Drizzle ORM</p>
-				<p><strong>Database:</strong> PostgreSQL 15</p>
+				<p><strong>Database:</strong> PostgreSQL (Supabase)</p>
 				<p><strong>Migrations:</strong> Generated and ready to apply</p>
 			</div>
 		</div>
@@ -114,7 +116,7 @@
 	<div class="help-section">
 		<h2>Quick Commands</h2>
 		<div class="commands">
-			<code>docker-compose up -d</code> - Start database
+			<code>supabase start</code> - Start local Supabase (DB + Realtime + Studio)
 			<code>npm run db:generate</code> - Generate migrations
 			<code>npm run db:migrate</code> - Apply migrations
 			<code>npm run db:push</code> - Push schema (development)
