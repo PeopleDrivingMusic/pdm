@@ -38,11 +38,11 @@ plan implements it task-by-task; read both.
   tool used for schema changes from this point forward — cloud or local, same
   `drizzle/migrations/*.sql` files applied directly to whichever Postgres
   `DIRECT_DATABASE_URL` points at. `supabase/migrations/` +
-  `supabase_migrations.schema_migrations` were a **one-time bootstrap only** (Task
-  1. and are not touched again — there is no second database to keep in sync
-     (Supabase's Postgres _is_ the database now), so the only place this actually
-     matters is local dev: Task 4's `supabase db reset` replays the frozen baseline,
-     then `yarn db:migrate` catches local up on anything Drizzle has added since.
+  `supabase_migrations.schema_migrations` were a **one-time bootstrap only**, from
+  Task 1, and are not touched again — there is no second database to keep in sync
+  (Supabase's Postgres _is_ the database now), so the only place this actually
+  matters is local dev: Task 4's `supabase db reset` replays the frozen baseline,
+  then `yarn db:migrate` catches local up on anything Drizzle has added since.
 
 ---
 
