@@ -66,3 +66,44 @@ export type LikeErrorCode =
 	| 'rate_limited'
 	| 'invalid_request'
 	| 'unauthorized';
+
+/** Author identity as a chat message renders it. Same shape as `MessageAuthor`,
+ *  kept separate so chat and comments can diverge without cross-coupling. */
+export interface ChatAuthor {
+	id: string;
+	name: string;
+	avatar: string | null;
+}
+
+/** A subscriber-visible chat message. No edit, no likes — unlike comments. */
+export interface ChatDTO {
+	id: string;
+	body: string;
+	createdAt: string;
+	author: ChatAuthor;
+	isArtist: boolean;
+	canDelete: boolean;
+}
+
+/** What a non-subscriber sees instead of a real message: real cadence, no content. */
+export interface ChatTeaser {
+	id: string;
+	createdAt: string;
+}
+
+/** One frame streamed by `getChatRoom`. `presence` frames go to every viewer
+ *  unmasked; `message`/`teaser` are the masked/unmasked split of the same event. */
+export type ChatFrame =
+	| { type: 'message'; message: ChatDTO }
+	| { type: 'teaser'; teaser: ChatTeaser }
+	| { type: 'presence'; onlineCount: number; artistOnline: boolean };
+
+export type ChatErrorCode =
+	| 'empty'
+	| 'too_long'
+	| 'links_not_allowed'
+	| 'not_subscribed'
+	| 'not_found'
+	| 'forbidden'
+	| 'invalid_request'
+	| 'unauthorized';
