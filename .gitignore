@@ -37,6 +37,9 @@ coverage/
 
 # Claude Code (local config + AI-maintained wiki)
 .claude/
+.agents/
+.mcp.json
+skills-lock.json
 
 # playwright-mcp session output (page snapshots), not project source
 .playwright-mcp/
