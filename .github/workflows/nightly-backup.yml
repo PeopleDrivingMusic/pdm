@@ -1,0 +1,76 @@
+name: Nightly DB Backup
+
+# pg_dump is a native Postgres binary, not available in Vercel's serverless
+# runtime — vendoring a static binary into an app function would be exactly
+# the kind of fragile, hand-rolled infra this project avoids. GitHub Actions
+# already runs CI and can install postgresql-client from the official apt
+# repo in seconds, so backups run here instead of the app's own scheduled-jobs
+# pattern (service + endpoint + Vercel Cron), which is reserved for jobs whose
+# logic is expressible as an authenticated app endpoint.
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install postgresql-client 17 (matches Supabase's Postgres version)
+        run: |
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Split DIRECT_DATABASE_URL into PG* env vars
+        # pg_dump reads PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE automatically —
+        # doing this keeps the password out of the process's argv (visible via
+        # `ps`/`/proc` to anything else on the runner) instead of interpolating
+        # the full connection string, password included, as a CLI argument.
+        env:
+          DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: |
+          node -e '
+            const u = new URL(process.env.DIRECT_DATABASE_URL);
+            const lines = [
+              `PGHOST=${u.hostname}`,
+              `PGPORT=${u.port || 5432}`,
+              `PGUSER=${decodeURIComponent(u.username)}`,
+              `PGPASSWORD=${decodeURIComponent(u.password)}`,
+              `PGDATABASE=${u.pathname.slice(1)}`
+            ];
+            require("fs").appendFileSync(process.env.GITHUB_ENV, lines.join("\n") + "\n");
+          '
+
+      - name: Dump PDM's app schemas
+        run: |
+          DATE=$(date -u +%Y-%m-%dT%H%M%SZ)
+          echo "DUMP_FILE=pdm-backup-${DATE}.dump" >> "$GITHUB_ENV"
+          # Includes `public` alongside the 7 app schemas + drizzle's journal:
+          # set_artist_active_on_approved() (see drizzle/migrations/0000_baseline.sql)
+          # lives in public, outside the named app schemas, same gap Task 1 hit
+          # bootstrapping Supabase — a dump that skipped public would restore with
+          # a missing-function error on that trigger.
+          pg_dump \
+            --schema=users --schema=artist --schema=content --schema=catalog \
+            --schema=engagement --schema=finance --schema=messages \
+            --schema=drizzle --schema=public \
+            --no-owner --no-privileges --format=custom \
+            --file="pdm-backup-${DATE}.dump"
+
+      - name: Upload to R2 (bd_dumps)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_BD_DUMP_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BD_DUMP_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 cp "$DUMP_FILE" "s3://bd_dumps/$DUMP_FILE" \
+            --endpoint-url "https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com"

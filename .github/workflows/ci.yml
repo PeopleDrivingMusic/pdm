@@ -24,7 +24,7 @@ env:
   R2_ACCESS_KEY_ID: ''
   R2_SECRET_ACCESS_KEY: ''
   PUBLIC_R2_IMAGES_BUCKET: ''
-  PUBLIC_PGADMIN_URL: ''
+  PUBLIC_SUPABASE_STUDIO_URL: ''
 
 jobs:
   changes:
@@ -173,7 +173,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://admin:root@localhost:5432/pdm_db
+      DIRECT_DATABASE_URL: postgresql://admin:root@localhost:5432/pdm_db
     steps:
       - uses: actions/checkout@v4
         with:

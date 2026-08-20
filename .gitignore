@@ -37,6 +37,22 @@ coverage/
 
 # Claude Code (local config + AI-maintained wiki)
 .claude/
+.agents/
+.mcp.json
+skills-lock.json
 
 # playwright-mcp session output (page snapshots), not project source
 .playwright-mcp/
+
+# Large demo/seed media (Metallica mp3s + placeholder art) — never belonged in
+# git; ~130MB of it made this branch's first push to origin impractical.
+# Untracked here going forward, kept on disk locally for dev/demo purposes.
+# Regenerate/reacquire per-machine rather than cloning them.
+pen/
+static/music/
+static/bg/
+static/albums/
+static/artists/cover/
+static/uploads/tracks/
+static/muse.webp
+static/rock_am_ring.jpeg
