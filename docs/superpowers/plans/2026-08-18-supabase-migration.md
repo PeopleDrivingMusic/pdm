@@ -637,7 +637,7 @@ git commit -m "feat(db): nightly pg_dump with retention to dedicated archival st
 
 **Interfaces:** none — documentation/tracking only.
 
-- [ ] **Step 1: Amend the decision doc**
+- [x] **Step 1: Amend the decision doc**
 
 In `.claude/wiki/decisions/supabase-managed-postgres.md`:
 
@@ -651,27 +651,22 @@ In `.claude/wiki/decisions/supabase-managed-postgres.md`:
   the spec) supersedes the original two-project (Free dev/staging + Pro prod) plan
   for now, with a note to revisit the split once real users exist.
 
-- [ ] **Step 2: Commit the wiki change**
+- [x] **Step 2: Commit the wiki change**
 
-```bash
-git -C .claude add wiki/decisions/supabase-managed-postgres.md
-git -C .claude commit -m "docs: amend Supabase decision — Realtime in scope, migration in progress"
-git -C .claude push
-```
+  Committed and pushed to `pdm-claude` as `a61d574` ("docs: amend Supabase
+  decision — Realtime in scope, migration in progress") on 2026-08-19, ahead of
+  this task actually being reached in plan order — the doc content matches this
+  step's requirements verbatim (Realtime scope note, in-progress status line,
+  single-project note under Staged rollout).
 
-(Per `CLAUDE.md`: `.claude/` is a separate nested repo, gitignored in the main repo —
-commit/push it from inside `.claude/`, never through the main repo.)
+- [x] **Step 3: Update issue #24**
 
-- [ ] **Step 3: Update issue #24**
-
-```bash
-gh issue edit 24 --remove-label "P2" 2>/dev/null || true
-gh issue comment 24 --body "Scope amended 2026-08-18: Realtime is now in scope (needed for the fan-chat feature), and this is being worked now rather than deferred — see feature/supabase-migration and docs/superpowers/specs/2026-08-18-supabase-migration-design.md."
-```
-
-(Check the issue's actual current labels first with `gh issue view 24 --json
-labels` — the `--remove-label` call above is a guess at the label name; confirm
-before running.)
+  Already done ahead of this task, verified now via `gh issue view 24 --json
+labels,comments,state`: issue is `OPEN`, only carries the `enhancement` label
+  (no `P2` present — either never applied or already removed, moot either way),
+  and carries a comment posted 2026-08-19 covering the scope amendment (Realtime
+  in scope, single-project rollout, links to the design/plan docs and the
+  decision-doc amendment). Matches this step's intent; nothing further needed.
 
 ---
 
