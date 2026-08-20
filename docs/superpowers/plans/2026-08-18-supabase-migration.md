@@ -582,49 +582,89 @@ bucket fills up with backup clutter indefinitely.
 `bd-dump`, separate account/bucket from media, per the user directly. What's still
 open is the R2 API token for that bucket specifically.
 
-- [ ] **Step 1: Get an R2 API token scoped to the `bd-dump` bucket** — Object
-      Read & Write, scoped to that bucket only (not account-wide, matching the
-      least-privilege pattern `R2Service`'s existing media credentials already
-      follow). New env vars, e.g. `BACKUP_R2_ACCOUNT_ID`, `BACKUP_R2_ACCESS_KEY_ID`,
-      `BACKUP_R2_SECRET_ACCESS_KEY`, `BACKUP_R2_BUCKET=bd-dump` — kept separate from
-      the existing `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY` (media) so a scoped
-      token compromise on one doesn't expose the other.
+- [x] **Step 1: Get an R2 API token scoped to the `bd-dump` bucket**
 
-- [ ] **Step 2: Read `scheduled-jobs.md`** to find the existing cron mechanism
-      (`pg_cron`? an external scheduler? a Vercel Cron Job, now that hosting is
-      confirmed as Vercel?) rather than inventing a new one.
+  Bucket ended up named `bd_dumps` (underscore, user-provisioned directly —
+  `R2_BD_DUMPS_BUCKET` in `.env`), not `bd-dump` as this plan originally assumed.
+  User added a scoped token: `R2_BD_DUMP_API_TOKEN`, `R2_BD_DUMP_ACCESS_KEY_ID`,
+  `R2_BD_DUMP_SECRET_ACCESS_KEY` — separate from the media credentials, matching
+  the least-privilege intent (confirmed later in Step 4: this token can PUT/GET
+  objects but correctly cannot alter bucket-level config like lifecycle rules).
+  Mirrored into GitHub Actions secrets (`R2_BD_DUMP_ACCESS_KEY_ID`,
+  `R2_BD_DUMP_SECRET_ACCESS_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `DIRECT_DATABASE_URL` —
+  the last one set by the user directly via `gh secret set` so the raw DB password
+  never passed through the agent).
 
-- [ ] **Step 3: Write the backup script**, shape depends on Step 2's finding — likely
-      a small Node script (`pg_dump` isn't available as a JS API; shell out to it).
-      Check `get_project`/dashboard first for whether Supabase's own Pro-tier daily
-      backups already cover this, before building a second, redundant mechanism —
-      Free tier has **no** built-in backups (per `database-hosting.md`), so this is
-      load-bearing only while on Free; if/when the project moves to Pro, revisit
-      whether this script is still needed at all.
+- [x] **Step 2: Read `scheduled-jobs.md`**
 
-- [ ] **Step 4: Configure retention — prefer a bucket lifecycle rule over a
-      hand-rolled delete step.** If the target is R2 (or any S3-compatible store),
-      it supports native object-expiration lifecycle rules — configuring "expire
-      objects with prefix `pdm-backup-` after N days" on the bucket itself is
-      zero-maintenance and can't have an off-by-one bug that deletes the wrong
-      thing. Only fall back to deleting old objects from inside the backup script
-      itself if the chosen target has no lifecycle-rule support. Pick N (e.g. 14 or
-      30 days) with the user before finalizing — not decided in this plan.
+  Confirmed the documented pattern (service method → thin authenticated endpoint →
+  external scheduler, Vercel Cron now that hosting is confirmed) — but that pattern
+  assumes job logic expressible as an app endpoint. `pg_dump` is a native Postgres
+  binary, not available in Vercel's serverless runtime (no system Postgres tools,
+  and vendoring a static binary into a function is exactly the kind of fragile
+  hand-rolled infra this project has been avoiding all session). Flagged this
+  conflict to the user directly rather than silently picking a workaround; user
+  chose a **GitHub Actions scheduled workflow** instead of Vercel Cron + endpoint —
+  CI already runs there, and `apt-get`/PGDG installs `postgresql-client` in
+  seconds. This is a deliberate one-off exception to the scheduled-jobs.md pattern
+  for jobs that need a native binary, not a reversal of the pattern itself.
 
-- [ ] **Step 5: Verify** by running the backup once manually and restoring the dump
-      into a scratch database (`createdb pdm_backup_test && pg_restore -d
-pdm_backup_test pdm-backup-test.dump`), confirming row counts match the
-      source. Separately verify the retention rule actually fires — either by
-      checking the lifecycle-rule config took effect (dashboard/API), or, if
-      script-based, by running the delete path against a fake old-dated test object
-      rather than waiting N real days to find out.
+- [x] **Step 3: Write the backup script**
 
-- [ ] **Step 6: Commit**
+  Not a Node script — a GitHub Actions workflow (`.github/workflows/nightly-backup.yml`,
+  `schedule: '0 3 * * *'` + `workflow_dispatch`). Installs `postgresql-client-17`
+  via the official PGDG apt repo (matches Supabase's Postgres 17, not the
+  older client Ubuntu ships by default), dumps with `pg_dump --format=custom`
+  (custom format, so `pg_restore` — not plain SQL — is the restore path, matching
+  Step 5's verification command), then uploads via `aws s3 cp` against R2's
+  S3-compatible endpoint (`aws-cli` is preinstalled on `ubuntu-latest` runners, no
+  extra install needed). Dump scope is the 7 app schemas + `drizzle` + **`public`**
+  — `public` is included deliberately: `set_artist_active_on_approved()` lives
+  there (same gap Task 1 hit bootstrapping Supabase), and a schema-scoped dump that
+  skipped it would restore with a missing-function error on that trigger.
+  Confirmed via dashboard context earlier in this migration that the project is
+  still on **Free tier** (no built-in backups) — this script is load-bearing, not
+  redundant with anything Supabase already provides.
 
-```bash
-git add <backup script path>
-git commit -m "feat(db): nightly pg_dump with retention to dedicated archival storage"
-```
+- [x] **Step 4: Configure retention**
+
+  Attempted via the R2 S3 API (`PutBucketLifecycleConfigurationCommand`, reusing
+  the project's existing `@aws-sdk/client-s3` dependency) using the new scoped
+  token — got `AccessDenied`: the token's Object Read & Write scope correctly
+  doesn't extend to bucket-level configuration. Rather than widen the token's
+  permissions just for this one-time action, asked the user, who configured the
+  lifecycle rule directly in the Cloudflare dashboard instead (prefix
+  `pdm-backup-`, expire after **30 days** — user's choice over the plan's 14-day
+  option, more margin if a problem isn't noticed right away). Token stays
+  minimally scoped.
+
+- [~] **Step 5: Verify** — **partially blocked, deferred to post-PR-merge.**
+
+  `workflow_dispatch` cannot target a workflow that only exists on an unmerged
+  branch — GitHub requires the workflow file to be present on the default branch
+  before it's dispatchable via API/CLI, confirmed live (`HTTP 404: workflow
+nightly-backup.yml not found on the default branch`). Local verification was
+  also unavailable at this point: Docker was down after an unrelated Windows
+  crash/restart mid-session (no local Postgres container, no local `pg_dump`
+  binary on this machine either). Rather than fabricate a result or force a
+  workaround, surfaced this to the user directly; decision: open the PR now, user
+  reviews and merges, then dispatch the real workflow on `main` and confirm a
+  restore afterward — real CI-runner verification (the `apt-get`/PGDG install
+  path especially) rather than a local approximation.
+
+- [x] **Step 6: Commit**
+
+  Committed as `4485239` ("feat(db): nightly pg_dump with retention to dedicated
+  archival storage"). One unplanned follow-up commit (`0320b0d`) was needed first:
+  the very first push of this branch was blocked by the `pre-push` hook's `yarn
+lint` failing on pre-existing untracked files unrelated to this task
+  (`.agents/`, `.mcp.json`, `skills-lock.json` — local skill/agent tooling — and
+  `supabase/.temp/linked-project.json`, gitignored via a nested `supabase/.gitignore`
+  that prettier doesn't read). Asked the user rather than guessing intent; they
+  said gitignore them — added `.agents/`, `.mcp.json`, `skills-lock.json` to the
+  root `.gitignore` and `supabase/.temp/` to `.prettierignore`, committed
+  separately, then the real push succeeded (`yarn lint`/`yarn test:unit` — 369
+  tests — both green in the hook).
 
 ---
 
