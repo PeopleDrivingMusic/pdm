@@ -9,7 +9,7 @@ config();
 
 // Create connection with proper configuration
 const client = postgres(process.env.DATABASE_URL!, {
-	max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+	max: Number.parseInt(process.env.DATABASE_POOL_MAX ?? '', 10) || 10,
 	// Required against Supabase's transaction-mode pooler (port 6543), which does
 	// not support prepared statements — see database-hosting.md / the Supabase
 	// migration plan. Harmless against a direct/session connection too, so this is

@@ -11,7 +11,7 @@ volumes:
 
 services:
   # Local Postgres + Studio now come from `supabase start` (Supabase CLI), not this
-  # compose file — see docs/superpowers/plans/<date>-supabase-migration.md. That
+  # compose file — see docs/superpowers/plans/2026-08-18-supabase-migration.md. That
   # stack runs its own Postgres on 127.0.0.1:54322 and Studio on 127.0.0.1:54323,
   # replacing the `postgres`/`pgadmin` services that used to live here.
 
@@ -167,7 +167,7 @@ services:
   #     # Supabase transaction-mode pooler — see database-hosting.md / the
   #     # Supabase migration plan for DIRECT_DATABASE_URL (migrations) and the
   #     # required prepare:false + max settings.
-  #     - DATABASE_URL=postgresql://postgres:[password]@db.<ref>.supabase.co:6543/postgres
+  #     - DATABASE_URL=postgresql://postgres.<project-ref>:[password]@<pooler-host>:6543/postgres
   #     - LOKI_URL=http://loki:3100
   #     - PROMETHEUS_METRICS_ENABLED=true
   #   restart: unless-stopped

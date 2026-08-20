@@ -26,9 +26,31 @@ jobs:
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-17
 
-      - name: Dump PDM's app schemas
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Split DIRECT_DATABASE_URL into PG* env vars
+        # pg_dump reads PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE automatically —
+        # doing this keeps the password out of the process's argv (visible via
+        # `ps`/`/proc` to anything else on the runner) instead of interpolating
+        # the full connection string, password included, as a CLI argument.
         env:
           DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
+        run: |
+          node -e '
+            const u = new URL(process.env.DIRECT_DATABASE_URL);
+            const lines = [
+              `PGHOST=${u.hostname}`,
+              `PGPORT=${u.port || 5432}`,
+              `PGUSER=${decodeURIComponent(u.username)}`,
+              `PGPASSWORD=${decodeURIComponent(u.password)}`,
+              `PGDATABASE=${u.pathname.slice(1)}`
+            ];
+            require("fs").appendFileSync(process.env.GITHUB_ENV, lines.join("\n") + "\n");
+          '
+
+      - name: Dump PDM's app schemas
         run: |
           DATE=$(date -u +%Y-%m-%dT%H%M%SZ)
           echo "DUMP_FILE=pdm-backup-${DATE}.dump" >> "$GITHUB_ENV"
@@ -37,7 +59,7 @@ jobs:
           # lives in public, outside the named app schemas, same gap Task 1 hit
           # bootstrapping Supabase — a dump that skipped public would restore with
           # a missing-function error on that trigger.
-          pg_dump "$DIRECT_DATABASE_URL" \
+          pg_dump \
             --schema=users --schema=artist --schema=content --schema=catalog \
             --schema=engagement --schema=finance --schema=messages \
             --schema=drizzle --schema=public \
