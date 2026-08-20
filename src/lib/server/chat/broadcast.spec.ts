@@ -1,7 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('$lib/db', () => ({
-	client: { notify: vi.fn() }
+	client: { notify: vi.fn().mockResolvedValue(undefined) }
+}));
+
+vi.mock('$lib/utils/logger', () => ({
+	logger: { warn: vi.fn() }
 }));
 
 import { client } from '$lib/db';

@@ -1,4 +1,5 @@
 import { client } from '$lib/db';
+import { logger } from '$lib/utils/logger';
 import type { ChatDTO, ChatFrame } from '$lib/messages/types';
 
 export interface ChatMessagePublished {
@@ -11,7 +12,12 @@ export interface ChatMessagePublished {
  *  design; the message itself is already durably committed by the time this runs. */
 export function publishChatMessage(artistId: string, message: ChatDTO): void {
 	const event: ChatMessagePublished = { kind: 'message', message };
-	void client.notify(`chat_room_${artistId}`, JSON.stringify(event));
+	void client.notify(`chat_room_${artistId}`, JSON.stringify(event)).catch((err) => {
+		logger.warn('Failed to publish chat message via NOTIFY', {
+			component: 'chat',
+			metadata: { artistId, messageId: message.id, error: err }
+		});
+	});
 }
 
 /**
