@@ -63,11 +63,41 @@ export default defineConfig({
 				'src/lib/server/media/validation.ts',
 				'src/lib/server/media/uploadTargetHandler.ts',
 				'src/lib/server/media/logging.ts',
-				'src/lib/server/security/**'
+				'src/lib/server/security/**',
+				'src/lib/server/chat/**',
+				'src/lib/db/services/ChatRepository.ts',
+				'src/routes/api/chat/**'
 			],
 			// Barrel re-exports and type-only modules carry no testable logic.
 			exclude: ['**/index.ts', '**/types.ts'],
-			thresholds: { lines: 90, branches: 90, functions: 90, statements: 90 }
+			thresholds: {
+				lines: 90,
+				branches: 90,
+				functions: 90,
+				statements: 90,
+
+				'src/lib/server/chat/**': {
+					lines: 95,
+					branches: 80,
+					functions: 100,
+					statements: 95,
+					perFile: true
+				},
+				'src/lib/db/services/ChatRepository.ts': {
+					lines: 89,
+					branches: 87,
+					functions: 75,
+					statements: 89,
+					perFile: true
+				},
+				'src/routes/api/chat/**': {
+					lines: 100,
+					branches: 88,
+					functions: 100,
+					statements: 100,
+					perFile: true
+				}
+			}
 		},
 		projects: [
 			{
