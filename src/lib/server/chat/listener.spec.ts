@@ -1,0 +1,78 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const unlistenMocks: Array<ReturnType<typeof vi.fn>> = [];
+const listenMock = vi.fn(async (_channel: string, _onnotify: (payload: string) => void) => {
+	const unlisten = vi.fn(async () => {});
+	unlistenMocks.push(unlisten);
+	return { unlisten };
+});
+
+vi.mock('$lib/db', () => ({
+	client: { listen: (...args: [string, (payload: string) => void]) => listenMock(...args) }
+}));
+
+import { subscribeToChatRoom } from './listener';
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	unlistenMocks.length = 0;
+});
+
+describe('subscribeToChatRoom', () => {
+	it('opens exactly one Postgres LISTEN for two subscribers of the same room', async () => {
+		await subscribeToChatRoom('artist-1', () => {});
+		await subscribeToChatRoom('artist-1', () => {});
+
+		expect(listenMock).toHaveBeenCalledTimes(1);
+		expect(listenMock).toHaveBeenCalledWith('chat_room_artist-1', expect.any(Function));
+	});
+
+	it('fans a single NOTIFY out to every subscriber of the room', async () => {
+		const received1: unknown[] = [];
+		const received2: unknown[] = [];
+		await subscribeToChatRoom('artist-2', (event) => received1.push(event));
+		await subscribeToChatRoom('artist-2', (event) => received2.push(event));
+
+		const onnotify = listenMock.mock.calls[0][1] as (payload: string) => void;
+		onnotify(JSON.stringify({ kind: 'message', message: { id: 'm1' } }));
+
+		expect(received1).toEqual([{ kind: 'message', message: { id: 'm1' } }]);
+		expect(received2).toEqual([{ kind: 'message', message: { id: 'm1' } }]);
+	});
+
+	it('keeps the LISTEN open while at least one subscriber remains', async () => {
+		const unsubscribe1 = await subscribeToChatRoom('artist-3', () => {});
+		await subscribeToChatRoom('artist-3', () => {});
+
+		await unsubscribe1();
+
+		expect(unlistenMocks[0]).not.toHaveBeenCalled();
+	});
+
+	it('unlistens once the last subscriber of a room leaves', async () => {
+		const unsubscribe1 = await subscribeToChatRoom('artist-4', () => {});
+		const unsubscribe2 = await subscribeToChatRoom('artist-4', () => {});
+
+		await unsubscribe1();
+		await unsubscribe2();
+
+		expect(unlistenMocks[0]).toHaveBeenCalledTimes(1);
+	});
+
+	it('opens a fresh LISTEN if a room is rejoined after everyone left', async () => {
+		const unsubscribe1 = await subscribeToChatRoom('artist-5', () => {});
+		await unsubscribe1();
+
+		await subscribeToChatRoom('artist-5', () => {});
+
+		expect(listenMock).toHaveBeenCalledTimes(2);
+	});
+
+	it('keeps different rooms on separate LISTEN channels', async () => {
+		await subscribeToChatRoom('artist-6', () => {});
+		await subscribeToChatRoom('artist-7', () => {});
+
+		expect(listenMock).toHaveBeenCalledWith('chat_room_artist-6', expect.any(Function));
+		expect(listenMock).toHaveBeenCalledWith('chat_room_artist-7', expect.any(Function));
+	});
+});
