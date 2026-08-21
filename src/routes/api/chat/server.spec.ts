@@ -190,4 +190,26 @@ describe('POST /api/chat', () => {
 		const response = await POST(event);
 		expect(response.status).toBe(201);
 	});
+
+	it('201s and passes through null displayName/username with avatarUrl', async () => {
+		(ChatService.create as any).mockResolvedValue({ ok: true, message: { id: 'm3' } });
+		const event = {
+			request: {
+				json: async () => ({ artistId: ARTIST_ID, body: 'anon message' }),
+				headers: new Headers({ origin: 'http://localhost' })
+			},
+			url: new URL('http://localhost/api/chat'),
+			locals: {
+				user: {
+					id: 'u1',
+					displayName: null,
+					username: null,
+					avatarUrl: 'https://example.test/a.png'
+				}
+			}
+		} as any;
+		const response = await POST(event);
+		expect(response.status).toBe(201);
+		expect(await response.json()).toEqual({ message: { id: 'm3' } });
+	});
 });
