@@ -54,6 +54,24 @@ describe('ChatRepository.create', () => {
 	});
 });
 
+describe('ChatRepository.getById', () => {
+	it('returns the row by id from the select chain', async () => {
+		dbMock.select.mockReturnValue(makeChain([{ id: 'm1', body: 'test message' }]));
+
+		const row = await ChatRepository.getById('m1');
+
+		expect(row).toEqual({ id: 'm1', body: 'test message' });
+	});
+
+	it('returns undefined when the row does not exist', async () => {
+		dbMock.select.mockReturnValue(makeChain([]));
+
+		const row = await ChatRepository.getById('missing');
+
+		expect(row).toBeUndefined();
+	});
+});
+
 describe('ChatRepository.getMessages', () => {
 	it('returns the rows resolved by the select chain', async () => {
 		dbMock.select.mockReturnValue(makeChain([{ id: 'm1', body: 'hey' }]));
@@ -76,6 +94,20 @@ describe('ChatRepository.getMessages', () => {
 
 		await ChatRepository.getMessages({ artistId: 'a1', limit: -5 });
 		expect(limitArg).toBe(1);
+	});
+
+	it('includes the before condition when provided', async () => {
+		let whereArg: unknown;
+		dbMock.select.mockReturnValue(
+			makeChain([], (method, args) => {
+				if (method === 'where') whereArg = args[0];
+			})
+		);
+
+		const beforeDate = new Date('2026-08-18T00:00:00Z');
+		await ChatRepository.getMessages({ artistId: 'a1', before: beforeDate });
+
+		expect(whereArg).toBeDefined();
 	});
 });
 

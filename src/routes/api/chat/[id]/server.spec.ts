@@ -3,8 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('$lib/server/chat', () => ({
 	ChatService: { delete: vi.fn() }
 }));
+vi.mock('$lib/server/security/guards');
 
 import { ChatService } from '$lib/server/chat';
+import { requireSameOrigin, requireUser, isGuardResponse } from '$lib/server/security/guards';
 import { DELETE } from './+server';
 
 const ARTIST_ID = '11111111-1111-1111-1111-111111111111';
@@ -21,11 +23,28 @@ function makeEvent(id: string, artistId: string, userId?: string) {
 	} as any;
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+	vi.clearAllMocks();
+	(requireSameOrigin as any).mockReturnValue(undefined);
+	(requireUser as any).mockReturnValue({ userId: 'u1' });
+	(isGuardResponse as any).mockReturnValue(false);
+});
 
 describe('DELETE /api/chat/[id]', () => {
+	it('403s when origin check fails', async () => {
+		(requireSameOrigin as any).mockReturnValue(
+			new Response(JSON.stringify({ error: 'invalid_origin' }), { status: 403 })
+		);
+		const response = await DELETE(makeEvent(MESSAGE_ID, ARTIST_ID, 'u1'));
+		expect(response.status).toBe(403);
+	});
+
 	it('401s when logged out', async () => {
-		const response = await DELETE(makeEvent(MESSAGE_ID, ARTIST_ID));
+		(requireUser as any).mockReturnValue(
+			new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })
+		);
+		(isGuardResponse as any).mockReturnValue(true);
+		const response = await DELETE(makeEvent(MESSAGE_ID, ARTIST_ID, 'u1'));
 		expect(response.status).toBe(401);
 	});
 
@@ -36,6 +55,11 @@ describe('DELETE /api/chat/[id]', () => {
 
 	it('400s on a malformed artistId', async () => {
 		const response = await DELETE(makeEvent(MESSAGE_ID, 'nope', 'u1'));
+		expect(response.status).toBe(400);
+	});
+
+	it('400s when both id and artistId are malformed', async () => {
+		const response = await DELETE(makeEvent('bad-id', 'bad-artist', 'u1'));
 		expect(response.status).toBe(400);
 	});
 

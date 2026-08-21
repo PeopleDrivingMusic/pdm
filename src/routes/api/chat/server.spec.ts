@@ -3,11 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('$lib/server/chat', () => ({
 	ChatService: { getMessages: vi.fn(), create: vi.fn() }
 }));
-vi.mock('$lib/server/security/guards', async (importOriginal) => ({
-	...(await importOriginal<typeof import('$lib/server/security/guards')>())
-}));
+vi.mock('$lib/server/security/guards');
 
 import { ChatService } from '$lib/server/chat';
+import { requireSameOrigin, requireUser, isGuardResponse } from '$lib/server/security/guards';
 import { GET, POST } from './+server';
 
 const ARTIST_ID = '11111111-1111-1111-1111-111111111111';
@@ -18,7 +17,12 @@ function makeGetEvent(searchParams: Record<string, string>, userId?: string) {
 	return { url, locals: { user: userId ? { id: userId } : undefined } } as any;
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+	vi.clearAllMocks();
+	(requireSameOrigin as any).mockReturnValue(undefined);
+	(requireUser as any).mockReturnValue({ userId: 'u1' });
+	(isGuardResponse as any).mockReturnValue(false);
+});
 
 describe('GET /api/chat', () => {
 	it('400s when artistId is missing', async () => {
@@ -43,6 +47,13 @@ describe('GET /api/chat', () => {
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ messages: [{ id: 'm1' }] });
 	});
+
+	it('200s with empty messages list for non-subscriber with valid artistId', async () => {
+		(ChatService.getMessages as any).mockResolvedValue({ ok: true, messages: [] });
+		const response = await GET(makeGetEvent({ artistId: ARTIST_ID }));
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({ messages: [] });
+	});
 });
 
 function makePostEvent(body: unknown, userId?: string) {
@@ -59,8 +70,20 @@ function makePostEvent(body: unknown, userId?: string) {
 }
 
 describe('POST /api/chat', () => {
+	it('403s when origin check fails', async () => {
+		(requireSameOrigin as any).mockReturnValue(
+			new Response(JSON.stringify({ error: 'invalid_origin' }), { status: 403 })
+		);
+		const response = await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }, 'u1'));
+		expect(response.status).toBe(403);
+	});
+
 	it('401s when logged out', async () => {
-		const response = await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }));
+		(requireUser as any).mockReturnValue(
+			new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })
+		);
+		(isGuardResponse as any).mockReturnValue(true);
+		const response = await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }, 'u1'));
 		expect(response.status).toBe(401);
 	});
 
@@ -79,8 +102,39 @@ describe('POST /api/chat', () => {
 		expect(response.status).toBe(400);
 	});
 
-	it('400s when body is not a string', async () => {
+	it('400s when body is not a string (number)', async () => {
 		const response = await POST(makePostEvent({ artistId: ARTIST_ID, body: 123 }, 'u1'));
+		expect(response.status).toBe(400);
+	});
+
+	it('400s when artistId is null but body is string', async () => {
+		const event = {
+			request: {
+				json: async () => ({ artistId: null, body: 'hi' }),
+				headers: new Headers({ origin: 'http://localhost' })
+			},
+			url: new URL('http://localhost/api/chat'),
+			locals: { user: { id: 'u1', displayName: 'Fan', username: 'fan1', avatarUrl: null } }
+		} as any;
+		const response = await POST(event);
+		expect(response.status).toBe(400);
+	});
+
+	it('400s when both artistId and body are invalid', async () => {
+		const response = await POST(makePostEvent({ artistId: 'nope', body: 123 }, 'u1'));
+		expect(response.status).toBe(400);
+	});
+
+	it('400s when request is missing', async () => {
+		const event = {
+			request: {
+				json: async () => null,
+				headers: new Headers({ origin: 'http://localhost' })
+			},
+			url: new URL('http://localhost/api/chat'),
+			locals: { user: { id: 'u1', displayName: 'Fan', username: 'fan1', avatarUrl: null } }
+		} as any;
+		const response = await POST(event);
 		expect(response.status).toBe(400);
 	});
 
@@ -116,5 +170,24 @@ describe('POST /api/chat', () => {
 		const response = await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }, 'u1'));
 		expect(response.status).toBe(201);
 		expect(await response.json()).toEqual({ message: { id: 'm1' } });
+	});
+
+	it('creates message when payload is valid and passes all guards', async () => {
+		(ChatService.create as any).mockResolvedValue({
+			ok: true,
+			message: { id: 'm2', body: 'test' }
+		});
+		const event = {
+			request: {
+				json: async () => ({ artistId: ARTIST_ID, body: 'test message' }),
+				headers: new Headers({ origin: 'http://localhost' })
+			},
+			url: new URL('http://localhost/api/chat'),
+			locals: {
+				user: { id: 'u1', displayName: 'Test User', username: 'testuser', avatarUrl: null }
+			}
+		} as any;
+		const response = await POST(event);
+		expect(response.status).toBe(201);
 	});
 });

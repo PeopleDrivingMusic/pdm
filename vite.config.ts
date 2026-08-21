@@ -77,22 +77,22 @@ export default defineConfig({
 				statements: 90,
 
 				'src/lib/server/chat/**': {
-					lines: 95,
-					branches: 80,
+					lines: 100,
+					branches: 100,
 					functions: 100,
-					statements: 95,
+					statements: 100,
 					perFile: true
 				},
 				'src/lib/db/services/ChatRepository.ts': {
-					lines: 89,
-					branches: 87,
-					functions: 75,
-					statements: 89,
+					lines: 100,
+					branches: 100,
+					functions: 100,
+					statements: 100,
 					perFile: true
 				},
 				'src/routes/api/chat/**': {
 					lines: 100,
-					branches: 88,
+					branches: 100,
 					functions: 100,
 					statements: 100,
 					perFile: true

@@ -75,6 +75,20 @@ describe('ChatService.create', () => {
 		});
 	});
 
+	it('refuses when authorId is null', async () => {
+		const result = await ChatService.create({
+			artistId: 'a1',
+			authorId: null,
+			authorName: 'Fan',
+			authorUsername: 'fan2',
+			authorAvatar: null,
+			body: 'hi'
+		});
+
+		expect(result).toEqual({ ok: false, reason: 'unauthorized' });
+		expect(ChatRepository.create).not.toHaveBeenCalled();
+	});
+
 	it('refuses a non-subscriber and never touches the repository', async () => {
 		(EntitlementService.isSubscriberOf as any).mockResolvedValue(false);
 
@@ -101,6 +115,19 @@ describe('ChatService.create', () => {
 			body: '   '
 		});
 		expect(result).toEqual({ ok: false, reason: 'empty' });
+	});
+
+	it('rejects a body that exceeds MAX_MESSAGE_LENGTH', async () => {
+		const longBody = 'x'.repeat(10001); // MAX_MESSAGE_LENGTH is 10000
+		const result = await ChatService.create({
+			artistId: 'a1',
+			authorId: 'u2',
+			authorName: 'Fan',
+			authorUsername: 'fan2',
+			authorAvatar: null,
+			body: longBody
+		});
+		expect(result).toEqual({ ok: false, reason: 'too_long' });
 	});
 
 	it('rejects a link from a non-owner', async () => {
@@ -131,9 +158,32 @@ describe('ChatService.create', () => {
 			expect.objectContaining({ id: 'm2', body: 'nice show' })
 		);
 	});
+
+	it('uses fallback "Listener" when author has no name or username', async () => {
+		const result = await ChatService.create({
+			artistId: 'a1',
+			authorId: 'u2',
+			authorName: null,
+			authorUsername: null,
+			authorAvatar: null,
+			body: 'nice show'
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.message.author.name).toBe('Listener');
+		}
+	});
 });
 
 describe('ChatService.delete', () => {
+	it('refuses when userId is null', async () => {
+		const result = await ChatService.delete({ messageId: 'm1', userId: null, artistId: 'a1' });
+
+		expect(result).toEqual({ ok: false, reason: 'unauthorized' });
+		expect(ChatRepository.getById).not.toHaveBeenCalled();
+	});
+
 	it('lets the author delete their own message', async () => {
 		(ChatRepository.getById as any).mockResolvedValue({
 			id: 'm1',
