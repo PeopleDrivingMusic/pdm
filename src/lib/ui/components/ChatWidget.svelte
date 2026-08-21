@@ -17,12 +17,17 @@
 		// consumer (`<ChatWidget artistId isSubscriber isArtist canSubscribe />`)
 		// and for future artist-specific behavior in the room.
 		isArtist: _isArtist,
-		canSubscribe
+		canSubscribe,
+		onSubscribe
 	}: {
 		artistId: string;
 		isSubscriber: boolean;
 		isArtist: boolean;
 		canSubscribe: boolean;
+		/** Task 13 wires this to the artist page's own `subscribe` action — the
+		 *  teaser CTA must trigger the same flow, not a second one. Optional so
+		 *  the component doesn't break if a future caller omits it. */
+		onSubscribe?: () => void;
 	} = $props();
 
 	// Subscribers read from the platform-wide store (opened in the root layout);
@@ -149,7 +154,7 @@
 			{#if canSubscribe}
 				<div class="teaser-cta">
 					<p>Subscribe to join the fan room</p>
-					<Button>Subscribe &middot; $1/mo</Button>
+					<Button onClick={() => onSubscribe?.()}>Subscribe &middot; $1/mo</Button>
 				</div>
 			{/if}
 		{/if}
