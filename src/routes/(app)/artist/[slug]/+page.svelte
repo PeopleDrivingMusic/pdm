@@ -10,6 +10,7 @@
 	import ArtistPhotos from './components/ArtistPhotos.svelte';
 	import ArtistVideos from './components/ArtistVideos.svelte';
 	import ArtistSidebarPhotos from './components/ArtistSidebarPhotos.svelte';
+	import ChatWidget from '$lib/ui/components/ChatWidget.svelte';
 
 	const { artist, viewer, tracks, albums, content } = $derived(page.data as PageData);
 
@@ -155,23 +156,13 @@
 	</main>
 
 	<aside class="side-content">
-		<section class="sidebar-card">
-			<div class="section-heading compact">
-				<div>
-					<p class="eyebrow">Community</p>
-					<h2>Fan room</h2>
-				</div>
-				<span class="online-dot"></span>
-			</div>
-			<div class="chat-preview">
-				{#each Array(6) as _, index (index)}
-					<div class="message-row">
-						<Avatar size="s" name={`User ${index + 1}`} />
-						<span>Fan message {index + 1}</span>
-					</div>
-				{/each}
-			</div>
-		</section>
+		<ChatWidget
+			artistId={artist.id}
+			isSubscriber={viewer.isSubscribed}
+			isArtist={viewer.isOwner}
+			canSubscribe={viewer.canSubscribe}
+			onSubscribe={subscribe}
+		/>
 
 		<section class="sidebar-card">
 			<div class="section-heading compact">
@@ -347,32 +338,6 @@
 			linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 48%),
 			color-mix(in srgb, var(--bg-surface) 72%, var(--bg-primary));
 		box-shadow: 0 14px 44px rgba(0, 0, 0, 0.18);
-	}
-
-	.online-dot {
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		background: var(--success);
-		box-shadow: 0 0 0 5px color-mix(in srgb, var(--success) 18%, transparent);
-	}
-
-	.chat-preview {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		margin-top: var(--space-3);
-	}
-
-	.message-row {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		padding: var(--space-2) 0;
-		border-radius: var(--radius-md);
-		background: transparent;
-		color: var(--text-secondary);
-		font-size: var(--font-size-sm);
 	}
 
 	.empty-state {

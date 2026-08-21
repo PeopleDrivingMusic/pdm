@@ -3,6 +3,7 @@
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import { mdiHome, mdiMusicNoteEighth } from '@mdi/js/mdi.js';
 	import { playerStore } from '$lib/stores/player.svelte';
+	import { chatStore } from '$lib/stores/chat.svelte';
 	import MusicPlayer from '$lib/ui/components/MusicPlayer/MusicPlayer.svelte';
 	import '../../app.scss';
 	import type { Snapshot } from '../$types';
@@ -13,6 +14,11 @@
 		restore: (value) => (sidebarExpand = value)
 	};
 	let sidebarExpand = $state(true);
+
+	$effect(() => {
+		for (const artistId of data.subscribedArtistIds ?? []) chatStore.open(artistId);
+		return () => chatStore.closeAll();
+	});
 
 	const sidebarItems = [
 		{ label: 'Home', icon: mdiHome, href: '/' },
