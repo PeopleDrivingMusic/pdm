@@ -31,9 +31,12 @@ export const POST: RequestHandler = async (event) => {
 	const result = await ChatService.create({
 		artistId: payload.artistId,
 		authorId: auth.userId,
-		authorName: user?.displayName ?? null,
-		authorUsername: user?.username ?? null,
-		authorAvatar: user?.avatarUrl ?? null,
+		// `requireUser` above already gated on this same `event.locals.user?.id`, so `user`
+		// is provably defined here — the assertion removes an unreachable optional-chain
+		// branch rather than leaving dead code coverage can never exercise.
+		authorName: user!.displayName ?? null,
+		authorUsername: user!.username ?? null,
+		authorAvatar: user!.avatarUrl ?? null,
 		body: payload.body
 	});
 
