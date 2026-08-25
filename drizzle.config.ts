@@ -8,7 +8,7 @@ export default defineConfig({
 	schema: './src/lib/db/schema.ts',
 	out: './drizzle/migrations',
 	dbCredentials: {
-		url: process.env.DATABASE_URL!
+		url: process.env.DIRECT_DATABASE_URL!
 	},
 	verbose: true,
 	strict: true

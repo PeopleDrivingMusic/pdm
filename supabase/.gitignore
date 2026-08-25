@@ -1,0 +1,14 @@
+# Supabase
+.branches
+.temp
+
+# Real dev data (emails, password hashes) from the Task 1 bootstrap dump —
+# never committed after it was found in a public PR review. Kept locally so
+# `supabase db reset` still seeds a working dev DB; regenerate via pg_dump
+# from your own local Postgres if this file is missing.
+seed.sql
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local

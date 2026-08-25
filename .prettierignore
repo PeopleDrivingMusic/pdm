@@ -7,3 +7,7 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Supabase CLI's local link cache (already gitignored via supabase/.gitignore,
+# but prettier doesn't read nested .gitignore files)
+supabase/.temp/
