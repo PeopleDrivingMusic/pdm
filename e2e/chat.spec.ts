@@ -6,9 +6,10 @@ import { TEST_DATABASE_URL } from './test-db.mjs';
 
 /**
  * Exercises the realtime fan chat end to end against the ephemeral e2e database:
- * a subscriber posts a message, a second subscribed session sees it live over the
- * remote-function stream, and a guest on the same artist page sees only the
- * reacting teaser (never the real message body).
+ * a subscriber posts a message and sees it live over the remote-function stream,
+ * while a guest on the same artist page — who never opens a live connection —
+ * only ever sees the static locked teaser, never the real message body. Also
+ * pins the raw Postgres LISTEN/NOTIFY wiring the feature is built on.
  *
  * The test seeds all of its own fixtures. The whole `pdm_e2e` database is dropped
  * after the run (e2e/global-teardown.ts), so no per-row cleanup is needed.
@@ -67,7 +68,7 @@ test.describe.serial('fan chat', () => {
 		await sql.end();
 	});
 
-	test('a subscriber posts and a guest sees the teaser react without the real body', async ({
+	test('a subscriber posts and a guest never sees the real body — guests hold no live connection', async ({
 		browser,
 		baseURL
 	}) => {
@@ -90,10 +91,13 @@ test.describe.serial('fan chat', () => {
 		await fanPage.goto(`/artist/${artistSlug}`);
 		await guestPage.goto(`/artist/${artistSlug}`);
 
-		// Both viewers need to be online for the presence count to reach 2 before
-		// the fan posts — otherwise the guest's snapshot can race the fan's join.
-		await expect(fanPage.getByText(/2 online/)).toBeVisible();
-		await expect(guestPage.getByText(/2 online/)).toBeVisible();
+		// Only the fan actually connects — a guest never opens a live connection at
+		// all, so presence only ever reflects the fan.
+		await expect(fanPage.getByText(/1 online/)).toBeVisible();
+		// The guest sees a static locked teaser instead of a presence cluster —
+		// there is no live data to show them.
+		await expect(guestPage.getByText(/online/)).toHaveCount(0);
+		await expect(guestPage.locator('.teaser-decoration .teaser-row')).toHaveCount(14);
 
 		const secretText = `secret-${Date.now()}`;
 		await fanPage.getByPlaceholder('Message the room…').fill(secretText);
@@ -101,13 +105,39 @@ test.describe.serial('fan chat', () => {
 
 		await expect(fanPage.getByText(secretText)).toBeVisible();
 
-		// The guest must never see the real body — only a reacting teaser row —
-		// and the online count must reflect both connected viewers.
-		await expect(guestPage.locator('.teaser-row')).toHaveCount(1, { timeout: 5000 });
+		// The guest's teaser is entirely static (no connection to react through in
+		// the first place) — it must never surface the real body.
 		await expect(guestPage.getByText(secretText)).toHaveCount(0);
-		await expect(guestPage.getByText(/2 online/)).toBeVisible();
 
 		await fanContext.close();
 		await guestContext.close();
+	});
+});
+
+test.describe('chat LISTEN/NOTIFY wiring', () => {
+	// Deliberately not mocked — this pins the real Postgres pub/sub round trip
+	// `subscribeToChatRoom`/`publishChatMessage` rely on (channel naming,
+	// payload delivery), the same way the suite above pins real query behavior.
+	// No app fixtures needed: it only proves LISTEN/NOTIFY itself works.
+	test('delivers a NOTIFY payload to a LISTEN on the same channel', async () => {
+		const sql = postgres(TEST_DATABASE_URL, { max: 1 });
+		try {
+			const received: string[] = [];
+			const { unlisten } = await sql.listen('chat_room_test-artist', (payload) => {
+				received.push(payload);
+			});
+
+			await sql.notify(
+				'chat_room_test-artist',
+				JSON.stringify({ kind: 'message', message: { id: 'm1' } })
+			);
+
+			await new Promise((resolve) => setTimeout(resolve, 200));
+			expect(received).toEqual([JSON.stringify({ kind: 'message', message: { id: 'm1' } })]);
+
+			await unlisten();
+		} finally {
+			await sql.end();
+		}
 	});
 });
