@@ -9,7 +9,6 @@
 	import ArtistPosts from './components/ArtistPosts.svelte';
 	import ArtistPhotos from './components/ArtistPhotos.svelte';
 	import ArtistVideos from './components/ArtistVideos.svelte';
-	import ArtistSidebarPhotos from './components/ArtistSidebarPhotos.svelte';
 	import ChatWidget from '$lib/ui/components/ChatWidget.svelte';
 
 	const { artist, viewer, tracks, albums, content } = $derived(page.data as PageData);
@@ -156,23 +155,7 @@
 	</main>
 
 	<aside class="side-content">
-		<ChatWidget
-			artistId={artist.id}
-			isSubscriber={viewer.isSubscribed}
-			isArtist={viewer.isOwner}
-			canSubscribe={viewer.canSubscribe}
-			onSubscribe={subscribe}
-		/>
-
-		<section class="sidebar-card">
-			<div class="section-heading compact">
-				<div>
-					<p class="eyebrow">Photos</p>
-					<h2>Latest shots</h2>
-				</div>
-			</div>
-			<ArtistSidebarPhotos {content} />
-		</section>
+		<ChatWidget artistId={artist.id} isSubscriber={viewer.isSubscribed} isArtist={viewer.isOwner} />
 	</aside>
 </div>
 
@@ -182,7 +165,9 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
 		gap: var(--space-7, 2rem);
-		align-items: start;
+		// Stretch (grid's default) so the sidebar matches the main column's height —
+		// the chat widget is the sidebar's only content now and fills that height.
+		align-items: stretch;
 	}
 
 	.main-content,
@@ -193,6 +178,10 @@
 	.side-content {
 		position: sticky;
 		top: var(--space-5);
+		// Capped to the viewport (minus the sticky top offset and a matching bottom
+		// gutter) so the chat card never grows taller than what's visible — its own
+		// message list scrolls internally instead of pushing the composer off-screen.
+		max-height: calc(100vh - var(--space-5) * 2);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-5);
@@ -292,7 +281,6 @@
 	}
 
 	.content-surface,
-	.sidebar-card,
 	.section-block {
 		border-radius: var(--radius-lg);
 	}
@@ -326,18 +314,6 @@
 			font-size: var(--font-size-2xl);
 			line-height: 1.2;
 		}
-
-		&.compact h2 {
-			font-size: var(--font-size-lg);
-		}
-	}
-
-	.sidebar-card {
-		padding: var(--space-5);
-		background:
-			linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 48%),
-			color-mix(in srgb, var(--bg-surface) 72%, var(--bg-primary));
-		box-shadow: 0 14px 44px rgba(0, 0, 0, 0.18);
 	}
 
 	.empty-state {
@@ -385,8 +361,7 @@
 		}
 
 		.content-surface,
-		.section-block,
-		.sidebar-card {
+		.section-block {
 			border-radius: var(--radius-md);
 		}
 

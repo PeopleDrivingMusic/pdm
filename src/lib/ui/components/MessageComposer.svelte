@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { mdiEmoticonOutline } from '@mdi/js';
-	import Button from '../Button.svelte';
+	import { mdiEmoticonOutline, mdiSend } from '@mdi/js';
 	import IconButton from '../IconButton.svelte';
 
 	let {
@@ -115,31 +114,39 @@
 </script>
 
 <div class="composer">
-	<textarea
-		style:max-height="{MAX_HEIGHT}px"
-		bind:this={field}
-		bind:value={draft}
-		{placeholder}
-		{disabled}
-		rows="1"
-		aria-label={placeholder || 'Write a message'}
-		onkeydown={onKeydown}
-	></textarea>
+	<div class="field-wrap">
+		<textarea
+			style:max-height="{MAX_HEIGHT}px"
+			bind:this={field}
+			bind:value={draft}
+			{placeholder}
+			{disabled}
+			rows="1"
+			aria-label={placeholder || 'Write a message'}
+			onkeydown={onKeydown}
+		></textarea>
 
-	<div class="composer-actions">
-		<IconButton
-			path={mdiEmoticonOutline}
-			label="Add emoji"
-			variant="ghost"
-			size="sm"
-			active={showPicker}
-			disabled={disabled || !pickerReady}
-			onClick={() => (showPicker = !showPicker)}
-		/>
+		<div class="composer-actions">
+			<IconButton
+				path={mdiEmoticonOutline}
+				label="Add emoji"
+				variant="ghost"
+				size="sm"
+				active={showPicker}
+				disabled={disabled || !pickerReady}
+				onClick={() => (showPicker = !showPicker)}
+			/>
 
-		<Button size="sm" onClick={submit} disabled={disabled || busy || !draft.trim()}>
-			{submitLabel}
-		</Button>
+			<IconButton
+				path={mdiSend}
+				label={submitLabel}
+				variant="ghost"
+				size="sm"
+				tone={draft.trim() ? 'accent' : undefined}
+				disabled={disabled || busy || !draft.trim()}
+				onClick={submit}
+			/>
+		</div>
 	</div>
 
 	{#if showPicker && pickerReady}
@@ -152,15 +159,19 @@
 <style lang="scss">
 	.composer {
 		position: relative;
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
 		width: 100%;
+	}
+
+	.field-wrap {
+		position: relative;
 	}
 
 	textarea {
 		width: 100%;
 		padding: var(--space-3);
+		// Room for the emoji + send icons docked inside the field, so typed text
+		// never runs under them.
+		padding-right: 76px;
 		border: 1px solid color-mix(in srgb, var(--border-primary) 62%, transparent);
 		border-radius: var(--radius-md);
 		background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
@@ -176,11 +187,20 @@
 		}
 	}
 
+	// Docked inside the field's bottom-right corner rather than below it — the emoji
+	// picker and send action read as part of the input, not a separate toolbar row.
+	// Vertically centered on the field rather than bottom-anchored — anchoring to
+	// the bottom looked fine once the textarea had grown a few lines, but on the
+	// single-line draft (the common case) it sat visibly below the text's own
+	// line box instead of alongside it.
 	.composer-actions {
+		position: absolute;
+		top: 50%;
+		right: var(--space-2);
+		transform: translateY(-50%);
 		display: flex;
 		align-items: center;
-		justify-content: flex-end;
-		gap: var(--space-2);
+		gap: var(--space-1);
 	}
 
 	.picker-anchor {

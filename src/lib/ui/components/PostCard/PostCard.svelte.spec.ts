@@ -181,17 +181,14 @@ test('disables the like button for an anonymous viewer, instead of a silent no-o
 	await expect.element(page.getByRole('button', { name: 'Like post' })).toBeDisabled();
 });
 
-test('shows the like count on a locked post as a teaser, disabled rather than a silent no-op', async () => {
+test('hides the like button entirely on a locked post — the whole card is the gated surface', async () => {
 	render(PostCard, {
 		post: basePost({ isLocked: true, likeCount: 3 }),
 		author,
 		isLoggedIn: true
 	});
 
-	const like = page.getByRole('button', { name: 'Like post' });
-	await expect.element(like).toBeInTheDocument();
-	await expect.element(like).toHaveTextContent('3');
-	await expect.element(like).toBeDisabled();
+	await expect.element(page.getByRole('button', { name: 'Like post' })).not.toBeInTheDocument();
 });
 
 test('leaves the like button enabled for a logged-in viewer on an unlocked post', async () => {
@@ -199,16 +196,21 @@ test('leaves the like button enabled for a logged-in viewer on an unlocked post'
 	await expect.element(page.getByRole('button', { name: 'Like post' })).not.toBeDisabled();
 });
 
-test('shows the comment count on a locked post as a teaser, but never opens the thread', async () => {
+test('hides the comment toggle entirely on a locked post', async () => {
 	render(PostCard, {
 		post: basePost({ isLocked: true, commentCount: 5 }),
 		author,
 		isLoggedIn: true
 	});
 
-	const toggle = page.getByRole('button', { name: 'Comments (5)' });
-	await expect.element(toggle).toBeInTheDocument();
+	await expect.element(page.getByRole('button', { name: 'Comments (5)' })).not.toBeInTheDocument();
+});
 
-	await toggle.click();
-	await expect.element(toggle).toHaveAttribute('aria-expanded', 'false');
+test('hides the author header on a locked post', () => {
+	const { container } = render(PostCard, {
+		post: basePost({ isLocked: true }),
+		author
+	});
+
+	expect(container.querySelector('.post-header')).toBeNull();
 });

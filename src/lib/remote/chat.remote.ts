@@ -40,7 +40,7 @@ export const getChatRoom = query.live('unchecked', async function* (artistId: un
 	queue.push({ type: 'presence', ...presence.snapshot(artistId) });
 
 	const stopListening = await subscribeToChatRoom(artistId, (event: ChatMessagePublished) => {
-		queue.push(maskChatEvent(event, isSubscriber));
+		queue.push(maskChatEvent(event, isSubscriber || isArtist));
 	});
 
 	try {

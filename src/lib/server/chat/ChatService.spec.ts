@@ -62,6 +62,15 @@ describe('ChatService.getMessages', () => {
 			expect(result.messages[0].body).toBe('hey fans');
 		}
 	});
+
+	it('lets the artist owner read their own room even without a subscription', async () => {
+		(EntitlementService.isSubscriberOf as any).mockResolvedValue(false);
+		(ChatRepository.getMessages as any).mockResolvedValue([]);
+
+		const result = await ChatService.getMessages({ artistId: 'a1', viewerUserId: 'owner1' });
+
+		expect(result).toEqual({ ok: true, messages: [] });
+	});
 });
 
 describe('ChatService.create', () => {
@@ -157,6 +166,51 @@ describe('ChatService.create', () => {
 			'a1',
 			expect.objectContaining({ id: 'm2', body: 'nice show' })
 		);
+	});
+
+	it('lets the artist owner post in their own room even without a subscription', async () => {
+		(EntitlementService.isSubscriberOf as any).mockResolvedValue(false);
+		(ChatRepository.create as any).mockResolvedValue({
+			id: 'm3',
+			body: 'thanks for coming out!',
+			createdAt: new Date('2026-08-18T00:00:00Z'),
+			authorId: 'owner1'
+		});
+
+		const result = await ChatService.create({
+			artistId: 'a1',
+			authorId: 'owner1',
+			authorName: 'The Artist',
+			authorUsername: 'artist1',
+			authorAvatar: null,
+			body: 'thanks for coming out!'
+		});
+
+		expect(result).toEqual({
+			ok: true,
+			message: expect.objectContaining({ id: 'm3', isArtist: true })
+		});
+	});
+
+	it('lets the artist owner post a link even without a subscription', async () => {
+		(EntitlementService.isSubscriberOf as any).mockResolvedValue(false);
+		(ChatRepository.create as any).mockResolvedValue({
+			id: 'm4',
+			body: 'tickets at example.com',
+			createdAt: new Date('2026-08-18T00:00:00Z'),
+			authorId: 'owner1'
+		});
+
+		const result = await ChatService.create({
+			artistId: 'a1',
+			authorId: 'owner1',
+			authorName: 'The Artist',
+			authorUsername: 'artist1',
+			authorAvatar: null,
+			body: 'tickets at example.com'
+		});
+
+		expect(result.ok).toBe(true);
 	});
 
 	it('uses fallback "Listener" when author has no name or username', async () => {

@@ -52,8 +52,10 @@ function toDTO(
 }
 
 /**
- * Application boundary for the subscriber fan chat. Unlike `CommentService`, every
- * operation here — read and write — is gated by `EntitlementService.isSubscriberOf`.
+ * Application boundary for the subscriber fan chat. Every operation here — read and
+ * write — is gated by `EntitlementService.isSubscriberOf` OR by being the artist who
+ * owns the room: the artist must always be able to read and post in their own fan
+ * room regardless of subscription status (they can't subscribe to themselves).
  * Returns only DTOs — no Drizzle rows leak across this seam.
  */
 export class ChatService {
@@ -62,16 +64,17 @@ export class ChatService {
 		viewerUserId: string | null;
 		before?: Date;
 	}): Promise<ListResult> {
-		const isSubscriber = await EntitlementService.isSubscriberOf(
-			input.viewerUserId,
-			input.artistId
-		);
-		if (!isSubscriber) return { ok: false, reason: 'not_subscribed' };
-
-		const [rows, ownerUserId] = await Promise.all([
-			ChatRepository.getMessages({ artistId: input.artistId, before: input.before }),
+		const [isSubscriber, ownerUserId] = await Promise.all([
+			EntitlementService.isSubscriberOf(input.viewerUserId, input.artistId),
 			resolveTargetOwnerUserId('artist', input.artistId)
 		]);
+		const isOwner = !!input.viewerUserId && input.viewerUserId === ownerUserId;
+		if (!isSubscriber && !isOwner) return { ok: false, reason: 'not_subscribed' };
+
+		const rows = await ChatRepository.getMessages({
+			artistId: input.artistId,
+			before: input.before
+		});
 
 		return { ok: true, messages: rows.map((r) => toDTO(r, ownerUserId, input.viewerUserId)) };
 	}
@@ -86,15 +89,18 @@ export class ChatService {
 	}): Promise<CreateResult> {
 		if (!input.authorId) return { ok: false, reason: 'unauthorized' };
 
-		const isSubscriber = await EntitlementService.isSubscriberOf(input.authorId, input.artistId);
-		if (!isSubscriber) return { ok: false, reason: 'not_subscribed' };
+		const [isSubscriber, ownerUserId] = await Promise.all([
+			EntitlementService.isSubscriberOf(input.authorId, input.artistId),
+			resolveTargetOwnerUserId('artist', input.artistId)
+		]);
+		const isOwner = input.authorId === ownerUserId;
+		if (!isSubscriber && !isOwner) return { ok: false, reason: 'not_subscribed' };
 
 		const body = input.body.trim();
 		if (!body) return { ok: false, reason: 'empty' };
 		if (body.length > MAX_MESSAGE_LENGTH) return { ok: false, reason: 'too_long' };
 
-		const ownerUserId = await resolveTargetOwnerUserId('artist', input.artistId);
-		if (containsUrl(body) && input.authorId !== ownerUserId) {
+		if (containsUrl(body) && !isOwner) {
 			return { ok: false, reason: 'links_not_allowed' };
 		}
 

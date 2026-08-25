@@ -7,28 +7,22 @@
 	import MessageList from './MessageList.svelte';
 	import MessageComposer from './MessageComposer.svelte';
 	import SvgIcon from '../SvgIcon.svelte';
-	import Button from '../Button.svelte';
+	import LockedPanel from './LockedPanel.svelte';
 	import type { ChatDTO, ChatFrame } from '$lib/messages/types';
 
 	let {
 		artistId,
 		isSubscriber,
-		// Not read yet in this task — kept in the prop contract for Task 13's
-		// consumer (`<ChatWidget artistId isSubscriber isArtist canSubscribe />`)
-		// and for future artist-specific behavior in the room.
-		isArtist: _isArtist,
-		canSubscribe,
-		onSubscribe
+		isArtist
 	}: {
 		artistId: string;
 		isSubscriber: boolean;
 		isArtist: boolean;
-		canSubscribe: boolean;
-		/** Task 13 wires this to the artist page's own `subscribe` action — the
-		 *  teaser CTA must trigger the same flow, not a second one. Optional so
-		 *  the component doesn't break if a future caller omits it. */
-		onSubscribe?: () => void;
 	} = $props();
+
+	// The artist always has full access to their own room — they can't subscribe to
+	// themselves, so `isSubscriber` alone would otherwise lock them out of it.
+	const hasAccess = $derived(isSubscriber || isArtist);
 
 	// Subscribers read from the platform-wide store (opened in the root layout);
 	// guests open a page-scoped connection here, torn down on unmount.
@@ -69,26 +63,20 @@
 
 	let history = $state<ChatDTO[]>([]);
 	onMount(async () => {
-		if (!isSubscriber) return;
+		if (!hasAccess) return;
 		const result = await fetchChatHistory(artistId);
 		if (result.ok) history = [...result.messages].reverse();
 	});
 
 	const messages = $derived(
-		isSubscriber
+		hasAccess
 			? [
 					...history,
-					...(isSubscriber ? (chatStore.rooms[artistId]?.messages ?? localMessages) : [])
+					...(chatStore.rooms[artistId]?.messages ?? localMessages)
 						.filter((f): f is Extract<ChatFrame, { type: 'message' }> => f.type === 'message')
 						.map((f) => f.message)
 				]
 			: []
-	);
-
-	const teasers = $derived(
-		localMessages
-			.filter((f): f is Extract<ChatFrame, { type: 'teaser' }> => f.type === 'teaser')
-			.slice(-6)
 	);
 
 	async function handleSubmit(body: string): Promise<boolean> {
@@ -117,7 +105,7 @@
 	</header>
 
 	<div class="chat-body">
-		{#if isSubscriber}
+		{#if hasAccess}
 			{#if messages.length === 0}
 				<div class="empty-state">
 					<SvgIcon path={mdiChatOutline} size={20} />
@@ -141,22 +129,17 @@
 				<MessageComposer placeholder="Message the room…" onSubmit={handleSubmit} />
 			</div>
 		{:else}
-			<div class="teaser-body" aria-hidden="true">
-				{#each teasers as frame, index (frame.teaser.id)}
-					<div class="teaser-row" class:is-new={index === teasers.length - 1}>
-						<span class="teaser-avatar"></span>
-						<div class="teaser-lines">
+			<div class="teaser-locked" aria-hidden="true">
+				<div class="teaser-decoration">
+					{#each Array(14) as _, index (index)}
+						<div class="teaser-row">
+							<span class="teaser-avatar"></span>
 							<span class="teaser-line" class:wide={index % 2 === 0}></span>
 						</div>
-					</div>
-				{/each}
-			</div>
-			{#if canSubscribe}
-				<div class="teaser-cta">
-					<p>Subscribe to join the fan room</p>
-					<Button onClick={() => onSubscribe?.()}>Subscribe &middot; $1/mo</Button>
+					{/each}
 				</div>
-			{/if}
+				<LockedPanel />
+			</div>
 		{/if}
 	</div>
 </section>
@@ -167,7 +150,15 @@
 	.chat-widget {
 		display: flex;
 		flex-direction: column;
+		// Fills the sidebar's full height (the artist page stretches `.side-content`
+		// to match the main column) instead of only being as tall as its content.
+		flex: 1;
+		min-height: 0;
 		padding: var(--space-5);
+		// The teaser lock bleeds past this padding to the card's own edges (see
+		// `.teaser-locked`'s negative margins) — clipped here so it still respects
+		// the card's rounded corners instead of squaring them off.
+		overflow: hidden;
 		border-radius: var(--radius-lg);
 		background:
 			linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 48%),
@@ -257,14 +248,22 @@
 	.chat-body {
 		display: flex;
 		flex-direction: column;
-		min-height: clamp(280px, 40vw, 360px);
+		flex: 1;
+		min-height: 0;
 	}
 
-	// Subscriber view — message list + composer.
+	// Subscriber view — message list + composer. Fills whatever height the parent
+	// page gives the widget (see the artist page's `.side-content` stretch) rather
+	// than capping itself, so the room genuinely uses the full sidebar height.
 	.message-scroll {
 		margin-top: var(--space-3);
-		max-height: clamp(260px, 40vw, 340px);
+		flex: 1;
+		min-height: 0;
 		overflow-y: auto;
+		// `.like`'s enlarged tap-target pseudo-element extends past the row's own
+		// edge on purpose (bigger hit area) — without this, that invisible overhang
+		// is enough to make the browser compute a horizontal scrollbar too.
+		overflow-x: hidden;
 		overscroll-behavior: contain;
 		scrollbar-width: thin;
 		scrollbar-color: color-mix(in srgb, var(--border-primary) 70%, transparent) transparent;
@@ -308,87 +307,38 @@
 		}
 	}
 
-	// Non-subscriber teaser — synthetic shimmer rows, never real content.
-	.teaser-body {
+	// Non-subscriber teaser — the same locked-overlay recipe as the feed and posts
+	// (`LockedPanel`): a blurred scrim over inert decoration, never real message
+	// content. `teaser-decoration` is purely synthetic (aria-hidden, static shapes) —
+	// the security boundary is that real messages never reach this branch at all,
+	// not that they're merely hidden behind the blur.
+	.teaser-locked {
+		position: relative;
+		flex: 1;
 		margin-top: var(--space-3);
+		// Bleed past the card's own padding on the sides and bottom — the lock
+		// reads as covering the room "wall to wall," not sitting indented inside
+		// the card's normal content padding. `.chat-widget`'s `overflow: hidden`
+		// clips this back to the card's rounded corners.
+		margin-inline: calc(-1 * var(--space-5));
+		margin-bottom: calc(-1 * var(--space-5));
+		overflow: hidden;
+		background: color-mix(in srgb, var(--bg-surface) 60%, transparent);
+	}
+
+	.teaser-decoration {
+		position: absolute;
+		inset: 0;
+		padding: var(--space-4);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
-		cursor: default;
 	}
 
 	.teaser-row {
 		display: flex;
 		align-items: center;
 		gap: var(--space-2);
-
-		@media (prefers-reduced-motion: no-preference) {
-			animation: teaser-row-enter var(--duration-normal) var(--easing-ease-out);
-		}
-	}
-
-	@keyframes teaser-row-enter {
-		from {
-			opacity: 0;
-			transform: translateY(6px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	@keyframes skeleton-shimmer {
-		0% {
-			background-position: -200% 0;
-		}
-		100% {
-			background-position: 200% 0;
-		}
-	}
-
-	// The one place the teaser gets a slightly richer flourish than the subscriber
-	// view: the newest row eases from a primary-tinted highlight into the normal
-	// shimmer, on entry only — never replayed on rows already present.
-	@keyframes teaser-arrival-tint {
-		from {
-			box-shadow: inset 0 0 0 999px var(--chat-arrival-tint);
-		}
-		to {
-			box-shadow: inset 0 0 0 999px transparent;
-		}
-	}
-
-	.teaser-row.is-new .teaser-avatar,
-	.teaser-row.is-new .teaser-line {
-		@media (prefers-reduced-motion: no-preference) {
-			animation:
-				skeleton-shimmer 1.4s ease-in-out infinite,
-				teaser-arrival-tint var(--duration-slow) var(--easing-ease-out);
-		}
-	}
-
-	.teaser-avatar,
-	.teaser-line {
-		border-radius: var(--radius-lg);
-		background: linear-gradient(
-			90deg,
-			color-mix(in srgb, var(--bg-surface) 70%, transparent) 25%,
-			color-mix(in srgb, var(--bg-tertiary) 90%, transparent) 50%,
-			color-mix(in srgb, var(--bg-surface) 70%, transparent) 75%
-		);
-		background-size: 200% 100%;
-
-		@media (prefers-reduced-motion: no-preference) {
-			animation: skeleton-shimmer 1.4s ease-in-out infinite;
-		}
-
-		// Freeze rather than loop forever for a viewer who asked for less motion —
-		// a gap the shared ContentSkeleton pattern doesn't yet cover either.
-		@media (prefers-reduced-motion: reduce) {
-			animation: none;
-			background-position: 0 0;
-		}
 	}
 
 	.teaser-avatar {
@@ -396,36 +346,18 @@
 		height: 28px;
 		border-radius: 50%;
 		flex-shrink: 0;
-	}
-
-	.teaser-lines {
-		flex: 1;
-		min-width: 0;
+		background: var(--border-primary);
 	}
 
 	.teaser-line {
 		display: block;
 		height: 10px;
 		width: 45%;
+		border-radius: var(--radius-lg);
+		background: var(--border-primary);
 
 		&.wide {
 			width: 70%;
-		}
-	}
-
-	.teaser-cta {
-		margin-top: var(--space-4);
-		padding-top: var(--space-4);
-		border-top: 1px solid var(--chat-divider);
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: var(--space-3);
-
-		p {
-			margin: 0;
-			color: var(--text-secondary);
-			font-size: var(--font-size-sm);
 		}
 	}
 

@@ -22,11 +22,25 @@ describe('ChatWidget — guest (non-subscriber)', () => {
 		render(ChatWidget, {
 			artistId: 'a1',
 			isSubscriber: false,
-			isArtist: false,
-			canSubscribe: true
+			isArtist: false
 		});
 
 		await expect.element(page.getByText(/3/)).toBeInTheDocument();
 		await expect.element(page.getByPlaceholder(/message/i)).not.toBeInTheDocument();
+		// The locked panel is informational only — never a subscribe button itself.
+		await expect.element(page.getByText(/subscribe to unlock/i)).toBeInTheDocument();
+		await expect.element(page.getByRole('button', { name: /subscribe/i })).not.toBeInTheDocument();
+	});
+});
+
+describe('ChatWidget — artist owner (not a subscriber of themselves)', () => {
+	it('still shows the composer, since the artist owns the room', async () => {
+		render(ChatWidget, {
+			artistId: 'a1',
+			isSubscriber: false,
+			isArtist: true
+		});
+
+		await expect.element(page.getByPlaceholder(/message the room/i)).toBeInTheDocument();
 	});
 });
