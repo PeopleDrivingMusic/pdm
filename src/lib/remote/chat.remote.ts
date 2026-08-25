@@ -39,10 +39,6 @@ export const getChatRoom = query.live('unchecked', async function* (artistId: un
 	// shows nothing until the next unrelated presence change.
 	queue.push({ type: 'presence', ...presence.snapshot(artistId) });
 
-	const stopListening = await subscribeToChatRoom(artistId, (event: ChatMessagePublished) => {
-		queue.push(maskChatEvent(event, isSubscriber || isArtist));
-	});
-
 	// A client-side `break` out of the consuming `for await` loop (e.g. on
 	// component unmount / client-side navigation) calls `.return()` on this
 	// generator, which runs `finally` below — that covers graceful teardown.
@@ -54,13 +50,21 @@ export const getChatRoom = query.live('unchecked', async function* (artistId: un
 	const onAbort = () => queue.close();
 	request.signal.addEventListener('abort', onAbort);
 
+	// The try starts here, before `subscribeToChatRoom` — if it throws (the
+	// LISTEN never gets established), `leavePresence()` above must still run,
+	// or this connection's presence entry never clears.
+	let stopListening: (() => Promise<void>) | undefined;
 	try {
+		stopListening = await subscribeToChatRoom(artistId, (event: ChatMessagePublished) => {
+			queue.push(maskChatEvent(event, isSubscriber || isArtist));
+		});
+
 		for await (const frame of queue.iterate()) {
 			yield frame;
 		}
 	} finally {
 		request.signal.removeEventListener('abort', onAbort);
-		await stopListening();
+		await stopListening?.();
 		leavePresence();
 		queue.close();
 	}

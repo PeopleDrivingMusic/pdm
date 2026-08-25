@@ -43,6 +43,17 @@ describe('createAsyncQueue', () => {
 		expect(await pending).toEqual({ value: undefined, done: true });
 	});
 
+	it('settles a pending next() when the consumer gives up via return(), with no push or close', async () => {
+		const queue = createAsyncQueue<number>();
+		const iterator = queue.iterate();
+
+		const pending = iterator.next();
+		const returned = await iterator.return(undefined);
+
+		expect(returned).toEqual({ value: undefined, done: true });
+		expect(await pending).toEqual({ value: undefined, done: true });
+	});
+
 	it('drops a push that arrives after close', async () => {
 		const queue = createAsyncQueue<number>();
 		queue.close();
