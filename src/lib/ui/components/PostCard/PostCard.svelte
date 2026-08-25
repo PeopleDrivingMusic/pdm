@@ -257,6 +257,13 @@
 		}
 	}
 
+	// A locked post's content is just the title + excerpt, which can be short —
+	// give the lock overlay real room to read as its own surface, not a thin
+	// strip hugging a couple of lines of text.
+	.post-card.is-locked .post-content {
+		min-height: 220px;
+	}
+
 	.author {
 		color: var(--text-primary);
 		font-size: var(--font-size-sm);

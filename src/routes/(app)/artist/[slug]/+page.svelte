@@ -10,8 +10,14 @@
 	import ArtistPhotos from './components/ArtistPhotos.svelte';
 	import ArtistVideos from './components/ArtistVideos.svelte';
 	import ChatWidget from '$lib/ui/components/ChatWidget.svelte';
+	import { playerStore } from '$lib/stores/player.svelte';
 
 	const { artist, viewer, tracks, albums, content } = $derived(page.data as PageData);
+	// The music player is a fixed bar docked to the viewport bottom (see
+	// `(app)/+layout.svelte`, which shrinks `.page` by the same 76px when a
+	// track is loaded) — the sidebar's own height cap has to shrink to match,
+	// or the chat composer ends up sitting underneath it.
+	const playerActive = $derived(playerStore.currentTrackIndex > -1);
 
 	const tabs = [
 		{ label: 'Feed', id: 'feed' },
@@ -154,7 +160,7 @@
 		</section>
 	</main>
 
-	<aside class="side-content">
+	<aside class="side-content" class:player-active={playerActive}>
 		<ChatWidget artistId={artist.id} isSubscriber={viewer.isSubscribed} isArtist={viewer.isOwner} />
 	</aside>
 </div>
@@ -185,6 +191,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-5);
+
+		// The fixed music player docks over the bottom 76px of the viewport when a
+		// track is loaded — shrink the cap by the same amount (see MusicPlayer.svelte's
+		// literal `height: 76px`) so the composer never renders underneath it.
+		&.player-active {
+			max-height: calc(100vh - var(--space-5) * 2 - 76px - var(--space-2));
+		}
 	}
 
 	.hero {

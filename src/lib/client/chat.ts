@@ -19,9 +19,19 @@ const CHAT_ERROR_COPY = {
 	unauthorized: 'Sign in to join the conversation.'
 } satisfies Record<ChatErrorCode, string>;
 
-export async function fetchChatHistory(artistId: string): Promise<ChatMessagesResult> {
+/**
+ * `before` is the oldest currently-loaded message's `createdAt` (ISO string) —
+ * pass it to page further back into history. Omit it for the initial (most
+ * recent) page.
+ */
+export async function fetchChatHistory(
+	artistId: string,
+	before?: string
+): Promise<ChatMessagesResult> {
 	try {
-		const response = await fetch(`/api/chat?${new URLSearchParams({ artistId })}`);
+		const params = new URLSearchParams({ artistId });
+		if (before) params.set('before', before);
+		const response = await fetch(`/api/chat?${params}`);
 		if (!response.ok) {
 			return {
 				ok: false,

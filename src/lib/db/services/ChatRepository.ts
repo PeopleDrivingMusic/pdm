@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull, lt } from 'drizzle-orm';
 import { db, withDbLogging } from '../index';
 import { chat, users, type Chat } from '../schema';
+import { CHAT_HISTORY_PAGE_SIZE } from '$lib/messages/types';
 
 export interface ChatMessageWithAuthor {
 	id: string;
@@ -58,7 +59,7 @@ export class ChatRepository {
 				.innerJoin(users, eq(chat.authorId, users.id))
 				.where(and(...conditions))
 				.orderBy(desc(chat.createdAt))
-				.limit(Math.max(1, Math.min(input.limit ?? 50, 100)));
+				.limit(Math.max(1, Math.min(input.limit ?? CHAT_HISTORY_PAGE_SIZE, 100)));
 		});
 	}
 

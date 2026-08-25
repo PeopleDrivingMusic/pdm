@@ -54,6 +54,28 @@ describe('GET /api/chat', () => {
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({ messages: [] });
 	});
+
+	it('passes no cursor to the service when `before` is absent', async () => {
+		(ChatService.getMessages as any).mockResolvedValue({ ok: true, messages: [] });
+		await GET(makeGetEvent({ artistId: ARTIST_ID }, 'u1'));
+		expect(ChatService.getMessages).toHaveBeenCalledWith(
+			expect.objectContaining({ before: undefined })
+		);
+	});
+
+	it('parses `before` into a Date cursor and passes it to the service', async () => {
+		(ChatService.getMessages as any).mockResolvedValue({ ok: true, messages: [] });
+		await GET(makeGetEvent({ artistId: ARTIST_ID, before: '2026-08-18T00:00:00.000Z' }, 'u1'));
+		expect(ChatService.getMessages).toHaveBeenCalledWith(
+			expect.objectContaining({ before: new Date('2026-08-18T00:00:00.000Z') })
+		);
+	});
+
+	it('400s when `before` is not a parseable date', async () => {
+		const response = await GET(makeGetEvent({ artistId: ARTIST_ID, before: 'not-a-date' }, 'u1'));
+		expect(response.status).toBe(400);
+		expect(ChatService.getMessages).not.toHaveBeenCalled();
+	});
 });
 
 function makePostEvent(body: unknown, userId?: string) {

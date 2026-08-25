@@ -18,7 +18,7 @@ import type { ChatMessagePublished } from '$lib/server/chat/broadcast';
 export const getChatRoom = query.live('unchecked', async function* (artistId: unknown) {
 	if (!isUuid(artistId)) throw new Error('invalid_artist_id');
 
-	const { locals } = getRequestEvent();
+	const { locals, request } = getRequestEvent();
 	const viewerUserId = locals.user?.id ?? null;
 
 	const [isSubscriber, ownerUserId] = await Promise.all([
@@ -43,11 +43,23 @@ export const getChatRoom = query.live('unchecked', async function* (artistId: un
 		queue.push(maskChatEvent(event, isSubscriber || isArtist));
 	});
 
+	// A client-side `break` out of the consuming `for await` loop (e.g. on
+	// component unmount / client-side navigation) calls `.return()` on this
+	// generator, which runs `finally` below — that covers graceful teardown.
+	// A hard disconnect (tab closed, network dropped) never runs client JS at
+	// all, so it can only be observed here, server-side, via the request's own
+	// abort signal. Without this, a connection that dies abruptly would leave
+	// its presence entry (and the Postgres LISTEN it's keeping alive) stuck
+	// until some other, unrelated mechanism happened to close it.
+	const onAbort = () => queue.close();
+	request.signal.addEventListener('abort', onAbort);
+
 	try {
 		for await (const frame of queue.iterate()) {
 			yield frame;
 		}
 	} finally {
+		request.signal.removeEventListener('abort', onAbort);
 		await stopListening();
 		leavePresence();
 		queue.close();

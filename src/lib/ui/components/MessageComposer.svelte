@@ -167,6 +167,11 @@
 	}
 
 	textarea {
+		// A <textarea> is inline-level by default, which reserves a few px of
+		// baseline "descender" space below it inside a block container — enough
+		// to throw off centering the docked icons against it. Block-level removes
+		// that gap so `.field-wrap`'s height matches the textarea's exactly.
+		display: block;
 		width: 100%;
 		padding: var(--space-3);
 		// Room for the emoji + send icons docked inside the field, so typed text
@@ -189,15 +194,16 @@
 
 	// Docked inside the field's bottom-right corner rather than below it — the emoji
 	// picker and send action read as part of the input, not a separate toolbar row.
-	// Vertically centered on the field rather than bottom-anchored — anchoring to
-	// the bottom looked fine once the textarea had grown a few lines, but on the
-	// single-line draft (the common case) it sat visibly below the text's own
-	// line box instead of alongside it.
+	// Bottom-anchored: on a single line this sits centered against the text (the
+	// textarea's padding is symmetric and the icons are only slightly taller than
+	// one line box, so the gap above/below reads as centered) — was previously
+	// thrown off by the textarea's own inline-block layout, see `display: block`
+	// above. On a grown, multi-line draft it stays pinned to the last line,
+	// which is the familiar chat-composer pattern.
 	.composer-actions {
 		position: absolute;
-		top: 50%;
 		right: var(--space-2);
-		transform: translateY(-50%);
+		bottom: var(--space-2);
 		display: flex;
 		align-items: center;
 		gap: var(--space-1);

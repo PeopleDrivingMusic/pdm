@@ -18,6 +18,20 @@ describe('fetchChatHistory', () => {
 		const result = await fetchChatHistory('a1');
 		expect(result).toEqual({ ok: false, error: 'Subscribe to join the conversation.' });
 	});
+
+	it('omits the before param on the initial page', async () => {
+		fetchMock.mockResolvedValue({ ok: true, json: async () => ({ messages: [] }) });
+		await fetchChatHistory('a1');
+		expect(fetchMock).toHaveBeenCalledWith('/api/chat?artistId=a1');
+	});
+
+	it('sends before as a cursor when paging further back', async () => {
+		fetchMock.mockResolvedValue({ ok: true, json: async () => ({ messages: [] }) });
+		await fetchChatHistory('a1', '2026-08-18T00:00:00.000Z');
+		expect(fetchMock).toHaveBeenCalledWith(
+			'/api/chat?artistId=a1&before=2026-08-18T00%3A00%3A00.000Z'
+		);
+	});
 });
 
 describe('postChatMessage', () => {

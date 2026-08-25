@@ -75,6 +75,11 @@ export interface ChatAuthor {
 	avatar: string | null;
 }
 
+/** Messages per page for chat history (initial load and each older-page fetch).
+ *  Shared by the repository (query limit) and the client (to infer whether a
+ *  fetch returned a full page, i.e. there may be more history to load). */
+export const CHAT_HISTORY_PAGE_SIZE = 50;
+
 /** A subscriber-visible chat message. No edit, no likes — unlike comments. */
 export interface ChatDTO {
 	id: string;

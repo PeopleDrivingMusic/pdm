@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { mdiChatOutline } from '@mdi/js';
 	import { getChatRoom } from '$lib/remote/chat.remote';
 	import { fetchChatHistory, postChatMessage, deleteChatMessage } from '$lib/client/chat';
@@ -8,7 +8,7 @@
 	import MessageComposer from './MessageComposer.svelte';
 	import SvgIcon from '../SvgIcon.svelte';
 	import LockedPanel from './LockedPanel.svelte';
-	import type { ChatDTO, ChatFrame } from '$lib/messages/types';
+	import { CHAT_HISTORY_PAGE_SIZE, type ChatDTO, type ChatFrame } from '$lib/messages/types';
 
 	let {
 		artistId,
@@ -24,8 +24,12 @@
 	// themselves, so `isSubscriber` alone would otherwise lock them out of it.
 	const hasAccess = $derived(isSubscriber || isArtist);
 
-	// Subscribers read from the platform-wide store (opened in the root layout);
-	// guests open a page-scoped connection here, torn down on unmount.
+	// Subscribers read from the platform-wide store (opened in the root layout).
+	// The artist opens their own page-scoped connection here (they're not "a
+	// subscriber" of themselves, so they're not in that store), torn down on
+	// unmount. A plain guest gets neither — they can't see real messages anyway,
+	// so there is nothing worth holding a live connection open for; the locked
+	// panel is fully static.
 	let localMessages = $state<ChatFrame[]>([]);
 	let onlineCount = $state(0);
 	let artistOnline = $state(false);
@@ -48,6 +52,7 @@
 			}
 			return;
 		}
+		if (!isArtist) return;
 
 		let cancelled = false;
 		(async () => {
@@ -62,11 +67,55 @@
 	});
 
 	let history = $state<ChatDTO[]>([]);
+	// A page shorter than the page size means the server has no more history —
+	// stops further scroll-triggered fetches instead of hammering an empty tail.
+	let hasMoreHistory = $state(true);
+	let loadingOlder = $state(false);
+	let scrollEl = $state<HTMLDivElement | null>(null);
+
 	onMount(async () => {
 		if (!hasAccess) return;
 		const result = await fetchChatHistory(artistId);
-		if (result.ok) history = [...result.messages].reverse();
+		if (!result.ok) return;
+		history = [...result.messages].reverse();
+		hasMoreHistory = result.messages.length === CHAT_HISTORY_PAGE_SIZE;
+		// Land on the latest message, not the oldest of the loaded page — a chat
+		// room opens on "now," and scrolling up is what reveals older history.
+		await tick();
+		if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
 	});
+
+	async function loadOlderHistory() {
+		if (loadingOlder || !hasMoreHistory || history.length === 0) return;
+		loadingOlder = true;
+		try {
+			const oldest = history[0].createdAt;
+			const result = await fetchChatHistory(artistId, oldest);
+			if (!result.ok) return;
+			hasMoreHistory = result.messages.length === CHAT_HISTORY_PAGE_SIZE;
+			if (result.messages.length === 0) return;
+
+			const el = scrollEl;
+			const prevScrollHeight = el?.scrollHeight ?? 0;
+			const prevScrollTop = el?.scrollTop ?? 0;
+			history = [...result.messages].reverse().concat(history);
+
+			// Prepending content above the viewport shifts everything down — restore
+			// the reader's position relative to the message they were looking at
+			// instead of letting the browser leave scrollTop unchanged (which would
+			// visually jerk the whole list downward).
+			await tick();
+			if (el) el.scrollTop = el.scrollHeight - prevScrollHeight + prevScrollTop;
+		} finally {
+			loadingOlder = false;
+		}
+	}
+
+	function handleScroll() {
+		// Near the top of the scroll area — close enough that the fetch resolves
+		// before the reader hits the literal top and sees the list stop dead.
+		if (scrollEl && scrollEl.scrollTop < 120) loadOlderHistory();
+	}
 
 	const messages = $derived(
 		hasAccess
@@ -95,13 +144,15 @@
 			<p class="eyebrow">Community</p>
 			<h2>Fan room</h2>
 		</div>
-		<div class="presence-cluster">
-			<span class="online-dot" class:offline={onlineCount === 0}></span>
-			<span class="online-count">{onlineCount} online</span>
-			{#if artistOnline}
-				<span class="artist-badge">Artist here</span>
-			{/if}
-		</div>
+		{#if hasAccess}
+			<div class="presence-cluster">
+				<span class="online-dot" class:offline={onlineCount === 0}></span>
+				<span class="online-count">{onlineCount} online</span>
+				{#if artistOnline}
+					<span class="artist-badge">Artist here</span>
+				{/if}
+			</div>
+		{/if}
 	</header>
 
 	<div class="chat-body">
@@ -112,7 +163,10 @@
 					<p>No messages yet — be the first to say hi.</p>
 				</div>
 			{:else}
-				<div class="message-scroll">
+				<div class="message-scroll" bind:this={scrollEl} onscroll={handleScroll}>
+					{#if loadingOlder}
+						<p class="loading-older">Loading earlier messages…</p>
+					{/if}
 					<MessageList
 						messages={messages.map((m) => ({
 							...m,
@@ -274,6 +328,13 @@
 		&::-webkit-scrollbar-thumb {
 			background: color-mix(in srgb, var(--border-primary) 70%, transparent);
 		}
+	}
+
+	.loading-older {
+		margin: 0 0 var(--space-3);
+		color: var(--text-tertiary);
+		font-size: var(--font-size-xs);
+		text-align: center;
 	}
 
 	.composer-slot {

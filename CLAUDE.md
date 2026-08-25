@@ -113,6 +113,7 @@ Reusable primitives in `src/lib/ui/` (`Button`, `Input`, `Avatar`, `FileUpload`,
 
 ## Conventions
 
+- **Always invoke the `design-taste-frontend` skill before any frontend/UI work in this repo** — new components, pages, redesigns, or styling changes under `src/lib/ui/`, `src/routes/`, or `src/styles/`. This applies even to small UI tweaks; it's what keeps the app from looking templated/generic.
 - New Svelte components use **runes** (`$state`, `$derived`, `$props`, `$effect`) — this is Svelte 5, not legacy stores syntax.
 - Keep secret-dependent code in `src/lib/server/` (or `.server.ts` files); it must never reach the client bundle.
 - Indentation is **tabs** (see `.prettierrc`); run `yarn format` before committing.
