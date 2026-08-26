@@ -68,6 +68,32 @@ describe('subscribeToChatRoom', () => {
 		expect(listenMock).toHaveBeenCalledTimes(2);
 	});
 
+	it('opens exactly one LISTEN when two subscribers race the first join', async () => {
+		const received1: unknown[] = [];
+		const received2: unknown[] = [];
+
+		// Neither call is awaited before the other starts — both see no existing
+		// room and would each try to create one without the in-flight dedup.
+		const [unsubscribe1, unsubscribe2] = await Promise.all([
+			subscribeToChatRoom('artist-race', (event) => received1.push(event)),
+			subscribeToChatRoom('artist-race', (event) => received2.push(event))
+		]);
+
+		expect(listenMock).toHaveBeenCalledTimes(1);
+
+		const onnotify = listenMock.mock.calls[0][1] as (payload: string) => void;
+		onnotify(JSON.stringify({ kind: 'message', message: { id: 'm1' } }));
+		expect(received1).toEqual([{ kind: 'message', message: { id: 'm1' } }]);
+		expect(received2).toEqual([{ kind: 'message', message: { id: 'm1' } }]);
+
+		// Both subscribers landed on the same room, so it takes both leaving to
+		// unlisten — a leaked second listener would never receive this cleanup.
+		await unsubscribe1();
+		expect(unlistenMocks[0]).not.toHaveBeenCalled();
+		await unsubscribe2();
+		expect(unlistenMocks[0]).toHaveBeenCalledTimes(1);
+	});
+
 	it('keeps different rooms on separate LISTEN channels', async () => {
 		await subscribeToChatRoom('artist-6', () => {});
 		await subscribeToChatRoom('artist-7', () => {});

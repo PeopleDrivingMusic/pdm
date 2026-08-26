@@ -117,3 +117,69 @@ describe('ChatWidget — history pagination', () => {
 		expect(fetchSpy).toHaveBeenCalledTimes(2);
 	});
 });
+
+describe('ChatWidget — dedup and delete', () => {
+	it('dedupes a message that lands in both the initial history fetch and the live stream', async () => {
+		const { fetchChatHistory } = await import('$lib/client/chat');
+		const { getChatRoom } = await import('$lib/remote/chat.remote');
+		const createdAt = new Date(2026, 7, 20, 0, 0, 1).toISOString();
+
+		vi.mocked(fetchChatHistory).mockResolvedValue({
+			ok: true,
+			messages: [chatMsg('dup-1', createdAt)]
+		});
+		// A message posted right as the live connection opens can arrive both via
+		// the history REST fetch and the live frame — the widget must show it once.
+		vi.mocked(getChatRoom).mockReturnValueOnce(
+			(async function* () {
+				yield { type: 'presence', onlineCount: 1, artistOnline: true };
+				yield { type: 'message', message: chatMsg('dup-1', createdAt) };
+			})() as unknown as ReturnType<typeof getChatRoom>
+		);
+
+		render(ChatWidget, { artistId: 'a1', isSubscriber: false, isArtist: true });
+
+		await expect.element(page.getByText('msg dup-1')).toBeInTheDocument();
+		// Give the async live frame a tick to arrive and get applied.
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		expect(document.querySelectorAll('.message-list li')).toHaveLength(1);
+	});
+
+	it('removes a deleted message from the list immediately, without a reload', async () => {
+		const { fetchChatHistory, deleteChatMessage } = await import('$lib/client/chat');
+		vi.mocked(fetchChatHistory).mockResolvedValue({
+			ok: true,
+			messages: [
+				{ ...chatMsg('del-1', new Date(2026, 7, 20, 0, 0, 1).toISOString()), canDelete: true }
+			]
+		});
+		vi.mocked(deleteChatMessage).mockResolvedValue({ ok: true });
+
+		render(ChatWidget, { artistId: 'a1', isSubscriber: true, isArtist: false });
+
+		await expect.element(page.getByText('msg del-1')).toBeInTheDocument();
+		await page.getByRole('button', { name: /more actions/i }).click();
+		await page.getByRole('button', { name: /delete comment/i }).click();
+
+		await expect.element(page.getByText('msg del-1')).not.toBeInTheDocument();
+	});
+
+	it('leaves the message in place when the server refuses the delete', async () => {
+		const { fetchChatHistory, deleteChatMessage } = await import('$lib/client/chat');
+		vi.mocked(fetchChatHistory).mockResolvedValue({
+			ok: true,
+			messages: [
+				{ ...chatMsg('del-2', new Date(2026, 7, 20, 0, 0, 1).toISOString()), canDelete: true }
+			]
+		});
+		vi.mocked(deleteChatMessage).mockResolvedValue({ ok: false, error: 'forbidden' });
+
+		render(ChatWidget, { artistId: 'a1', isSubscriber: true, isArtist: false });
+
+		await expect.element(page.getByText('msg del-2')).toBeInTheDocument();
+		await page.getByRole('button', { name: /more actions/i }).click();
+		await page.getByRole('button', { name: /delete comment/i }).click();
+
+		await expect.element(page.getByText('msg del-2')).toBeInTheDocument();
+	});
+});

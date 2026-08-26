@@ -117,14 +117,32 @@
 		if (scrollEl && scrollEl.scrollTop < 120) loadOlderHistory();
 	}
 
+	// A message posted in the narrow window between the initial history fetch
+	// resolving and the live connection actually starting can land in both —
+	// keep only the first occurrence (history's, already in its correct
+	// chronological slot) rather than rendering it twice.
+	function dedupeById(list: ChatDTO[]): ChatDTO[] {
+		// Scratch structure local to this one pass — never read across renders,
+		// so it doesn't need SvelteSet's reactivity.
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const seen = new Set<string>();
+		const result: ChatDTO[] = [];
+		for (const message of list) {
+			if (seen.has(message.id)) continue;
+			seen.add(message.id);
+			result.push(message);
+		}
+		return result;
+	}
+
 	const messages = $derived(
 		hasAccess
-			? [
+			? dedupeById([
 					...history,
 					...(chatStore.rooms[artistId]?.messages ?? localMessages)
 						.filter((f): f is Extract<ChatFrame, { type: 'message' }> => f.type === 'message')
 						.map((f) => f.message)
-				]
+				])
 			: []
 	);
 
@@ -134,7 +152,19 @@
 	}
 
 	async function handleDelete(messageId: string) {
-		await deleteChatMessage(artistId, messageId);
+		const result = await deleteChatMessage(artistId, messageId);
+		if (!result.ok) return;
+
+		// The server accepted the delete — drop it everywhere it might be held
+		// locally so it disappears immediately instead of waiting for a reload.
+		history = history.filter((m) => m.id !== messageId);
+		localMessages = localMessages.filter((f) => f.type !== 'message' || f.message.id !== messageId);
+		const room = chatStore.rooms[artistId];
+		if (room) {
+			room.messages = room.messages.filter(
+				(f) => f.type !== 'message' || f.message.id !== messageId
+			);
+		}
 	}
 </script>
 
@@ -183,8 +213,11 @@
 				<MessageComposer placeholder="Message the room…" onSubmit={handleSubmit} />
 			</div>
 		{:else}
-			<div class="teaser-locked" aria-hidden="true">
-				<div class="teaser-decoration">
+			<div class="teaser-locked">
+				<!-- Only the synthetic decoration is hidden from assistive tech — the
+				     surrounding container and LockedPanel's actual message must stay
+				     exposed, or a screen reader user gets nothing here at all. -->
+				<div class="teaser-decoration" aria-hidden="true">
 					{#each Array(14) as _, index (index)}
 						<div class="teaser-row">
 							<span class="teaser-avatar"></span>

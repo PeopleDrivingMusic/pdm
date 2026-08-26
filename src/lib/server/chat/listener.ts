@@ -14,6 +14,13 @@ interface RoomListener {
  * subscribers of the same room don't open N separate LISTENs.
  */
 const roomListeners = new Map<string, RoomListener>();
+// Two callers can both find no room and both start creating one before either
+// finishes `await client.listen(...)` — without this, that race opens two
+// LISTENs for the same channel and the second caller's `roomListeners.set`
+// silently orphans the first's subscriber set (and its LISTEN, forever). Later
+// callers for the same artistId while creation is in flight await this same
+// promise instead of starting their own.
+const roomCreations = new Map<string, Promise<RoomListener>>();
 
 export async function subscribeToChatRoom(
 	artistId: string,
@@ -21,13 +28,27 @@ export async function subscribeToChatRoom(
 ): Promise<() => Promise<void>> {
 	let room = roomListeners.get(artistId);
 	if (!room) {
-		const subscribers = new Set<(event: ChatMessagePublished) => void>();
-		const { unlisten } = await client.listen(`chat_room_${artistId}`, (payload: string) => {
-			const event = JSON.parse(payload) as ChatMessagePublished;
-			for (const subscriber of subscribers) subscriber(event);
-		});
-		room = { unlisten, subscribers };
-		roomListeners.set(artistId, room);
+		let creating = roomCreations.get(artistId);
+		if (!creating) {
+			creating = (async () => {
+				const subscribers = new Set<(event: ChatMessagePublished) => void>();
+				const { unlisten } = await client.listen(`chat_room_${artistId}`, (payload: string) => {
+					const event = JSON.parse(payload) as ChatMessagePublished;
+					for (const subscriber of subscribers) subscriber(event);
+				});
+				const created: RoomListener = { unlisten, subscribers };
+				roomListeners.set(artistId, created);
+				return created;
+			})();
+			roomCreations.set(artistId, creating);
+			// Whether it succeeds or fails, this promise no longer represents an
+			// in-flight creation — clear it so a room rejoined later (or a failed
+			// attempt retried) doesn't reuse a stale settled promise.
+			creating.finally(() => {
+				if (roomCreations.get(artistId) === creating) roomCreations.delete(artistId);
+			});
+		}
+		room = await creating;
 	}
 	room.subscribers.add(onMessage);
 
