@@ -35,19 +35,38 @@ jobs:
         # doing this keeps the password out of the process's argv (visible via
         # `ps`/`/proc` to anything else on the runner) instead of interpolating
         # the full connection string, password included, as a CLI argument.
+        #
+        # GitHub's log masking only matches the *exact* secret string. Once
+        # username/password go through decodeURIComponent() they can differ
+        # byte-for-byte from the raw `secrets.DIRECT_DATABASE_URL` value (e.g.
+        # a `+` or other percent-escaped character), so the decoded value
+        # silently stops being masked and leaks into the log in plaintext —
+        # this happened for PGPASSWORD on every run from 2026-08-21 to
+        # 2026-08-25. Explicitly re-mask every decoded piece with
+        # `::add-mask::` before it's ever echoed anywhere (including the
+        # "env:" block GitHub Actions prints for subsequent steps).
         env:
           DIRECT_DATABASE_URL: ${{ secrets.DIRECT_DATABASE_URL }}
         run: |
           node -e '
             const u = new URL(process.env.DIRECT_DATABASE_URL);
+            const host = u.hostname;
+            const port = u.port || "5432";
+            const user = decodeURIComponent(u.username);
+            const password = decodeURIComponent(u.password);
+            const database = u.pathname.slice(1);
+            const fs = require("fs");
+            for (const v of [host, port, user, password, database]) {
+              console.log("::add-mask::" + v);
+            }
             const lines = [
-              "PGHOST=" + u.hostname,
-              "PGPORT=" + (u.port || 5432),
-              "PGUSER=" + decodeURIComponent(u.username),
-              "PGPASSWORD=" + decodeURIComponent(u.password),
-              "PGDATABASE=" + u.pathname.slice(1)
+              "PGHOST=" + host,
+              "PGPORT=" + port,
+              "PGUSER=" + user,
+              "PGPASSWORD=" + password,
+              "PGDATABASE=" + database
             ];
-            require("fs").appendFileSync(process.env.GITHUB_ENV, lines.join("\n") + "\n");
+            fs.appendFileSync(process.env.GITHUB_ENV, lines.join("\n") + "\n");
           '
 
       - name: Dump PDM's app schemas
