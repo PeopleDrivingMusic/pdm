@@ -85,11 +85,15 @@ jobs:
             --no-owner --no-privileges --format=custom \
             --file="pdm-backup-${DATE}.dump"
 
-      - name: Upload to R2 (bd_dumps)
+      - name: Upload to R2 (bd-dump)
+        # Target bucket is `bd-dump` (hyphen) to match the R2 API token's
+        # existing scope — R2 buckets can't be renamed, and the token was
+        # provisioned against `bd-dump`, not the `bd_dumps` (underscore) name
+        # docs/.env assumed. Retargeting here avoids recreating the bucket.
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_BD_DUMP_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BD_DUMP_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
         run: |
-          aws s3 cp "$DUMP_FILE" "s3://bd_dumps/$DUMP_FILE" \
+          aws s3 cp "$DUMP_FILE" "s3://bd-dump/$DUMP_FILE" \
             --endpoint-url "https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com"
