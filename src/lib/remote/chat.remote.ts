@@ -64,8 +64,14 @@ export const getChatRoom = query.live('unchecked', async function* (artistId: un
 		}
 	} finally {
 		request.signal.removeEventListener('abort', onAbort);
-		await stopListening?.();
-		leavePresence();
-		queue.close();
+		// Nested so a rejecting stopListening() (e.g. the Postgres UNLISTEN
+		// round trip failing) can't skip leavePresence()/queue.close() — a
+		// throw partway through a bare finally body aborts everything after it.
+		try {
+			await stopListening?.();
+		} finally {
+			leavePresence();
+			queue.close();
+		}
 	}
 });

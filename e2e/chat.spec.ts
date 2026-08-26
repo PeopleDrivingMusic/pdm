@@ -123,8 +123,11 @@ test.describe('chat LISTEN/NOTIFY wiring', () => {
 		const sql = postgres(TEST_DATABASE_URL, { max: 1 });
 		try {
 			const received: string[] = [];
+			let notifyReceived: () => void;
+			const gotNotify = new Promise<void>((resolve) => (notifyReceived = resolve));
 			const { unlisten } = await sql.listen('chat_room_test-artist', (payload) => {
 				received.push(payload);
+				notifyReceived();
 			});
 
 			await sql.notify(
@@ -132,7 +135,15 @@ test.describe('chat LISTEN/NOTIFY wiring', () => {
 				JSON.stringify({ kind: 'message', message: { id: 'm1' } })
 			);
 
-			await new Promise((resolve) => setTimeout(resolve, 200));
+			// Resolves as soon as the payload actually arrives instead of guessing
+			// how long delivery takes; still bounded so a real regression fails
+			// the test instead of hanging the run.
+			await Promise.race([
+				gotNotify,
+				new Promise((_, reject) =>
+					setTimeout(() => reject(new Error('NOTIFY payload never arrived')), 5000)
+				)
+			]);
 			expect(received).toEqual([JSON.stringify({ kind: 'message', message: { id: 'm1' } })]);
 
 			await unlisten();

@@ -54,6 +54,15 @@ describe('createAsyncQueue', () => {
 		expect(await pending).toEqual({ value: undefined, done: true });
 	});
 
+	it('refuses a second concurrent iterate() — the queue is single-consumer', async () => {
+		const queue = createAsyncQueue<number>();
+		queue.iterate();
+
+		// A second iterator would share the same `waiters` array as the first —
+		// a `.return()` on either could resolve the *other* one's pending wait.
+		expect(() => queue.iterate()).toThrow(/single-consumer/);
+	});
+
 	it('drops a push that arrives after close', async () => {
 		const queue = createAsyncQueue<number>();
 		queue.close();

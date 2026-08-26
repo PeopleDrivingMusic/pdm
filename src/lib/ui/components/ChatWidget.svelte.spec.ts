@@ -1,5 +1,6 @@
 import { page } from '@vitest/browser/context';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { tick } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import ChatWidget from './ChatWidget.svelte';
 import { CHAT_HISTORY_PAGE_SIZE, type ChatDTO } from '$lib/messages/types';
@@ -130,18 +131,25 @@ describe('ChatWidget — dedup and delete', () => {
 		});
 		// A message posted right as the live connection opens can arrive both via
 		// the history REST fetch and the live frame — the widget must show it once.
+		// Signals when the generator itself is exhausted, so the test can wait for
+		// both frames to have actually been consumed instead of guessing a delay.
+		let liveFramesDone!: () => void;
+		const liveFramesConsumed = new Promise<void>((resolve) => (liveFramesDone = resolve));
 		vi.mocked(getChatRoom).mockReturnValueOnce(
 			(async function* () {
 				yield { type: 'presence', onlineCount: 1, artistOnline: true };
 				yield { type: 'message', message: chatMsg('dup-1', createdAt) };
+				liveFramesDone();
 			})() as unknown as ReturnType<typeof getChatRoom>
 		);
 
 		render(ChatWidget, { artistId: 'a1', isSubscriber: false, isArtist: true });
 
 		await expect.element(page.getByText('msg dup-1')).toBeInTheDocument();
-		// Give the async live frame a tick to arrive and get applied.
-		await new Promise((resolve) => setTimeout(resolve, 10));
+		await liveFramesConsumed;
+		// Both applyFrame() calls have run synchronously by now — flush Svelte's
+		// pending reactive update before reading the DOM.
+		await tick();
 		expect(document.querySelectorAll('.message-list li')).toHaveLength(1);
 	});
 

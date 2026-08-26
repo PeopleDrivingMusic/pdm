@@ -94,6 +94,20 @@ describe('subscribeToChatRoom', () => {
 		expect(unlistenMocks[0]).toHaveBeenCalledTimes(1);
 	});
 
+	it('propagates a failed LISTEN to the caller and allows a clean retry', async () => {
+		listenMock.mockRejectedValueOnce(new Error('connection refused'));
+
+		await expect(subscribeToChatRoom('artist-fail', () => {})).rejects.toThrow(
+			'connection refused'
+		);
+
+		// The failed attempt's in-flight creation entry must have been cleared —
+		// otherwise a retry would hang awaiting (or reject from) the same stale
+		// promise instead of opening a fresh LISTEN.
+		await subscribeToChatRoom('artist-fail', () => {});
+		expect(listenMock).toHaveBeenCalledTimes(2);
+	});
+
 	it('keeps different rooms on separate LISTEN channels', async () => {
 		await subscribeToChatRoom('artist-6', () => {});
 		await subscribeToChatRoom('artist-7', () => {});

@@ -8,6 +8,12 @@ export function createAsyncQueue<T>() {
 	const buffer: T[] = [];
 	const waiters: Array<(result: IteratorResult<T>) => void> = [];
 	let closed = false;
+	// `waiters` (and the `.return()` override below, which just shifts the
+	// front of it) only make sense with exactly one in-flight consumer — a
+	// second concurrent `iterate()` would share the same array and a
+	// `.return()` on either iterator could resolve the *other* one's pending
+	// wait instead of its own. Enforced rather than merely documented.
+	let consumed = false;
 
 	function push(value: T): void {
 		if (closed) return;
@@ -25,6 +31,13 @@ export function createAsyncQueue<T>() {
 	}
 
 	function iterate(): AsyncGenerator<T> {
+		if (consumed) {
+			throw new Error(
+				'createAsyncQueue: iterate() already has an active consumer (single-consumer)'
+			);
+		}
+		consumed = true;
+
 		async function* gen(): AsyncGenerator<T> {
 			while (true) {
 				if (buffer.length > 0) {

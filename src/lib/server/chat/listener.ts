@@ -43,10 +43,17 @@ export async function subscribeToChatRoom(
 			roomCreations.set(artistId, creating);
 			// Whether it succeeds or fails, this promise no longer represents an
 			// in-flight creation — clear it so a room rejoined later (or a failed
-			// attempt retried) doesn't reuse a stale settled promise.
-			creating.finally(() => {
-				if (roomCreations.get(artistId) === creating) roomCreations.delete(artistId);
-			});
+			// attempt retried) doesn't reuse a stale settled promise. The trailing
+			// `.catch` is a no-op: every caller already awaits `creating` itself
+			// (below) and handles its rejection there — this is a *separate*
+			// promise chain (`.finally()`'s own return value), and without a
+			// handler on it too, Node flags it as an unhandled rejection even
+			// though the original error is properly handled elsewhere.
+			creating
+				.finally(() => {
+					if (roomCreations.get(artistId) === creating) roomCreations.delete(artistId);
+				})
+				.catch(() => {});
 		}
 		room = await creating;
 	}
