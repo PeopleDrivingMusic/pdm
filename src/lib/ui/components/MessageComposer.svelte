@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { mdiEmoticonOutline } from '@mdi/js';
-	import Button from '../Button.svelte';
+	import { mdiEmoticonOutline, mdiSend } from '@mdi/js';
 	import IconButton from '../IconButton.svelte';
 
 	let {
@@ -115,31 +114,39 @@
 </script>
 
 <div class="composer">
-	<textarea
-		style:max-height="{MAX_HEIGHT}px"
-		bind:this={field}
-		bind:value={draft}
-		{placeholder}
-		{disabled}
-		rows="1"
-		aria-label={placeholder || 'Write a message'}
-		onkeydown={onKeydown}
-	></textarea>
+	<div class="field-wrap">
+		<textarea
+			style:max-height="{MAX_HEIGHT}px"
+			bind:this={field}
+			bind:value={draft}
+			{placeholder}
+			{disabled}
+			rows="1"
+			aria-label={placeholder || 'Write a message'}
+			onkeydown={onKeydown}
+		></textarea>
 
-	<div class="composer-actions">
-		<IconButton
-			path={mdiEmoticonOutline}
-			label="Add emoji"
-			variant="ghost"
-			size="sm"
-			active={showPicker}
-			disabled={disabled || !pickerReady}
-			onClick={() => (showPicker = !showPicker)}
-		/>
+		<div class="composer-actions">
+			<IconButton
+				path={mdiEmoticonOutline}
+				label="Add emoji"
+				variant="ghost"
+				size="sm"
+				active={showPicker}
+				disabled={disabled || !pickerReady}
+				onClick={() => (showPicker = !showPicker)}
+			/>
 
-		<Button size="sm" onClick={submit} disabled={disabled || busy || !draft.trim()}>
-			{submitLabel}
-		</Button>
+			<IconButton
+				path={mdiSend}
+				label={submitLabel}
+				variant="ghost"
+				size="sm"
+				tone={draft.trim() ? 'accent' : undefined}
+				disabled={disabled || busy || !draft.trim()}
+				onClick={submit}
+			/>
+		</div>
 	</div>
 
 	{#if showPicker && pickerReady}
@@ -152,15 +159,24 @@
 <style lang="scss">
 	.composer {
 		position: relative;
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
 		width: 100%;
 	}
 
+	.field-wrap {
+		position: relative;
+	}
+
 	textarea {
+		// A <textarea> is inline-level by default, which reserves a few px of
+		// baseline "descender" space below it inside a block container — enough
+		// to throw off centering the docked icons against it. Block-level removes
+		// that gap so `.field-wrap`'s height matches the textarea's exactly.
+		display: block;
 		width: 100%;
 		padding: var(--space-3);
+		// Room for the emoji + send icons docked inside the field, so typed text
+		// never runs under them.
+		padding-right: 76px;
 		border: 1px solid color-mix(in srgb, var(--border-primary) 62%, transparent);
 		border-radius: var(--radius-md);
 		background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
@@ -176,11 +192,21 @@
 		}
 	}
 
+	// Docked inside the field's bottom-right corner rather than below it — the emoji
+	// picker and send action read as part of the input, not a separate toolbar row.
+	// Bottom-anchored: on a single line this sits centered against the text (the
+	// textarea's padding is symmetric and the icons are only slightly taller than
+	// one line box, so the gap above/below reads as centered) — was previously
+	// thrown off by the textarea's own inline-block layout, see `display: block`
+	// above. On a grown, multi-line draft it stays pinned to the last line,
+	// which is the familiar chat-composer pattern.
 	.composer-actions {
+		position: absolute;
+		right: var(--space-2);
+		bottom: var(--space-2);
 		display: flex;
 		align-items: center;
-		justify-content: flex-end;
-		gap: var(--space-2);
+		gap: var(--space-1);
 	}
 
 	.picker-anchor {

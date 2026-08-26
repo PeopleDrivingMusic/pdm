@@ -8,6 +8,7 @@
 	import CommentToggle from '../CommentToggle.svelte';
 	import CommentSection from '../CommentSection.svelte';
 	import IconButton from '../../IconButton.svelte';
+	import LockedPanel from '../LockedPanel.svelte';
 	import { toggleLikeOptimistic, type LikeState } from '$lib/client/comments';
 
 	interface PostMediaItem {
@@ -105,34 +106,36 @@
 </script>
 
 <article class="post-card" class:is-locked={post.isLocked}>
-	<header class="post-header">
-		<Avatar size="md" src={author.avatar} name={author.name} />
-		<div>
-			<div class="author">{author.name}</div>
-			<div class="meta-row">
-				<span>{formatDate(post.publishedAt)}</span>
-				{#if post.visibility !== 'public'}
-					<span class="visibility">
-						<SvgIcon path={mdiLockOutline} size={13} />
-						{post.visibility}
-					</span>
-				{/if}
-			</div>
-		</div>
-	</header>
-
-	<div class="post-content">
-		<h3>{post.title}</h3>
-
-		{#if post.isLocked}
+	{#if post.isLocked}
+		<!-- Matches the feed's locked-card treatment exactly: the whole card is the
+		     gated surface — no header, no like/comment row, nothing peeking out
+		     from under the overlay. -->
+		<div class="post-content">
+			<h3>{post.title}</h3>
 			{#if post.excerpt}
 				<p>{post.excerpt}</p>
 			{/if}
-			<div class="locked-panel">
-				<SvgIcon path={mdiLockOutline} size={22} />
-				<span>Subscribe to unlock</span>
+		</div>
+		<LockedPanel />
+	{:else}
+		<header class="post-header">
+			<Avatar size="md" src={author.avatar} name={author.name} />
+			<div>
+				<div class="author">{author.name}</div>
+				<div class="meta-row">
+					<span>{formatDate(post.publishedAt)}</span>
+					{#if post.visibility !== 'public'}
+						<span class="visibility">
+							<SvgIcon path={mdiLockOutline} size={13} />
+							{post.visibility}
+						</span>
+					{/if}
+				</div>
 			</div>
-		{:else}
+		</header>
+
+		<div class="post-content">
+			<h3>{post.title}</h3>
 			<PostMediaGrid media={post.media} />
 
 			{#if post.bodyHtml}
@@ -149,34 +152,38 @@
 			{#if post.poll}
 				<PostPoll poll={post.poll} />
 			{/if}
-		{/if}
-	</div>
-
-	<footer class="post-actions">
-		<IconButton
-			path={likedByViewer ? mdiHeart : mdiHeartOutline}
-			label={likedByViewer ? 'Unlike post' : 'Like post'}
-			variant="ghost"
-			tone={likedByViewer ? 'accent' : 'neutral'}
-			count={likeCount}
-			disabled={!canLike}
-			onClick={handleLike}
-		/>
-		{#if commentsEnabled}
-			<CommentToggle count={commentCount} expanded={showComments} onToggle={handleCommentToggle} />
-		{/if}
-	</footer>
-
-	<!-- Outside the action row on purpose: the panel spans the card's full width. -->
-	{#if showComments && canOpenComments}
-		<div class="post-comments">
-			<CommentSection
-				targetType="post"
-				targetId={post.id}
-				{isLoggedIn}
-				onCountChange={(delta) => (countDelta += delta)}
-			/>
 		</div>
+
+		<footer class="post-actions">
+			<IconButton
+				path={likedByViewer ? mdiHeart : mdiHeartOutline}
+				label={likedByViewer ? 'Unlike post' : 'Like post'}
+				variant="ghost"
+				tone={likedByViewer ? 'accent' : 'neutral'}
+				count={likeCount}
+				disabled={!canLike}
+				onClick={handleLike}
+			/>
+			{#if commentsEnabled}
+				<CommentToggle
+					count={commentCount}
+					expanded={showComments}
+					onToggle={handleCommentToggle}
+				/>
+			{/if}
+		</footer>
+
+		<!-- Outside the action row on purpose: the panel spans the card's full width. -->
+		{#if showComments && canOpenComments}
+			<div class="post-comments">
+				<CommentSection
+					targetType="post"
+					targetId={post.id}
+					{isLoggedIn}
+					onCountChange={(delta) => (countDelta += delta)}
+				/>
+			</div>
+		{/if}
 	{/if}
 </article>
 
@@ -229,6 +236,7 @@
 	}
 
 	.post-content {
+		position: relative;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
@@ -247,6 +255,13 @@
 			font-size: var(--font-size-sm);
 			line-height: 1.5;
 		}
+	}
+
+	// A locked post's content is just the title + excerpt, which can be short —
+	// give the lock overlay real room to read as its own surface, not a thin
+	// strip hugging a couple of lines of text.
+	.post-card.is-locked .post-content {
+		min-height: 220px;
 	}
 
 	.author {
@@ -282,23 +297,6 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--space-3);
-	}
-
-	.locked-panel {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: var(--space-2);
-		min-height: 140px;
-		margin-top: var(--space-3);
-		border: 1px dashed color-mix(in srgb, var(--primary) 45%, var(--border-primary));
-		border-radius: var(--radius-lg);
-		background:
-			linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, transparent), transparent),
-			color-mix(in srgb, var(--bg-surface) 70%, var(--bg-primary));
-		color: var(--text-primary);
-		text-align: center;
-		font-weight: 700;
 	}
 
 	.post-actions {

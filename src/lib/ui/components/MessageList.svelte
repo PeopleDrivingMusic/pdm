@@ -151,23 +151,26 @@
 					<!-- Plain text on purpose: never {@html} user input. -->
 					<p class="text">{message.body}</p>
 
-					<!-- Row actions. Reply slots in here next to the like. -->
-					<div class="row-actions">
-						<button
-							type="button"
-							class="like"
-							class:is-liked={message.likedByViewer}
-							aria-label={message.likedByViewer ? 'Unlike comment' : 'Like comment'}
-							aria-pressed={message.likedByViewer}
-							disabled={!onToggleLike}
-							onclick={() => onToggleLike?.(message.id)}
-						>
-							<SvgIcon path={message.likedByViewer ? mdiHeart : mdiHeartOutline} size={14} />
-							{#if message.likeCount > 0}
-								<span>{message.likeCount}</span>
-							{/if}
-						</button>
-					</div>
+					<!-- Row actions. Reply slots in here next to the like. No handler means
+					     this list doesn't support liking at all (chat) — omit the row
+					     entirely rather than show a permanently-disabled button. -->
+					{#if onToggleLike}
+						<div class="row-actions">
+							<button
+								type="button"
+								class="like"
+								class:is-liked={message.likedByViewer}
+								aria-label={message.likedByViewer ? 'Unlike comment' : 'Like comment'}
+								aria-pressed={message.likedByViewer}
+								onclick={() => onToggleLike?.(message.id)}
+							>
+								<SvgIcon path={message.likedByViewer ? mdiHeart : mdiHeartOutline} size={14} />
+								{#if message.likeCount > 0}
+									<span>{message.likeCount}</span>
+								{/if}
+							</button>
+						</div>
+					{/if}
 				{/if}
 			</div>
 		</li>

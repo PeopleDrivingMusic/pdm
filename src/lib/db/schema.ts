@@ -23,7 +23,7 @@ export {
 } from './schemas/content';
 export { genres, albums, tracks, albumTracks } from './schemas/catalog';
 export { trackStats, commentLikes, postLikes } from './schemas/engagement';
-export { comments } from './schemas/messages';
+export { comments, chat } from './schemas/messages';
 export { playlists, playlistTracks, userFavorites } from './schemas/user-library';
 export { purchases, subscriptions } from './schemas/finance';
 import { users, sessions } from './schemas/users';
@@ -50,7 +50,7 @@ import {
 } from './schemas/content';
 import { genres, albums, tracks, albumTracks } from './schemas/catalog';
 import { trackStats, commentLikes, postLikes } from './schemas/engagement';
-import { comments } from './schemas/messages';
+import { comments, chat } from './schemas/messages';
 import { playlists, playlistTracks, userFavorites } from './schemas/user-library';
 import { purchases, subscriptions } from './schemas/finance';
 
@@ -196,6 +196,17 @@ export const commentsRelations = relations(comments, ({ one }) => ({
 	author: one(users, {
 		fields: [comments.authorId],
 		references: [users.id]
+	})
+}));
+
+export const chatRelations = relations(chat, ({ one }) => ({
+	author: one(users, {
+		fields: [chat.authorId],
+		references: [users.id]
+	}),
+	artist: one(artists, {
+		fields: [chat.artistId],
+		references: [artists.id]
 	})
 }));
 
@@ -366,6 +377,7 @@ export type PostLike = typeof postLikes.$inferSelect;
 export type NewPostLike = typeof postLikes.$inferInsert;
 export type Comment = typeof comments.$inferSelect;
 export type NewComment = typeof comments.$inferInsert;
+export type Chat = typeof chat.$inferSelect;
 export type Genre = typeof genres.$inferSelect;
 export type NewGenre = typeof genres.$inferInsert;
 export type AlbumTrack = typeof albumTracks.$inferSelect;
@@ -429,6 +441,7 @@ export const schema = {
 	commentLikes,
 	postLikes,
 	comments,
+	chat,
 	albumTracks,
 	playlists,
 	playlistTracks,

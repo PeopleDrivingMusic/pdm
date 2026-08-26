@@ -1,5 +1,6 @@
 import { pgSchema, uuid, varchar, text, timestamp, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
+import { artists } from './artist';
 
 export const messagesDbSchema = pgSchema('messages');
 
@@ -27,6 +28,20 @@ export const comments = messagesDbSchema.table(
 	]
 );
 
-// NOTE: `messages.chat` (artist_id, author_id, body, created_at, deleted_at) is added
-// in Slice 2 as a SEPARATE table in this same schema — distinct shape (no target_type,
-// no parent_id) + subscriber-gated policy.
+// Subscriber-only, artist-scoped fan chat. Flat — no target_type, no parent_id.
+export const chat = messagesDbSchema.table(
+	'chat',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		artistId: uuid('artist_id')
+			.notNull()
+			.references(() => artists.id, { onDelete: 'cascade' }),
+		authorId: uuid('author_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		body: text('body').notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		deletedAt: timestamp('deleted_at')
+	},
+	(t) => [index('chat_artist_idx').on(t.artistId, t.createdAt)]
+);

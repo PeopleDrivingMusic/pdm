@@ -1,4 +1,5 @@
 import { PlaylistService } from '$lib/db/services/PlaylistService';
+import { EntitlementService } from '$lib/server/entitlement';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async (event) => {
@@ -7,6 +8,7 @@ export const load: LayoutServerLoad = async (event) => {
 	return {
 		user,
 		session: event.locals.session,
-		user_playlists: user ? PlaylistService.getUserPlaylists(user.id) : []
+		user_playlists: user ? PlaylistService.getUserPlaylists(user.id) : [],
+		subscribedArtistIds: user ? await EntitlementService.getSubscribedArtistIds(user.id) : []
 	};
 };

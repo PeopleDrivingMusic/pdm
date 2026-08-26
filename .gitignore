@@ -56,3 +56,10 @@ static/artists/cover/
 static/uploads/tracks/
 static/muse.webp
 static/rock_am_ring.jpeg
+
+# Business/outreach working files — not project source, don't belong in the
+# app repo (and `outreach/`'s xlsx/py scratch files fail `prettier --check .`).
+outreach/
+/image.png
+/image copy.png
+/image copy 2.png

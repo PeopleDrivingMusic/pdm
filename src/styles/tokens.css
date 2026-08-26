@@ -518,3 +518,13 @@
 :root {
 	--font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
 }
+
+/* ── Fan chat widget tokens (spec 2026-08-18-fan-chat-ui-direction §6) ── */
+:root {
+	--chat-presence-ring: color-mix(in srgb, var(--success) 18%, transparent);
+	--chat-artist-badge-bg: color-mix(in srgb, var(--primary) 22%, transparent);
+	--chat-artist-badge-text: var(--primary);
+	--chat-divider: color-mix(in srgb, var(--border-primary) 40%, transparent);
+	--chat-arrival-tint: color-mix(in srgb, var(--primary) 14%, transparent);
+	--chat-new-pill-bg: var(--chat-artist-badge-bg);
+}

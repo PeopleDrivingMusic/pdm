@@ -97,8 +97,10 @@ export async function withDbLogging<T>(
 	}
 }
 
-// Export the client for manual operations if needed
-// export { client };
+// Exported for LISTEN/NOTIFY, which needs the raw postgres-js client — Drizzle's
+// wrapper has no equivalent API. postgres-js maintains LISTEN on its own dedicated
+// connection automatically, separate from the `max: 1` query pool above.
+export { client };
 
 // Type exports for better TypeScript support
 export type User = typeof schema.users.$inferSelect;

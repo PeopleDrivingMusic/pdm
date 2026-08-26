@@ -5,6 +5,7 @@
 	import { contentIcon, contentLabel, formatDate } from '../content-helpers';
 	import ContentSkeleton from './ContentSkeleton.svelte';
 	import LoadError from './LoadError.svelte';
+	import LockedPanel from '$lib/ui/components/LockedPanel.svelte';
 
 	let { content }: { content: PageData['content'] } = $props();
 </script>
@@ -36,10 +37,7 @@
 						<p>{item.type === 'post' ? item.excerpt : item.description}</p>
 					</div>
 					{#if item.isLocked}
-						<div class="lock-overlay">
-							<SvgIcon path={mdiLockOutline} size={20} />
-							<span>Subscribe to unlock</span>
-						</div>
+						<LockedPanel />
 					{/if}
 				</article>
 			{/each}
@@ -132,22 +130,6 @@
 		gap: var(--space-1);
 		color: var(--primary);
 		text-transform: capitalize;
-	}
-
-	.lock-overlay {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		color: var(--text-primary);
-		position: absolute;
-		inset: 0;
-		justify-content: center;
-		padding: var(--space-4);
-		background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
-		backdrop-filter: blur(16px);
-		text-align: center;
-		font-size: var(--font-size-sm);
-		font-weight: 700;
 	}
 
 	.is-locked {

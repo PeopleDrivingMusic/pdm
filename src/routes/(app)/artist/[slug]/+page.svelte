@@ -9,9 +9,15 @@
 	import ArtistPosts from './components/ArtistPosts.svelte';
 	import ArtistPhotos from './components/ArtistPhotos.svelte';
 	import ArtistVideos from './components/ArtistVideos.svelte';
-	import ArtistSidebarPhotos from './components/ArtistSidebarPhotos.svelte';
+	import ChatWidget from '$lib/ui/components/ChatWidget.svelte';
+	import { playerStore } from '$lib/stores/player.svelte';
 
 	const { artist, viewer, tracks, albums, content } = $derived(page.data as PageData);
+	// The music player is a fixed bar docked to the viewport bottom (see
+	// `(app)/+layout.svelte`, which shrinks `.page` by the same 76px when a
+	// track is loaded) — the sidebar's own height cap has to shrink to match,
+	// or the chat composer ends up sitting underneath it.
+	const playerActive = $derived(playerStore.currentTrackIndex > -1);
 
 	const tabs = [
 		{ label: 'Feed', id: 'feed' },
@@ -154,34 +160,8 @@
 		</section>
 	</main>
 
-	<aside class="side-content">
-		<section class="sidebar-card">
-			<div class="section-heading compact">
-				<div>
-					<p class="eyebrow">Community</p>
-					<h2>Fan room</h2>
-				</div>
-				<span class="online-dot"></span>
-			</div>
-			<div class="chat-preview">
-				{#each Array(6) as _, index (index)}
-					<div class="message-row">
-						<Avatar size="s" name={`User ${index + 1}`} />
-						<span>Fan message {index + 1}</span>
-					</div>
-				{/each}
-			</div>
-		</section>
-
-		<section class="sidebar-card">
-			<div class="section-heading compact">
-				<div>
-					<p class="eyebrow">Photos</p>
-					<h2>Latest shots</h2>
-				</div>
-			</div>
-			<ArtistSidebarPhotos {content} />
-		</section>
+	<aside class="side-content" class:player-active={playerActive}>
+		<ChatWidget artistId={artist.id} isSubscriber={viewer.isSubscribed} isArtist={viewer.isOwner} />
 	</aside>
 </div>
 
@@ -191,7 +171,9 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
 		gap: var(--space-7, 2rem);
-		align-items: start;
+		// Stretch (grid's default) so the sidebar matches the main column's height —
+		// the chat widget is the sidebar's only content now and fills that height.
+		align-items: stretch;
 	}
 
 	.main-content,
@@ -202,9 +184,20 @@
 	.side-content {
 		position: sticky;
 		top: var(--space-5);
+		// Capped to the viewport (minus the sticky top offset and a matching bottom
+		// gutter) so the chat card never grows taller than what's visible — its own
+		// message list scrolls internally instead of pushing the composer off-screen.
+		max-height: calc(100vh - var(--space-5) * 2);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-5);
+
+		// The fixed music player docks over the bottom 76px of the viewport when a
+		// track is loaded — shrink the cap by the same amount (see MusicPlayer.svelte's
+		// literal `height: 76px`) so the composer never renders underneath it.
+		&.player-active {
+			max-height: calc(100vh - var(--space-5) * 2 - 76px - var(--space-2));
+		}
 	}
 
 	.hero {
@@ -301,7 +294,6 @@
 	}
 
 	.content-surface,
-	.sidebar-card,
 	.section-block {
 		border-radius: var(--radius-lg);
 	}
@@ -335,44 +327,6 @@
 			font-size: var(--font-size-2xl);
 			line-height: 1.2;
 		}
-
-		&.compact h2 {
-			font-size: var(--font-size-lg);
-		}
-	}
-
-	.sidebar-card {
-		padding: var(--space-5);
-		background:
-			linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 48%),
-			color-mix(in srgb, var(--bg-surface) 72%, var(--bg-primary));
-		box-shadow: 0 14px 44px rgba(0, 0, 0, 0.18);
-	}
-
-	.online-dot {
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		background: var(--success);
-		box-shadow: 0 0 0 5px color-mix(in srgb, var(--success) 18%, transparent);
-	}
-
-	.chat-preview {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		margin-top: var(--space-3);
-	}
-
-	.message-row {
-		display: flex;
-		align-items: center;
-		gap: var(--space-2);
-		padding: var(--space-2) 0;
-		border-radius: var(--radius-md);
-		background: transparent;
-		color: var(--text-secondary);
-		font-size: var(--font-size-sm);
 	}
 
 	.empty-state {
@@ -420,8 +374,7 @@
 		}
 
 		.content-surface,
-		.section-block,
-		.sidebar-card {
+		.section-block {
 			border-radius: var(--radius-md);
 		}
 
