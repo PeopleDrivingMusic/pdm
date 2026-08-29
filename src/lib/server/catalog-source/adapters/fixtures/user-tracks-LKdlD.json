@@ -1,0 +1,180 @@
+{
+	"data": [
+		{
+			"id": "7YmNr",
+			"title": "deadmau5 - Nextra (Stem Drop)",
+			"duration": 61,
+			"genre": "Electronic",
+			"release_date": "2021-05-11T15:05:00Z",
+			"play_count": 106778,
+			"permalink": "/deadmau5/deadmau5-nextra-stem-drop-402369",
+			"license": "All rights reserved",
+			"isrc": "GBTDG1302232",
+			"is_streamable": true,
+			"is_available": true,
+			"is_stream_gated": false,
+			"is_unlisted": false,
+			"is_delete": false,
+			"access": {
+				"stream": true,
+				"download": false
+			},
+			"field_visibility": {
+				"mood": true,
+				"tags": true,
+				"genre": true,
+				"share": true,
+				"remixes": true,
+				"play_count": true
+			},
+			"artwork": {
+				"150x150": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/150x150.jpg",
+				"480x480": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/480x480.jpg",
+				"1000x1000": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/1000x1000.jpg",
+				"mirrors": [
+					"https://audius-creator-12.theblueprint.xyz",
+					"https://cn4.mainnet.audiusindex.org",
+					"https://v.monophonic.digital"
+				]
+			}
+		},
+		{
+			"id": "GATED1",
+			"title": "deadmau5 - Nextra (Stem Drop)",
+			"duration": 61,
+			"genre": "Electronic",
+			"release_date": "2021-05-11T15:05:00Z",
+			"play_count": 106778,
+			"permalink": "/deadmau5/deadmau5-nextra-stem-drop-402369",
+			"license": "All rights reserved",
+			"isrc": "GBTDG1302232",
+			"is_streamable": true,
+			"is_available": true,
+			"is_stream_gated": true,
+			"is_unlisted": false,
+			"is_delete": false,
+			"access": {
+				"stream": false,
+				"download": false
+			},
+			"field_visibility": {
+				"mood": true,
+				"tags": true,
+				"genre": true,
+				"share": true,
+				"remixes": true,
+				"play_count": true
+			},
+			"artwork": {
+				"150x150": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/150x150.jpg",
+				"480x480": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/480x480.jpg",
+				"1000x1000": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/1000x1000.jpg",
+				"mirrors": [
+					"https://audius-creator-12.theblueprint.xyz",
+					"https://cn4.mainnet.audiusindex.org",
+					"https://v.monophonic.digital"
+				]
+			}
+		},
+		{
+			"id": "HIDDEN1",
+			"title": "deadmau5 - Nextra (Stem Drop)",
+			"duration": 61,
+			"genre": "Electronic",
+			"release_date": "2021-05-11T15:05:00Z",
+			"play_count": 106778,
+			"permalink": "/deadmau5/deadmau5-nextra-stem-drop-402369",
+			"license": "All rights reserved",
+			"isrc": "GBTDG1302232",
+			"is_streamable": true,
+			"is_available": true,
+			"is_stream_gated": false,
+			"is_unlisted": true,
+			"is_delete": false,
+			"access": {
+				"stream": true,
+				"download": false
+			},
+			"field_visibility": {
+				"play_count": false
+			},
+			"artwork": {
+				"150x150": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/150x150.jpg",
+				"480x480": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/480x480.jpg",
+				"1000x1000": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/1000x1000.jpg",
+				"mirrors": [
+					"https://audius-creator-12.theblueprint.xyz",
+					"https://cn4.mainnet.audiusindex.org",
+					"https://v.monophonic.digital"
+				]
+			}
+		},
+		{
+			"id": "DELETED1",
+			"title": "deadmau5 - Nextra (Stem Drop)",
+			"duration": 61,
+			"genre": "Electronic",
+			"release_date": "2021-05-11T15:05:00Z",
+			"play_count": 106778,
+			"permalink": "/deadmau5/deadmau5-nextra-stem-drop-402369",
+			"license": "All rights reserved",
+			"isrc": "GBTDG1302232",
+			"is_streamable": true,
+			"is_available": true,
+			"is_stream_gated": false,
+			"is_unlisted": false,
+			"is_delete": true,
+			"access": {
+				"stream": true,
+				"download": false
+			},
+			"field_visibility": {
+				"mood": true,
+				"tags": true,
+				"genre": true,
+				"share": true,
+				"remixes": true,
+				"play_count": true
+			},
+			"artwork": {
+				"150x150": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/150x150.jpg",
+				"480x480": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/480x480.jpg",
+				"1000x1000": "https://val018.open-audio-validator.com/content/QmQcmc5CR2z2WkzirJmWvp8ZJp1ztVbvaX6Ak5mk9K3ojQ/1000x1000.jpg",
+				"mirrors": [
+					"https://audius-creator-12.theblueprint.xyz",
+					"https://cn4.mainnet.audiusindex.org",
+					"https://v.monophonic.digital"
+				]
+			}
+		},
+		{
+			"id": "GONE1",
+			"title": "deadmau5 - Nextra (Stem Drop)",
+			"duration": null,
+			"genre": null,
+			"release_date": null,
+			"play_count": 106778,
+			"permalink": "/deadmau5/deadmau5-nextra-stem-drop-402369",
+			"license": null,
+			"isrc": null,
+			"is_streamable": true,
+			"is_available": false,
+			"is_stream_gated": false,
+			"is_unlisted": false,
+			"is_delete": false,
+			"access": {
+				"stream": false,
+				"download": false
+			},
+			"field_visibility": {
+				"mood": true,
+				"tags": true,
+				"genre": true,
+				"share": true,
+				"remixes": true,
+				"play_count": true
+			},
+			"artwork": null
+		}
+	]
+}
