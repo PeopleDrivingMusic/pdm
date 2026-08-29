@@ -4,7 +4,7 @@
 
 **Goal:** Import unclaimed artist profiles and their tracks from Audius into PDM's own tables, idempotently and behind a service boundary — with no UI.
 
-**Architecture:** A new application-service boundary at `src/lib/server/catalog-source/` owns the outside world. `AudiusAdapter` turns HTTP responses into our own `ExternalArtist` / `ExternalTrack` DTOs; `CatalogSourceService` applies the import gates and orchestrates; a new `SeededCatalogRepository` in the DB layer performs idempotent upserts keyed on `(origin, external_id)`. No Audius response type and no Drizzle row crosses the service boundary in either direction. Seeded artists reuse the existing `artist.artists` table behind an `origin` discriminator, so every existing FK, query and page keeps working.
+**Architecture:** A new application-service boundary at `src/lib/server/catalog-source/` owns the outside world. `AudiusAdapter` turns HTTP responses into our own `ExternalArtist` / `ExternalTrack` DTOs; `CatalogSourceService` applies the import gates and orchestrates; a new `CatalogImportRepository` in the DB layer performs idempotent upserts keyed on `(origin, external_id)`. No Audius response type and no Drizzle row crosses the service boundary in either direction. Seeded artists reuse the existing `artist.artists` table behind an `origin` discriminator, so every existing FK, query and page keeps working.
 
 **Tech Stack:** SvelteKit 2 · TypeScript · Drizzle ORM + Postgres (`postgres-js`) · Vitest (node project) · yarn
 
@@ -33,14 +33,14 @@
 | `src/lib/db/schemas/artist.ts`                                 | **Modify.** `userId` nullable; add `origin`, `externalId`, `externalUrl`, `claimedAt`; partial unique index |
 | `src/lib/db/schemas/catalog.ts`                                | **Modify.** `tracks` gains `audioSource`, `externalId`                                                      |
 | `src/lib/db/schemas/finance.ts`                                | **Modify.** `subscriptions` gains `kind`                                                                    |
-| `src/lib/db/schema.seeded.spec.ts`                             | **Create.** Asserts the column shape so a domain-file edit can't drift from intent                          |
-| `drizzle/migrations/<generated>.sql`                           | **Create** via `yarn db:generate`                                                                           |
+| `src/lib/db/schemas/external-origin.spec.ts`                   | **Create.** Asserts the column shape so a domain-file edit can't drift from intent                          |
+| `drizzle/migrations/<generated>.sql`                           | **Create** via `yarn db:generate`. Columns and indexes only — **this slice creates no table**               |
 | `src/lib/server/catalog-source/types.ts`                       | **Create.** `ExternalArtist`, `ExternalTrack`, `CatalogSource`                                              |
 | `src/lib/server/catalog-source/adapters/AudiusAdapter.ts`      | **Create.** HTTP + mapping. The only file that knows Audius field names                                     |
 | `src/lib/server/catalog-source/adapters/fixtures/`             | **Create.** Real captured responses                                                                         |
 | `src/lib/server/catalog-source/adapters/AudiusAdapter.spec.ts` | **Create.** Mapping + gate tests against fixtures, no network                                               |
-| `src/lib/db/services/SeededCatalogRepository.ts`               | **Create.** Idempotent upserts. The only file that writes seeded rows                                       |
-| `src/lib/db/services/SeededCatalogRepository.spec.ts`          | **Create.**                                                                                                 |
+| `src/lib/db/services/CatalogImportRepository.ts`               | **Create.** Idempotent upserts. The only file that writes seeded rows                                       |
+| `src/lib/db/services/CatalogImportRepository.spec.ts`          | **Create.**                                                                                                 |
 | `src/lib/server/catalog-source/CatalogSourceService.ts`        | **Create.** Gates + orchestration. Returns primitives                                                       |
 | `src/lib/server/catalog-source/CatalogSourceService.spec.ts`   | **Create.**                                                                                                 |
 | `src/lib/server/catalog-source/index.ts`                       | **Create.** Barrel — the only import path for consumers                                                     |
@@ -56,7 +56,7 @@
 - Modify: `src/lib/db/schemas/artist.ts`
 - Modify: `src/lib/db/schemas/catalog.ts:41-70` (the `tracks` table)
 - Modify: `src/lib/db/schemas/finance.ts:20-38` (the `subscriptions` table)
-- Test: `src/lib/db/schema.seeded.spec.ts`
+- Test: `src/lib/db/schemas/external-origin.spec.ts`
 - Create: `drizzle/migrations/<generated>.sql`
 
 **Interfaces:**
@@ -66,15 +66,15 @@
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/lib/db/schema.seeded.spec.ts`:
+Create `src/lib/db/schemas/external-origin.spec.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { artists } from './schemas/artist';
-import { tracks } from './schemas/catalog';
-import { subscriptions } from './schemas/finance';
+import { artists } from './artist';
+import { tracks } from './catalog';
+import { subscriptions } from './finance';
 
-describe('seeded-artist schema', () => {
+describe('external-origin columns', () => {
 	it('lets an artist exist with no PDM user', () => {
 		expect(artists.userId.notNull).toBe(false);
 	});
@@ -111,7 +111,7 @@ describe('seeded-artist schema', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `yarn test:unit -- --run src/lib/db/schema.seeded.spec.ts`
+Run: `yarn test:unit -- --run src/lib/db/schemas/external-origin.spec.ts`
 Expected: FAIL — `artists.origin` is undefined, so reading `.notNull` throws `TypeError: Cannot read properties of undefined`.
 
 - [ ] **Step 3: Add the columns to `schemas/artist.ts`**
@@ -194,7 +194,7 @@ Inside the `subscriptions` table definition, directly after the existing `status
 
 - [ ] **Step 6: Run the test to verify it passes**
 
-Run: `yarn test:unit -- --run src/lib/db/schema.seeded.spec.ts`
+Run: `yarn test:unit -- --run src/lib/db/schemas/external-origin.spec.ts`
 Expected: PASS, 7 tests.
 
 - [ ] **Step 7: Confirm the aggregator needs no edit, then typecheck**
@@ -233,7 +233,7 @@ Expected: applies cleanly. Existing rows are unaffected — every added column h
 
 ```bash
 yarn format
-git add src/lib/db/schemas/artist.ts src/lib/db/schemas/catalog.ts src/lib/db/schemas/finance.ts src/lib/db/schema.seeded.spec.ts drizzle/migrations
+git add src/lib/db/schemas/artist.ts src/lib/db/schemas/catalog.ts src/lib/db/schemas/finance.ts src/lib/db/schemas/external-origin.spec.ts drizzle/migrations
 git commit -m "feat(db): allow ownerless artists and external-sourced tracks"
 ```
 
@@ -705,19 +705,19 @@ git commit -m "feat(catalog-source): add Audius adapter with per-track import ga
 
 **Files:**
 
-- Create: `src/lib/db/services/SeededCatalogRepository.ts`
-- Test: `src/lib/db/services/SeededCatalogRepository.spec.ts`
+- Create: `src/lib/db/services/CatalogImportRepository.ts`
+- Test: `src/lib/db/services/CatalogImportRepository.spec.ts`
 
 **Interfaces:**
 
 - Consumes: `ExternalArtist`, `ExternalTrack` from `src/lib/server/catalog-source/types`.
 - Produces:
-  - `SeededCatalogRepository.upsertArtist(input: ExternalArtist, slug: string): Promise<{ id: string }>`
-  - `SeededCatalogRepository.upsertTracks(artistId: string, input: ExternalTrack[]): Promise<{ imported: number }>`
+  - `CatalogImportRepository.upsertArtist(input: ExternalArtist, slug: string): Promise<{ id: string }>`
+  - `CatalogImportRepository.upsertTracks(artistId: string, input: ExternalTrack[]): Promise<{ imported: number }>`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/lib/db/services/SeededCatalogRepository.spec.ts`:
+Create `src/lib/db/services/CatalogImportRepository.spec.ts`:
 
 ```ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -731,7 +731,7 @@ vi.mock('$lib/db', () => ({
 	withDbLogging: vi.fn(async (_name: string, fn: () => unknown) => fn())
 }));
 
-import { SeededCatalogRepository } from './SeededCatalogRepository';
+import { CatalogImportRepository } from './CatalogImportRepository';
 import type { ExternalArtist, ExternalTrack } from '$lib/server/catalog-source/types';
 
 const artist: ExternalArtist = {
@@ -768,9 +768,9 @@ beforeEach(() => {
 	vi.clearAllMocks();
 });
 
-describe('SeededCatalogRepository.upsertArtist', () => {
+describe('CatalogImportRepository.upsertArtist', () => {
 	it('writes the artist with no owner and the source recorded', async () => {
-		await SeededCatalogRepository.upsertArtist(artist, 'deadmau5');
+		await CatalogImportRepository.upsertArtist(artist, 'deadmau5');
 		expect(values).toHaveBeenCalledWith(
 			expect.objectContaining({
 				userId: null,
@@ -786,18 +786,18 @@ describe('SeededCatalogRepository.upsertArtist', () => {
 	});
 
 	it('never sets claimedAt on import — that is the claim flow’s job', async () => {
-		await SeededCatalogRepository.upsertArtist(artist, 'deadmau5');
+		await CatalogImportRepository.upsertArtist(artist, 'deadmau5');
 		expect(values.mock.calls[0][0]).not.toHaveProperty('claimedAt');
 	});
 
 	it('re-imports into the same row by keying on origin and external id', async () => {
-		await SeededCatalogRepository.upsertArtist(artist, 'deadmau5');
+		await CatalogImportRepository.upsertArtist(artist, 'deadmau5');
 		const conflict = onConflictDoUpdate.mock.calls[0][0] as { target: unknown[]; set: object };
 		expect(conflict.target).toHaveLength(2);
 	});
 
 	it('refreshes mutable fields on re-import but not identity', async () => {
-		await SeededCatalogRepository.upsertArtist(artist, 'deadmau5');
+		await CatalogImportRepository.upsertArtist(artist, 'deadmau5');
 		const conflict = onConflictDoUpdate.mock.calls[0][0] as { set: Record<string, unknown> };
 		expect(Object.keys(conflict.set).sort()).toEqual(
 			['avatar', 'coverImg', 'description', 'name', 'updatedAt'].sort()
@@ -805,14 +805,14 @@ describe('SeededCatalogRepository.upsertArtist', () => {
 	});
 
 	it('returns the row id so tracks can be parented', async () => {
-		const result = await SeededCatalogRepository.upsertArtist(artist, 'deadmau5');
+		const result = await CatalogImportRepository.upsertArtist(artist, 'deadmau5');
 		expect(result).toEqual({ id: 'artist-1' });
 	});
 });
 
-describe('SeededCatalogRepository.upsertTracks', () => {
+describe('CatalogImportRepository.upsertTracks', () => {
 	it('marks imported tracks ready, published and public', async () => {
-		await SeededCatalogRepository.upsertTracks('artist-1', [track]);
+		await CatalogImportRepository.upsertTracks('artist-1', [track]);
 		expect(values).toHaveBeenCalledWith([
 			expect.objectContaining({
 				artistId: 'artist-1',
@@ -827,18 +827,18 @@ describe('SeededCatalogRepository.upsertTracks', () => {
 	});
 
 	it('keeps the licence and ISRC with the music', async () => {
-		await SeededCatalogRepository.upsertTracks('artist-1', [track]);
+		await CatalogImportRepository.upsertTracks('artist-1', [track]);
 		const row = (values.mock.calls[0][0] as Array<{ metadata: unknown }>)[0];
 		expect(row.metadata).toEqual({ license: 'All rights reserved', isrc: 'GBTDG1302232' });
 	});
 
 	it('reports how many rows it wrote', async () => {
-		const result = await SeededCatalogRepository.upsertTracks('artist-1', [track]);
+		const result = await CatalogImportRepository.upsertTracks('artist-1', [track]);
 		expect(result).toEqual({ imported: 1 });
 	});
 
 	it('does not touch the database for an empty list', async () => {
-		const result = await SeededCatalogRepository.upsertTracks('artist-1', []);
+		const result = await CatalogImportRepository.upsertTracks('artist-1', []);
 		expect(insert).not.toHaveBeenCalled();
 		expect(result).toEqual({ imported: 0 });
 	});
@@ -847,12 +847,12 @@ describe('SeededCatalogRepository.upsertTracks', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `yarn test:unit -- --run src/lib/db/services/SeededCatalogRepository.spec.ts`
-Expected: FAIL — `Failed to resolve import "./SeededCatalogRepository"`.
+Run: `yarn test:unit -- --run src/lib/db/services/CatalogImportRepository.spec.ts`
+Expected: FAIL — `Failed to resolve import "./CatalogImportRepository"`.
 
 - [ ] **Step 3: Write the repository**
 
-Create `src/lib/db/services/SeededCatalogRepository.ts`:
+Create `src/lib/db/services/CatalogImportRepository.ts`:
 
 ```ts
 import { sql } from 'drizzle-orm';
@@ -865,9 +865,9 @@ import type { ExternalArtist, ExternalTrack } from '$lib/server/catalog-source/t
  * import updates the same rows rather than duplicating them, and neither ever touches
  * PDM-side data (chat, comments, likes, subscriptions).
  */
-export class SeededCatalogRepository {
+export class CatalogImportRepository {
 	static async upsertArtist(input: ExternalArtist, slug: string): Promise<{ id: string }> {
-		return withDbLogging('SeededCatalogRepository.upsertArtist', async () => {
+		return withDbLogging('CatalogImportRepository.upsertArtist', async () => {
 			const [row] = await db
 				.insert(artists)
 				.values({
@@ -905,7 +905,7 @@ export class SeededCatalogRepository {
 	): Promise<{ imported: number }> {
 		if (input.length === 0) return { imported: 0 };
 
-		return withDbLogging('SeededCatalogRepository.upsertTracks', async () => {
+		return withDbLogging('CatalogImportRepository.upsertTracks', async () => {
 			await db
 				.insert(tracks)
 				.values(
@@ -957,7 +957,7 @@ Then: `yarn db:generate`, read the SQL (it must contain only the one `CREATE UNI
 
 - [ ] **Step 5: Run the test to verify it passes**
 
-Run: `yarn test:unit -- --run src/lib/db/services/SeededCatalogRepository.spec.ts`
+Run: `yarn test:unit -- --run src/lib/db/services/CatalogImportRepository.spec.ts`
 Expected: PASS, 9 tests.
 
 - [ ] **Step 6: Commit**
@@ -965,7 +965,7 @@ Expected: PASS, 9 tests.
 ```bash
 yarn format
 yarn check
-git add src/lib/db/services/SeededCatalogRepository.ts src/lib/db/services/SeededCatalogRepository.spec.ts src/lib/db/schemas/catalog.ts drizzle/migrations
+git add src/lib/db/services/CatalogImportRepository.ts src/lib/db/services/CatalogImportRepository.spec.ts src/lib/db/schemas/catalog.ts drizzle/migrations
 git commit -m "feat(db): idempotent upserts for seeded artists and tracks"
 ```
 
@@ -981,7 +981,7 @@ git commit -m "feat(db): idempotent upserts for seeded artists and tracks"
 
 **Interfaces:**
 
-- Consumes: `AudiusAdapter.searchArtists`, `AudiusAdapter.listTracks` (Task 2); `SeededCatalogRepository.upsertArtist`, `.upsertTracks` (Task 3).
+- Consumes: `AudiusAdapter.searchArtists`, `AudiusAdapter.listTracks` (Task 2); `CatalogImportRepository.upsertArtist`, `.upsertTracks` (Task 3).
 - Produces:
   - `CatalogSourceService.lookupArtist(query: string): Promise<ArtistCandidate[]>` where `ArtistCandidate = { externalId, handle, name, followerCount, trackCount, isVerified, externalUrl }`
   - `CatalogSourceService.importArtist(externalId: string, opts?: { allowUnverified?: boolean }): Promise<ImportResult>` where `ImportResult = { ok: true; artistId: string; slug: string; tracksImported: number } | { ok: false; reason: 'not_found' | 'unverified' | 'deactivated' | 'no_tracks' }`
@@ -996,12 +996,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('./adapters/AudiusAdapter', () => ({
 	AudiusAdapter: { searchArtists: vi.fn(), listTracks: vi.fn() }
 }));
-vi.mock('$lib/db/services/SeededCatalogRepository', () => ({
-	SeededCatalogRepository: { upsertArtist: vi.fn(), upsertTracks: vi.fn() }
+vi.mock('$lib/db/services/CatalogImportRepository', () => ({
+	CatalogImportRepository: { upsertArtist: vi.fn(), upsertTracks: vi.fn() }
 }));
 
 import { AudiusAdapter } from './adapters/AudiusAdapter';
-import { SeededCatalogRepository } from '$lib/db/services/SeededCatalogRepository';
+import { CatalogImportRepository } from '$lib/db/services/CatalogImportRepository';
 import { CatalogSourceService } from './CatalogSourceService';
 import type { ExternalArtist, ExternalTrack } from './types';
 
@@ -1047,8 +1047,8 @@ const track: ExternalTrack = {
 
 beforeEach(() => {
 	vi.clearAllMocks();
-	vi.mocked(SeededCatalogRepository.upsertArtist).mockResolvedValue({ id: 'artist-1' });
-	vi.mocked(SeededCatalogRepository.upsertTracks).mockResolvedValue({ imported: 1 });
+	vi.mocked(CatalogImportRepository.upsertArtist).mockResolvedValue({ id: 'artist-1' });
+	vi.mocked(CatalogImportRepository.upsertTracks).mockResolvedValue({ imported: 1 });
 });
 
 describe('CatalogSourceService.lookupArtist', () => {
@@ -1075,7 +1075,7 @@ describe('CatalogSourceService.lookupArtist', () => {
 	it('writes nothing — lookup is read-only', async () => {
 		vi.mocked(AudiusAdapter.searchArtists).mockResolvedValue([verified]);
 		await CatalogSourceService.lookupArtist('deadmau5');
-		expect(SeededCatalogRepository.upsertArtist).not.toHaveBeenCalled();
+		expect(CatalogImportRepository.upsertArtist).not.toHaveBeenCalled();
 	});
 });
 
@@ -1117,8 +1117,8 @@ describe('CatalogSourceService.importArtist gates', () => {
 	it('writes nothing when a gate refuses', async () => {
 		vi.mocked(AudiusAdapter.searchArtists).mockResolvedValue([impostor]);
 		await CatalogSourceService.importArtist('D8OGl');
-		expect(SeededCatalogRepository.upsertArtist).not.toHaveBeenCalled();
-		expect(SeededCatalogRepository.upsertTracks).not.toHaveBeenCalled();
+		expect(CatalogImportRepository.upsertArtist).not.toHaveBeenCalled();
+		expect(CatalogImportRepository.upsertTracks).not.toHaveBeenCalled();
 	});
 });
 
@@ -1130,12 +1130,12 @@ describe('CatalogSourceService.importArtist success path', () => {
 
 	it('derives a stable slug from the source handle', async () => {
 		await CatalogSourceService.importArtist('LKdlD');
-		expect(SeededCatalogRepository.upsertArtist).toHaveBeenCalledWith(verified, 'deadmau5');
+		expect(CatalogImportRepository.upsertArtist).toHaveBeenCalledWith(verified, 'deadmau5');
 	});
 
 	it('parents the tracks to the row the repository returned', async () => {
 		await CatalogSourceService.importArtist('LKdlD');
-		expect(SeededCatalogRepository.upsertTracks).toHaveBeenCalledWith('artist-1', [track]);
+		expect(CatalogImportRepository.upsertTracks).toHaveBeenCalledWith('artist-1', [track]);
 	});
 
 	it('reports what it wrote', async () => {
@@ -1166,7 +1166,7 @@ Create `src/lib/server/catalog-source/CatalogSourceService.ts`:
 
 ```ts
 import { AudiusAdapter } from './adapters/AudiusAdapter';
-import { SeededCatalogRepository } from '$lib/db/services/SeededCatalogRepository';
+import { CatalogImportRepository } from '$lib/db/services/CatalogImportRepository';
 import type { ExternalArtist } from './types';
 
 /** What a human needs in order to tell a real artist from a same-named impostor. */
@@ -1217,8 +1217,8 @@ export class CatalogSourceService {
 		if (tracks.length === 0) return { ok: false, reason: 'no_tracks' };
 
 		const slug = artist.handle.toLowerCase();
-		const { id } = await SeededCatalogRepository.upsertArtist(artist, slug);
-		const { imported } = await SeededCatalogRepository.upsertTracks(id, tracks);
+		const { id } = await CatalogImportRepository.upsertArtist(artist, slug);
+		const { imported } = await CatalogImportRepository.upsertTracks(id, tracks);
 
 		return { ok: true, artistId: id, slug, tracksImported: imported };
 	}
@@ -1367,14 +1367,14 @@ In `vite.config.ts`, inside `test.coverage.include`, add these two entries along
 
 ```ts
 				'src/lib/server/catalog-source/**',
-				'src/lib/db/services/SeededCatalogRepository.ts',
+				'src/lib/db/services/CatalogImportRepository.ts',
 ```
 
 `**/index.ts` and `**/types.ts` are already excluded globally, so the barrel and the DTO file are not counted.
 
 - [ ] **Step 4: Verify the whole slice**
 
-Run: `yarn test:unit -- --run src/lib/server/catalog-source src/lib/db/services/SeededCatalogRepository.spec.ts src/lib/db/schema.seeded.spec.ts`
+Run: `yarn test:unit -- --run src/lib/server/catalog-source src/lib/db/services/CatalogImportRepository.spec.ts src/lib/db/schemas/external-origin.spec.ts`
 Expected: PASS, 40 tests, and coverage for the new paths at or above the 90% threshold.
 
 Run: `yarn check`
