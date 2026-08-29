@@ -65,12 +65,17 @@ Three independent blocks; the first two are mechanical, not matters of interpret
 copyrighted by their owners regardless of MusicBrainz's CC0 core data, so they are not
 a banner source.
 
-**Audius** fits: free API, key optional, the stream endpoint returns mp3 with `Range`
-support so it drops straight into the existing `MusicPlayer`; artwork and `cover_photo`
-are uploaded by the artist; and artists already carry a wallet bound to their profile,
-which makes claim verification cheap when we get there. Play counts are reported back
-(we do **not** set the disable-play-count flag) so we are useful to the artist rather
-than parasitic.
+**Audius** fits, and the API was verified live on 2026-08-29 rather than taken from
+docs — see section 3.1 for the exact responses. Free API, no key and no auth on the
+endpoints we need; `cover_photo` and `profile_picture` are uploaded by the artist; the
+stream endpoint serves `audio/mpeg` with `Range` support so it drops straight into the
+existing `MusicPlayer`; and artists already carry a wallet bound to their profile, which
+makes claim verification cheap when we get there.
+
+One thing **not** to over-claim: a partial (`Range`) request comes back with
+`skip_play_count=true` appended by Audius itself, so seeking and partial reads do not
+register a play. Reporting listens back to the artist is the intent, but it is not
+something to promise as reliable.
 
 ## 3. Current State (grounding — verified in-repo 2026-08-29)
 
@@ -99,6 +104,44 @@ than parasitic.
 - `api/music/[id]/+server.ts:33` presigns **every** track through R2.
 - **No email verification exists.** `users.isVerified` is in the schema, but nothing
   sets it. "Logged in" today means an unverified email + password, or Google.
+
+### 3.1 The Audius API, verified live (2026-08-29)
+
+Every endpoint below was called against the live API while writing this spec, not read
+from documentation. Base host is `https://api.audius.co/v1` — the discovery-node list at
+`https://api.audius.co` currently returns that single host. No key and no auth are
+required; `app_name` is optional (a request without it still returns 200) but is sent by
+convention.
+
+| Call                             | Result                                                                                                |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `GET /users/search?query=<name>` | 200. Full user objects                                                                                |
+| `GET /users/{id}/tracks`         | 200. Track list                                                                                       |
+| `GET /tracks/{id}/stream`        | **302** to a signed validator URL, then `206` with `accept-ranges: bytes`, `content-type: audio/mpeg` |
+| `GET /tracks/search?query=<q>`   | 200 (not needed in this scope)                                                                        |
+
+Fields we consume from a user: `id`, `handle`, `name`, `bio`, `profile_picture`
+(1000×1000), `cover_photo` (2000× / 640×), `follower_count`, `track_count`,
+`album_count`, `erc_wallet`, `twitter_handle`, `instagram_handle`, `is_verified`,
+`is_deactivated`. From a track: `id`, `title`, `duration`, `genre`, `mood`,
+`release_date`, `play_count`, `permalink`, `is_streamable`, `field_visibility`.
+
+**The finding that shapes the import design.** Searching `deadmau5` returns _two_
+accounts carrying that same display name:
+
+| id      | handle         | `is_verified` | followers |
+| ------- | -------------- | ------------- | --------- |
+| `LKdlD` | `deadmau5`     | **true**      | 94,917    |
+| `D8OGl` | `deadmau54321` | false         | 704       |
+
+Auto-importing the top hit would eventually seed a page under a real artist's name built
+out of an **impostor's** uploads — precisely the scenario the legal framing in section 7
+exists to prevent. This is why `lookupArtist()` is a separate admin confirmation step and
+not an automatic pipeline.
+
+**Stream URLs are signed and expire.** `/tracks/{id}/stream` answers `302` to a validator
+host with a `signature` carrying a timestamp. The resolved URL must therefore **never** be
+stored or cached; see section 4.2.
 
 ## 4. Data Model
 
@@ -130,9 +173,13 @@ everything. YAGNI.
 | `audioSource` | new `varchar(16) NOT NULL DEFAULT 'r2'` — `r2` or `audius` |
 | `externalId`  | new `varchar(64)` — the track's id in the source           |
 
-`audioUrl` is already `text` and holds the Audius stream URL when
-`audioSource = 'audius'`. Imported tracks get `status='ready'`, `isPublished=true`,
-`visibility='public'`.
+`audioUrl` is already `text`. For `audioSource = 'audius'` it holds the **stable**
+endpoint `https://api.audius.co/v1/tracks/{externalId}/stream` — never the URL that
+endpoint redirects to. That target is signed with a timestamp and expires, so a stored
+copy would be a track that plays in testing and 403s a day later. The browser follows the
+302 itself, which also means the audio element fetches from a validator host directly.
+
+Imported tracks get `status='ready'`, `isPublished=true`, `visibility='public'`.
 
 ### 4.3 `finance.subscriptions` (`schemas/finance.ts`)
 
@@ -178,6 +225,21 @@ subscriptions).
 An admin-triggered import — no catalog crawler. We seed named artists we actually intend
 to contact, which keeps volume, moderation load and legal exposure proportional to
 intent. Slice 1 exposes it as a script / admin endpoint only.
+
+`lookupArtist(handle)` returns candidates for a human to confirm; `importArtist` takes an
+**id**, never a search string, so no search result is ever imported implicitly. Given the
+impostor case in section 3.1, the service refuses to import an artist unless:
+
+| Gate      | Rule                                                                                                                  |
+| --------- | --------------------------------------------------------------------------------------------------------------------- |
+| Identity  | `is_verified === true` — Audius's own verification is the strongest available signal that the account is the person   |
+| Liveness  | `is_deactivated === false`                                                                                            |
+| Substance | `track_count > 0`                                                                                                     |
+| Per track | `is_streamable === true`, otherwise the track is skipped                                                              |
+| Display   | Honour `field_visibility` — the artist controls what is public, so a hidden `play_count` stays hidden on our page too |
+
+The `is_verified` gate is a policy default, not a hard technical limit: an admin importing
+an unverified artist on purpose is a deliberate override, logged as such.
 
 ### 5.3 Changes to existing code
 
@@ -282,7 +344,15 @@ Each slice is its own PR, reviewed at the boundary.
 
 ## 10. Testing
 
-- `AudiusAdapter` — against **recorded fixtures**, no network in tests.
+- `AudiusAdapter` — against **recorded fixtures**, no network in tests. Fixtures are
+  captured from the live responses in section 3.1, including the two-`deadmau5` search
+  result, so the impostor case is a permanent test case rather than a memory.
+- Import gates — an unverified, a deactivated, and a zero-track candidate are each
+  refused; a non-`is_streamable` track is skipped while its siblings import; a hidden
+  `field_visibility.play_count` does not reach the DTO.
+- `audioUrl` — the stored value is the stable `/tracks/{id}/stream` endpoint. A test
+  asserts we never persist a URL containing a `signature` query parameter, which is the
+  regression that would look fine on the day and 403 the next.
 - `CatalogSourceService.importArtist` — idempotency: a second import creates no
   duplicate artist and no duplicate tracks; it refreshes metadata; it leaves PDM-side
   rows (chat, comments, likes, subscriptions) untouched.
