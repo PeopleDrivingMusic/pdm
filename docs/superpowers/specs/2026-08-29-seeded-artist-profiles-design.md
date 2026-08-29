@@ -72,10 +72,10 @@ stream endpoint serves `audio/mpeg` with `Range` support so it drops straight in
 existing `MusicPlayer`; and artists already carry a wallet bound to their profile, which
 makes claim verification cheap when we get there.
 
-One thing **not** to over-claim: a partial (`Range`) request comes back with
-`skip_play_count=true` appended by Audius itself, so seeking and partial reads do not
-register a play. Reporting listens back to the artist is the intent, but it is not
-something to promise as reliable.
+One thing **not** to over-claim: the redirect comes back with `skip_play_count=true`
+appended by Audius itself — on a plain `GET`, not only on a `Range` request. Plays routed
+this way appear not to register at all. Reporting listens back to the artist is the
+intent, but nothing here should be promised until it is measured.
 
 ## 3. Current State (grounding — verified in-repo 2026-08-29)
 
@@ -206,10 +206,18 @@ src/lib/server/catalog-source/
   index.ts
 ```
 
-`lookupArtist(source, handle)` resolves one artist in the source by handle so an admin
+`lookupArtist(query)` searches the source and returns **every** candidate, so an admin
 can confirm the right person before importing. It is **not** user-facing search — that
-stays out of scope (section 1). There is no separate `refreshArtist()`: `importArtist`
-is idempotent, so re-running it _is_ the refresh.
+stays out of scope (section 1).
+
+`importArtist(externalId)` takes an **id** and resolves it through the source's own id
+endpoint (`GET /v1/users/{id}`) — **never through search**. Audius search matches names
+and handles, not ids: `?query=LKdlD` does not return `LKdlD`. Resolving an id by search
+and taking the first hit would import a completely unrelated account under the operator's
+intent — the impostor failure this two-step design exists to prevent.
+
+There is no separate `refreshArtist()`: `importArtist` is idempotent, so re-running it is
+the refresh.
 
 Rules for the seam: **no Audius response types and no Drizzle rows cross it.** The
 adapter returns `ExternalArtist` / `ExternalTrack`; `CatalogSourceService` maps those
@@ -230,16 +238,53 @@ intent. Slice 1 exposes it as a script / admin endpoint only.
 **id**, never a search string, so no search result is ever imported implicitly. Given the
 impostor case in section 3.1, the service refuses to import an artist unless:
 
-| Gate      | Rule                                                                                                                  |
-| --------- | --------------------------------------------------------------------------------------------------------------------- |
-| Identity  | `is_verified === true` — Audius's own verification is the strongest available signal that the account is the person   |
-| Liveness  | `is_deactivated === false`                                                                                            |
-| Substance | `track_count > 0`                                                                                                     |
-| Per track | `is_streamable === true`, otherwise the track is skipped                                                              |
-| Display   | Honour `field_visibility` — the artist controls what is public, so a hidden `play_count` stays hidden on our page too |
+| Gate      | Rule                                                                                                                                                |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity  | `is_verified === true` — Audius's own verification is the strongest available signal that the account is the person                                 |
+| Liveness  | `is_deactivated === false`                                                                                                                          |
+| Substance | `track_count > 0`                                                                                                                                   |
+| Per track | All of `is_streamable`, `is_available`, `access.stream` true **and** all of `is_stream_gated`, `is_unlisted`, `is_delete` false — otherwise skipped |
+| Display   | Honour `field_visibility` — the artist controls what is public, so a hidden `play_count` stays hidden on our page too                               |
 
 The `is_verified` gate is a policy default, not a hard technical limit: an admin importing
 an unverified artist on purpose is a deliberate override, logged as such.
+
+The per-track gate is wider than "is it streamable" because the track object — dumped in
+full on 2026-08-29 — carries six independent ways to be unplayable. `is_stream_gated` is
+the dangerous one: a token-gated track needs a wallet signature we do not have, so it
+would import cleanly and only fail at play time. `is_unlisted` and `is_delete` matter for
+a different reason: the artist deliberately took that track out of public view, and
+re-publishing it on our page is exactly the disrespect this feature cannot afford.
+
+Audius also exposes a per-track `license` (e.g. `All rights reserved`) and an `isrc`. We
+store both: the licence travels with music that is not ours, and the ISRC is the join key
+if MusicBrainz is ever added as a second source.
+
+### Imported rows are hidden until section 6 ships
+
+**Import writes `artists.is_active = false` and `tracks.is_published = false`.** This is a
+correctness requirement, not tidiness. The app finds content by flags, not by imports:
+`getPopularTracks` (`queries.ts:443`) selects every published, playable track globally,
+`getActiveArtists` (`queries.ts:279`) returns every active artist, and `/artist/[slug]`
+loads purely by slug. Publishing on import would put a real person's name, photo and
+banner on a page that reads as their official PDM presence — with none of the "unofficial"
+chrome from section 6 and no working audio. Slice S2b flips both flags on **together
+with** the notice, so the disclaimer and the visibility can never be out of step.
+
+### Import must never modify a claimed page
+
+Once an artist claims their page they edit their own name, bio and avatar; a later
+re-import would overwrite all of it. The upsert therefore carries
+`setWhere: claimed_at IS NULL`, and the service reports `already_claimed` when the guard
+suppressed the write. This is the second reason `claimedAt` is stored in this scope even
+though badges are not built.
+
+### Slug
+
+`artists.slug` is globally unique and the slug is derived from the source handle, so an
+import whose handle collides with an existing PDM artist is refused with `slug_taken`
+rather than raising an unhandled `unique_violation`. Re-importing the _same_ source
+artist is not a collision.
 
 ### 5.3 Changes to existing code
 
