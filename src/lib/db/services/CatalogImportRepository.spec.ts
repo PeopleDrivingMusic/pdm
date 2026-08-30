@@ -1,4 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import type { SQL } from 'drizzle-orm';
+
+// Renders a drizzle expression to the SQL Postgres will actually receive, with no
+// database and no connection. `toBeDefined()` on these guards proved nothing: it passes
+// just as happily for a guard on the wrong column, which is exactly the v1 defect these
+// tests exist to prevent. Claim-safety is a legal-exposure property, so it gets a test
+// that can tell a correct guard from a plausible-looking wrong one.
+const dialect = new PgDialect();
+const render = (expr: unknown) => dialect.sqlToQuery(expr as SQL);
 
 type ConflictConfig = {
 	target: unknown[];
@@ -84,16 +94,28 @@ describe('CatalogImportRepository.upsertArtist', () => {
 		expect(conflict.target).toHaveLength(2);
 	});
 
-	it('matches the partial index, or Postgres raises 42P10', async () => {
+	it('repeats the index predicate on origin, or Postgres raises 42P10', async () => {
 		await CatalogImportRepository.upsertArtist(artistRow);
 		const conflict = m.onConflictDoUpdate.mock.calls[0][0];
-		expect(conflict.targetWhere).toBeDefined();
+		const { sql, params } = render(conflict.targetWhere);
+		expect(sql).toContain('"origin"');
+		expect(sql).toContain('<>');
+		expect(params).toEqual(['native']);
 	});
 
-	it('refuses to overwrite a claimed page', async () => {
+	it('guards the update on claimed_at, so a claimed page cannot be overwritten', async () => {
 		await CatalogImportRepository.upsertArtist(artistRow);
 		const conflict = m.onConflictDoUpdate.mock.calls[0][0];
-		expect(conflict.setWhere).toBeDefined();
+		const { sql } = render(conflict.setWhere);
+		// The exact column matters: a guard on any other column still "is defined".
+		expect(sql).toContain('"claimed_at"');
+		expect(sql).toContain('is null');
+	});
+
+	it('never guards the update on origin by mistake — that would re-open claimed pages', async () => {
+		await CatalogImportRepository.upsertArtist(artistRow);
+		const conflict = m.onConflictDoUpdate.mock.calls[0][0];
+		expect(render(conflict.setWhere).sql).not.toContain('"origin"');
 	});
 
 	it('refreshes mutable fields on re-import but never identity', async () => {
@@ -138,10 +160,13 @@ describe('CatalogImportRepository.upsertTracks', () => {
 		expect(row.metadata).toEqual({ license: 'All rights reserved', isrc: 'GBTDG1302232' });
 	});
 
-	it('matches the partial index, or Postgres raises 42P10', async () => {
+	it('repeats the index predicate on audio_source, or Postgres raises 42P10', async () => {
 		await CatalogImportRepository.upsertTracks('artist-1', [trackRow]);
 		const conflict = m.onConflictDoUpdate.mock.calls[0][0];
-		expect(conflict.targetWhere).toBeDefined();
+		const { sql, params } = render(conflict.targetWhere);
+		expect(sql).toContain('"audio_source"');
+		expect(sql).toContain('<>');
+		expect(params).toEqual(['r2']);
 	});
 
 	it('updates from plain values, never a raw excluded reference', async () => {
