@@ -6,7 +6,13 @@ import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const artist = await ArtistService.getArtistBySlug(params.slug);
-	if (!artist) {
+	// Imported artists are seeded data, not pages. This route renders a name, avatar,
+	// banner and bio under a Subscribe CTA with no "unofficial account" notice and no
+	// attribution — passing off a real person until slice S2b builds the page that may
+	// legitimately show them. Gate on `origin`, not `isActive`: native artists awaiting
+	// onboarding approval are created inactive too (artist/register) and must stay
+	// reachable, and `isActive` is nullable so its falsiness is ambiguous.
+	if (!artist || artist.origin !== 'native') {
 		throw error(404, 'Artist not found');
 	}
 
