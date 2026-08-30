@@ -90,9 +90,25 @@ describe('AudiusAdapter.getArtist', () => {
 		expect(lastUrl()).not.toContain('search');
 	});
 
-	it('returns null for an unknown id rather than guessing', async () => {
-		vi.stubGlobal('fetch', mockFetch({ data: null }, 404));
-		await expect(AudiusAdapter.getArtist('NOPE')).resolves.toBeNull();
+	// Probed live 2026-08-30: an unknown or malformed id answers 400 `invalid userId`,
+	// never 404. A 404-only guard turned every typo into a thrown stack trace instead of
+	// the `not_found` refusal the import script is written to explain.
+	it.each([400, 404])(
+		'returns null for an unknown id (%i) rather than guessing',
+		async (status) => {
+			vi.stubGlobal('fetch', mockFetch({ code: status, error: 'invalid userId' }, status));
+			await expect(AudiusAdapter.getArtist('NOPE')).resolves.toBeNull();
+		}
+	);
+
+	it('still throws on a real outage, which is not "no such artist"', async () => {
+		vi.stubGlobal('fetch', mockFetch({}, 503));
+		await expect(AudiusAdapter.getArtist('LKdlD')).rejects.toThrow('503');
+	});
+
+	it('returns null when the id resolves but carries no user', async () => {
+		vi.stubGlobal('fetch', mockFetch({ data: null }));
+		await expect(AudiusAdapter.getArtist('LKdlD')).resolves.toBeNull();
 	});
 });
 
@@ -124,6 +140,89 @@ describe('AudiusAdapter.listTracks', () => {
 	it('keeps only the one playable track from the fixture', async () => {
 		const found = await AudiusAdapter.listTracks('LKdlD');
 		expect(found.map((t) => t.externalId)).toEqual(['7YmNr']);
+	});
+});
+
+// Probed live 2026-08-30: the endpoint defaults to 20 items, accepts limit=100, rejects
+// limit=500 with 400 `limit is invalid`, and pages correctly on offset. An artist with
+// 201 tracks returned 20 without an explicit limit — so the un-paged version silently
+// truncated every prolific artist and a re-import never picked up the remainder.
+describe('AudiusAdapter.listTracks paging', () => {
+	const playable = (id: string) => ({
+		id,
+		title: `T${id}`,
+		duration: 10,
+		is_streamable: true,
+		is_available: true,
+		is_stream_gated: false,
+		is_unlisted: false,
+		is_delete: false,
+		access: { stream: true }
+	});
+
+	function pagedFetch(pages: unknown[][]) {
+		let call = 0;
+		return vi.fn(async (_input: RequestInfo | URL) => {
+			const body = { data: pages[call] ?? [] };
+			call += 1;
+			return new Response(JSON.stringify(body), { status: 200 });
+		});
+	}
+
+	function urls(): string[] {
+		const f = globalThis.fetch as unknown as ReturnType<typeof pagedFetch>;
+		return f.mock.calls.map((c) => String(c[0]));
+	}
+
+	it('asks for a full page instead of accepting the 20-item default', async () => {
+		vi.stubGlobal('fetch', pagedFetch([[playable('A')]]));
+		await AudiusAdapter.listTracks('LKdlD');
+		expect(urls()[0]).toContain('limit=100');
+		expect(urls()[0]).toContain('offset=0');
+	});
+
+	it('follows offset until a short page ends it, and returns every track', async () => {
+		const full = Array.from({ length: 100 }, (_, i) => playable(`P${i}`));
+		vi.stubGlobal('fetch', pagedFetch([full, [playable('LAST')]]));
+		const found = await AudiusAdapter.listTracks('LKdlD');
+		expect(found).toHaveLength(101);
+		expect(found.at(-1)?.externalId).toBe('LAST');
+		expect(urls()).toHaveLength(2);
+		expect(urls()[1]).toContain('offset=100');
+	});
+
+	it('stops on a full page followed by an empty one without a third request', async () => {
+		const full = Array.from({ length: 100 }, (_, i) => playable(`P${i}`));
+		vi.stubGlobal('fetch', pagedFetch([full, []]));
+		const found = await AudiusAdapter.listTracks('LKdlD');
+		expect(found).toHaveLength(100);
+		expect(urls()).toHaveLength(2);
+	});
+
+	it('caps the walk so a runaway source cannot loop forever', async () => {
+		const full = Array.from({ length: 100 }, (_, i) => playable(`P${i}`));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(
+				async (_input: RequestInfo | URL) =>
+					new Response(JSON.stringify({ data: full }), { status: 200 })
+			)
+		);
+		const found = await AudiusAdapter.listTracks('LKdlD');
+		expect(found).toHaveLength(AudiusAdapter.MAX_TRACKS);
+	});
+
+	it('counts unplayable tracks toward the page, so gating cannot stall paging', async () => {
+		// A page of 100 that yields 0 importable tracks is still a full page: paging must
+		// advance on what the source returned, not on what survived the gates.
+		const gated = Array.from({ length: 100 }, (_, i) => ({
+			...playable(`G${i}`),
+			is_stream_gated: true
+		}));
+		vi.stubGlobal('fetch', pagedFetch([gated, [playable('LAST')]]));
+		const found = await AudiusAdapter.listTracks('LKdlD');
+		expect(found.map((t) => t.externalId)).toEqual(['LAST']);
+		expect(urls()).toHaveLength(2);
 	});
 });
 
