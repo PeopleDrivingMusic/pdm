@@ -1712,3 +1712,52 @@ An independent review of the first draft found six real defects. They are record
 6. **Slug collision was unhandled** and would have surfaced as an unhandled `unique_violation` on first import of a colliding handle.
 
 Also corrected: the DB layer no longer imports from `$lib/server` (a layering inversion against `.claude/wiki/architecture/service-boundaries.md`); the "verify coverage" step now actually measures coverage; the unverified override is logged as the spec requires; social handles are mapped; and the migration-review step no longer tells a literal executor to stop on `--> statement-breakpoint` separators.
+
+## What the code review found (2026-08-30)
+
+A second independent review, this time against the finished code rather than the plan. All
+five substantive findings were re-verified before being acted on — the two live-API claims
+by re-probing `api.audius.co` directly.
+
+1. **The slice was not invisible after all — Critical.** `is_active = false` does not hide
+   anything: `/artist/[slug]` loads purely by slug. One import would have served a real
+   person's name, avatar, banner and bio under a Subscribe CTA with no "unofficial account"
+   notice. This was a **plan-level** defect that v1's review and this plan both inherited —
+   §"Imported rows are hidden" even names the hazard and then relies on the flag anyway. The
+   route now gates on `origin`; the spec has been corrected. Gating on `is_active` would have
+   been wrong twice over: insufficient here, and a regression for native artists, who are
+   also created inactive while onboarding is pending.
+2. **Track import silently truncated at 20 — Important.** `/users/{id}/tracks` defaults to 20
+   items. Re-probed live: an artist with `track_count: 201` returned 20; `limit=100` is the
+   maximum (`limit=500` → 400 `limit is invalid`); `offset` pages correctly. Because import is
+   an upsert, a re-run never recovered the rest. The manual smoke test could not have caught
+   this — deadmau5 has exactly 9 tracks, and a fixture-shaped world hides page boundaries.
+3. **`not_found` was unreachable — Important.** Audius answers an unknown _or malformed_ id
+   with **400 `invalid userId`**, never 404. Re-probed live. The unit test passed only because
+   it mocked a 404 the API never sends: a fixture asserting our own assumption rather than the
+   source's behaviour.
+4. **Third-party strings reached the database unchecked — Important.** No scheme validation,
+   no length bounds. Not exploitable today (Svelte's `style:` directive drops a malformed URL,
+   and nothing renders these through `{@html}`), but S2b is specced to render `externalUrl` as
+   an `href` and the socials as links. Guards now run at ingest, in `sanitize.ts`, so a
+   hostile value cannot be _stored_ — a stronger property than escaping correctly at every
+   future render site.
+5. **The claim-safety guard had no real test — Important.** `expect(setWhere).toBeDefined()`
+   passes for a guard on the wrong column, i.e. it could not distinguish correct code from the
+   v1 defect it existed to prevent; the actual proof was a manual database run recorded in a
+   commit message. Now rendered through `PgDialect.sqlToQuery` and asserted by column and
+   parameter, and mutation-checked: `isNull(userId)` fails the new test and passed the old one.
+
+Two lessons worth carrying into S2:
+
+- **A flag named "hidden" hides nothing until a reader enforces it.** Assert visibility at the
+  reachable surface, not at the write.
+- **A fixture proves the mapping, never the protocol.** Every claim about status codes, page
+  sizes and limits in this plan came from live probes; the two that were assumed instead were
+  both wrong.
+
+Not fixed, recorded deliberately: `AnalyticsService.getTotalArtists` counts hidden imports
+(`/api/db/health` only); imported `socialLinks` store bare handles while native artists store
+URLs, so S2b's renderer must branch on `origin`; the seeded slug is the raw handle rather than
+`slugify()`d; and the upsert arbiter relies on `prepare: false` in `src/lib/db/index.ts` to
+const-fold `origin <> $1`, which would break if the pool ever switched to prepared statements.

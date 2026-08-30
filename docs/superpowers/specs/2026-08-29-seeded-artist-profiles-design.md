@@ -271,6 +271,24 @@ banner on a page that reads as their official PDM presence — with none of the 
 chrome from section 6 and no working audio. Slice S2b flips both flags on **together
 with** the notice, so the disclaimer and the visibility can never be out of step.
 
+**Correction (2026-08-30, from code review): the flags alone do NOT achieve this.**
+`is_active` was never a visibility mechanism in this codebase. `/artist/[slug]` loads by
+slug and never reads it — as this very section notes two paragraphs up and then relies on
+it anyway — so the first import would have served a real person's page. Native artists
+awaiting onboarding approval are also created with `is_active = false`
+(`artist/register/+page.server.ts:90`) and their pages are reachable, so tightening
+`is_active` would have been both insufficient here and a regression there.
+
+The route therefore gates on **`origin`**: `/artist/[slug]` 404s anything that is not
+`origin = 'native'`. That is the single line S2b replaces with the real seeded page, and
+it is the load-bearing guarantee — the flags are now defence in depth, keeping imports out
+of `getPopularTracks` and `getActiveArtists`, not the primary gate.
+
+The lesson generalises: **"we write a flag that means hidden" is not a visibility
+guarantee until some reader enforces it.** Any future scope that adds a way to reach an
+artist (search, an API, a sitemap) must add its own `origin` gate, because nothing about
+the data shape enforces one.
+
 ### Import must never modify a claimed page
 
 Once an artist claims their page they edit their own name, bio and avatar; a later
