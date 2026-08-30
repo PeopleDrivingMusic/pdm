@@ -119,3 +119,41 @@ Reusable primitives in `src/lib/ui/` (`Button`, `Input`, `Avatar`, `FileUpload`,
 - Indentation is **tabs** (see `.prettierrc`); run `yarn format` before committing.
 - When changing DB shape: edit the domain schema file → update `schema.ts` aggregator + relations + type exports → `yarn db:generate` → review the SQL in `drizzle/migrations/` → `yarn db:migrate`.
 - **Don't use `db:push` against the shared dev DB.** `db:push` applies `schema.ts` directly and writes nothing to `drizzle.__drizzle_migrations`, so it silently reintroduces the exact drift issue #25 (`db:generate`/`db:migrate` desynced from the DB) fixed on 2026-08-17 — CI now has a `db-migrate` job that would catch the resulting drift, but only after you've already pushed. `db:push` is still fine against a throwaway/disposable DB for quick experiments; just never the tracked dev DB the team shares.
+
+## Implementation plans (overrides `superpowers:writing-plans`)
+
+The `writing-plans` skill requires every task to carry the literal test body **and** the
+literal implementation body in the plan document. In this repo it does not. Its own rule —
+user instructions override skills — applies here.
+
+**Why.** The S1 plan for issue #43 was 1763 lines, 1245 of them inside code fences, against
+1018 lines of shipped implementation and 909 of tests: roughly two thirds of the final code
+was written twice, once into markdown and once into the files. Worse than the waste, a test
+and an implementation composed in the same breath encode the **same assumption**, so the
+test cannot falsify it. Two shipped bugs came from exactly that: the Audius adapter mocked a
+404 the API never sends (it answers 400), and a claim-safety guard was "verified" by
+`expect(...).toBeDefined()`, which passes for a guard on any column. Both were green. Both
+were found later by an external reviewer probing the live API — never by the TDD cycle, whose
+red phase in a plan is a _prediction_ (`Expected: FAIL with "function not defined"`) that
+nobody runs.
+
+**A plan contains:** decisions and the reasoning behind them, the file map, exact signatures
+(the skill's `Interfaces: Consumes/Produces` block), `file:line` references to tests that
+already exist on disk, known traps, and the verification commands.
+
+**A plan does not contain:** test bodies or implementation bodies.
+
+**Tests are written into their real files during planning, not into the plan.** They are then
+runnable, so the red phase is observed rather than predicted, and the plan links to them.
+
+**One exception:** a snippet whose _syntactic form is itself the finding_ — a drizzle index
+predicate, migration SQL. `uniqueIndex().where()` must use an `sql` template because
+drizzle-kit discards `.params` and emits an unbindable `$1`; that belongs in the plan
+verbatim, because the value is in the exact spelling, not in the logic.
+
+Two rules that outlive any skill:
+
+- **A claim about a third-party API enters a test only after a live probe.** Both bugs above
+  were this omission. Record the probe date next to the assertion.
+- **A test guarding a load-bearing invariant must fail under a plausible wrong
+  implementation.** Check it by mutation before trusting it.
