@@ -112,6 +112,74 @@ describe('AudiusAdapter.getArtist', () => {
 	});
 });
 
+// The source is community-run: profile images come from whatever host a discovery node
+// names, and every string here was chosen by someone outside PDM. S2b renders externalUrl
+// as an href and the socials as links, so a hostile value must be impossible to STORE,
+// not merely escaped at some future render site.
+describe('AudiusAdapter.getArtist ingest guards', () => {
+	const user = (over = {}) => ({
+		id: 'LKdlD',
+		handle: 'deadmau5',
+		name: 'deadmau5',
+		...over
+	});
+
+	const fetchUser = (over = {}) => vi.stubGlobal('fetch', mockFetch({ data: user(over) }));
+
+	it('drops a profile picture that is not https', async () => {
+		fetchUser({ profile_picture: { '1000x1000': 'javascript:alert(1)' } });
+		expect((await AudiusAdapter.getArtist('LKdlD'))?.avatarUrl).toBeNull();
+	});
+
+	it('drops a cover photo served over plain http', async () => {
+		fetchUser({ cover_photo: { '2000x': 'http://cdn.example.com/b.jpg' } });
+		expect((await AudiusAdapter.getArtist('LKdlD'))?.bannerUrl).toBeNull();
+	});
+
+	it('keeps a genuine https image', async () => {
+		fetchUser({ profile_picture: { '1000x1000': 'https://cdn.example.com/a.jpg' } });
+		expect((await AudiusAdapter.getArtist('LKdlD'))?.avatarUrl).toBe(
+			'https://cdn.example.com/a.jpg'
+		);
+	});
+
+	it('drops a social value that is a URL rather than a handle', async () => {
+		fetchUser({ twitter_handle: 'https://evil.example.com/phish', instagram_handle: 'deadmau5' });
+		expect((await AudiusAdapter.getArtist('LKdlD'))?.socials).toEqual({ instagram: 'deadmau5' });
+	});
+
+	it('caps a name at the column width', async () => {
+		fetchUser({ name: 'N'.repeat(500) });
+		expect((await AudiusAdapter.getArtist('LKdlD'))?.name).toHaveLength(100);
+	});
+
+	it('caps a bio rather than letting one hostile profile bloat the row', async () => {
+		fetchUser({ bio: 'B'.repeat(20000) });
+		expect((await AudiusAdapter.getArtist('LKdlD'))?.bio).toHaveLength(5000);
+	});
+
+	it('refuses a user whose handle would not make a safe slug or profile URL', async () => {
+		fetchUser({ handle: 'dead/../mau5' });
+		await expect(AudiusAdapter.getArtist('LKdlD')).resolves.toBeNull();
+	});
+
+	it('refuses a user whose id is not a plain id', async () => {
+		fetchUser({ id: 'LKdlD?x=1' });
+		await expect(AudiusAdapter.getArtist('LKdlD')).resolves.toBeNull();
+	});
+
+	it('falls back to the handle when a user has no display name', async () => {
+		fetchUser({ name: '   ' });
+		expect((await AudiusAdapter.getArtist('LKdlD'))?.name).toBe('deadmau5');
+	});
+
+	it('drops unusable users from a search page instead of failing the whole search', async () => {
+		vi.stubGlobal('fetch', mockFetch({ data: [user(), user({ id: 'bad/id' })] }));
+		const found = await AudiusAdapter.searchArtists('deadmau5');
+		expect(found.map((a) => a.externalId)).toEqual(['LKdlD']);
+	});
+});
+
 describe('AudiusAdapter.listTracks', () => {
 	beforeEach(() => vi.stubGlobal('fetch', mockFetch(tracks)));
 
@@ -262,6 +330,24 @@ describe('AudiusAdapter.toExternalTrack gates', () => {
 	it('drops a genre the artist chose to hide', () => {
 		const hidden = { ...playable, genre: 'Electronic', field_visibility: { genre: false } };
 		expect(AudiusAdapter.toExternalTrack(hidden)?.genre).toBeNull();
+	});
+
+	it('drops artwork served over anything but https', () => {
+		const hostile = { ...playable, artwork: { '1000x1000': 'javascript:alert(1)' } };
+		expect(AudiusAdapter.toExternalTrack(hostile)?.imageUrl).toBeNull();
+	});
+
+	it('refuses a track whose id is not a plain id — it would retarget the stream URL', () => {
+		expect(AudiusAdapter.toExternalTrack({ ...playable, id: 'X1/../evil' })).toBeNull();
+	});
+
+	it('caps a title at the column width instead of letting Postgres raise 22001', () => {
+		const long = { ...playable, title: 'T'.repeat(500) };
+		expect(AudiusAdapter.toExternalTrack(long)?.title).toHaveLength(200);
+	});
+
+	it('refuses a track with no usable title at all', () => {
+		expect(AudiusAdapter.toExternalTrack({ ...playable, title: '   ' })).toBeNull();
 	});
 
 	it('tolerates every optional field being absent', () => {

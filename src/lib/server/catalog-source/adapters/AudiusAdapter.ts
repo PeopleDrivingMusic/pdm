@@ -1,4 +1,5 @@
 import { logger } from '$lib/utils/logger';
+import { bounded, externalIdOrNull, httpsUrl, socialHandle, LIMITS } from '../sanitize';
 import type { ExternalArtist, ExternalTrack } from '../types';
 
 const BASE = 'https://api.audius.co/v1';
@@ -21,7 +22,7 @@ export class AudiusAdapter {
 			`/users/search?query=${encodeURIComponent(query)}`,
 			'users/search'
 		);
-		return raw.data.map(toExternalArtist);
+		return raw.data.map(toExternalArtist).filter((a): a is ExternalArtist => a !== null);
 	}
 
 	/**
@@ -95,14 +96,20 @@ export class AudiusAdapter {
 			raw.is_delete !== true;
 		if (!playable) return null;
 
+		// Same split as the artist mapping: the id is refused if it is not a plain id
+		// (it becomes the stream URL), the title is capped.
+		const externalId = externalIdOrNull(raw.id);
+		const title = bounded(raw.title, LIMITS.title);
+		if (!externalId || !title) return null;
+
 		return {
 			source: 'audius',
-			externalId: raw.id,
-			title: raw.title,
+			externalId,
+			title,
 			durationSeconds: raw.duration ?? null,
-			genre: raw.field_visibility?.genre === false ? null : (raw.genre ?? null),
-			imageUrl: pick(raw.artwork, '1000x1000'),
-			streamUrl: AudiusAdapter.streamUrlFor(raw.id),
+			genre: raw.field_visibility?.genre === false ? null : bounded(raw.genre, LIMITS.genre),
+			imageUrl: httpsUrl(pick(raw.artwork, '1000x1000')),
+			streamUrl: AudiusAdapter.streamUrlFor(externalId),
 			releaseDate: raw.release_date ? new Date(raw.release_date) : null,
 			playCount: raw.field_visibility?.play_count === false ? null : (raw.play_count ?? null),
 			license: raw.license ?? null,
@@ -111,20 +118,34 @@ export class AudiusAdapter {
 	}
 }
 
-function toExternalArtist(raw: AudiusUser): ExternalArtist {
+/**
+ * Null when the record cannot be safely stored. Identity fields (`id`, `handle`) are
+ * refused rather than repaired: a truncated id names a different artist, and a handle
+ * with a slash in it escapes both the slug and the profile URL built from it. Display
+ * fields are capped instead, so one long bio does not fail an otherwise good import.
+ */
+function toExternalArtist(raw: AudiusUser): ExternalArtist | null {
+	const externalId = externalIdOrNull(raw.id);
+	const handle = externalIdOrNull(raw.handle);
+	if (!externalId || !handle) return null;
+
 	const socials: Record<string, string> = {};
-	if (raw.twitter_handle) socials.twitter = raw.twitter_handle;
-	if (raw.instagram_handle) socials.instagram = raw.instagram_handle;
+	const twitter = socialHandle(raw.twitter_handle);
+	const instagram = socialHandle(raw.instagram_handle);
+	if (twitter) socials.twitter = twitter;
+	if (instagram) socials.instagram = instagram;
 
 	return {
 		source: 'audius',
-		externalId: raw.id,
-		handle: raw.handle,
-		name: raw.name,
-		bio: raw.bio ?? null,
-		avatarUrl: pick(raw.profile_picture, '1000x1000'),
-		bannerUrl: pick(raw.cover_photo, '2000x'),
-		externalUrl: `${PROFILE_BASE}/${raw.handle}`,
+		externalId,
+		handle,
+		// A display name is optional on Audius; the handle is not, and it is what the
+		// slug is derived from anyway.
+		name: bounded(raw.name, LIMITS.name) ?? handle,
+		bio: bounded(raw.bio, LIMITS.description),
+		avatarUrl: httpsUrl(pick(raw.profile_picture, '1000x1000')),
+		bannerUrl: httpsUrl(pick(raw.cover_photo, '2000x')),
+		externalUrl: `${PROFILE_BASE}/${handle}`,
 		socials,
 		followerCount: raw.follower_count ?? 0,
 		trackCount: raw.track_count ?? 0,
