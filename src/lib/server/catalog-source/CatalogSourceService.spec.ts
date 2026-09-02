@@ -109,27 +109,83 @@ describe('CatalogSourceService.importArtist resolution', () => {
 	});
 });
 
-describe('CatalogSourceService.importArtist gates', () => {
-	it('refuses an unverified artist by default', async () => {
+describe('CatalogSourceService.importArtist identity gate', () => {
+	it('refuses an unverified artist whose name a verified account already owns', async () => {
+		// The live case, probed 2026-09-02: handle `deadmau54321` publishes under the
+		// display name `deadmau5`, identical to the verified account's.
 		vi.mocked(AudiusAdapter.getArtist).mockResolvedValue(impostor);
+		vi.mocked(AudiusAdapter.searchArtists).mockResolvedValue([verified, impostor]);
 		await expect(CatalogSourceService.importArtist('D8OGl')).resolves.toEqual({
 			ok: false,
-			reason: 'unverified'
+			reason: 'name_conflict'
 		});
 	});
 
-	it('imports an unverified artist when an admin overrides on purpose', async () => {
+	it('compares names ignoring case and punctuation', async () => {
+		vi.mocked(AudiusAdapter.getArtist).mockResolvedValue({
+			...impostor,
+			name: '  Dead Mau5!  '
+		});
+		vi.mocked(AudiusAdapter.searchArtists).mockResolvedValue([verified]);
+		await expect(CatalogSourceService.importArtist('D8OGl')).resolves.toMatchObject({
+			ok: false,
+			reason: 'name_conflict'
+		});
+	});
+
+	it('imports an unverified artist nobody notable shares a name with', async () => {
+		// The reason the blanket `is_verified` default was dropped: 353 of 1288 trending
+		// artists are verified (sampled 2026-09-02), and the unverified long tail is the
+		// segment a $1 subscription actually serves.
+		vi.mocked(AudiusAdapter.getArtist).mockResolvedValue({
+			...impostor,
+			name: 'lame.musik',
+			handle: 'lame.musik'
+		});
+		vi.mocked(AudiusAdapter.searchArtists).mockResolvedValue([]);
+		await expect(CatalogSourceService.importArtist('D8OGl')).resolves.toMatchObject({ ok: true });
+	});
+
+	it('does not treat an unverified namesake as a conflict', async () => {
+		// Only a verified account establishes that a name belongs to someone else.
 		vi.mocked(AudiusAdapter.getArtist).mockResolvedValue(impostor);
-		const result = await CatalogSourceService.importArtist('D8OGl', { allowUnverified: true });
+		vi.mocked(AudiusAdapter.searchArtists).mockResolvedValue([
+			{ ...verified, externalId: 'other1', isVerified: false }
+		]);
+		await expect(CatalogSourceService.importArtist('D8OGl')).resolves.toMatchObject({ ok: true });
+	});
+
+	it('spends no search call on an artist the source itself verified', async () => {
+		vi.mocked(AudiusAdapter.getArtist).mockResolvedValue(verified);
+		await CatalogSourceService.importArtist('LKdlD');
+		expect(AudiusAdapter.searchArtists).not.toHaveBeenCalled();
+	});
+
+	it('imports a name conflict when an admin overrides on purpose', async () => {
+		vi.mocked(AudiusAdapter.getArtist).mockResolvedValue(impostor);
+		vi.mocked(AudiusAdapter.searchArtists).mockResolvedValue([verified]);
+		const result = await CatalogSourceService.importArtist('D8OGl', { allowNameConflict: true });
 		expect(result).toMatchObject({ ok: true });
 	});
 
 	it('logs the override, because it weakens the impostor defence', async () => {
 		vi.mocked(AudiusAdapter.getArtist).mockResolvedValue(impostor);
-		await CatalogSourceService.importArtist('D8OGl', { allowUnverified: true });
+		vi.mocked(AudiusAdapter.searchArtists).mockResolvedValue([verified]);
+		await CatalogSourceService.importArtist('D8OGl', { allowNameConflict: true });
 		expect(logger.warn).toHaveBeenCalled();
 	});
 
+	it('refuses when the namesake check itself fails — the defence must fail closed', async () => {
+		vi.mocked(AudiusAdapter.getArtist).mockResolvedValue(impostor);
+		vi.mocked(AudiusAdapter.searchArtists).mockRejectedValue(new Error('audius down'));
+		await expect(CatalogSourceService.importArtist('D8OGl')).resolves.toMatchObject({
+			ok: false,
+			reason: 'name_conflict'
+		});
+	});
+});
+
+describe('CatalogSourceService.importArtist gates', () => {
 	it('refuses a deactivated account', async () => {
 		vi.mocked(AudiusAdapter.getArtist).mockResolvedValue({ ...verified, isDeactivated: true });
 		await expect(CatalogSourceService.importArtist('LKdlD')).resolves.toEqual({
@@ -177,6 +233,7 @@ describe('CatalogSourceService.importArtist gates', () => {
 
 	it('writes nothing when a gate refuses', async () => {
 		vi.mocked(AudiusAdapter.getArtist).mockResolvedValue(impostor);
+		vi.mocked(AudiusAdapter.searchArtists).mockResolvedValue([verified]);
 		await CatalogSourceService.importArtist('D8OGl');
 		expect(CatalogImportRepository.upsertArtist).not.toHaveBeenCalled();
 		expect(CatalogImportRepository.upsertTracks).not.toHaveBeenCalled();

@@ -240,14 +240,49 @@ impostor case in section 3.1, the service refuses to import an artist unless:
 
 | Gate      | Rule                                                                                                                                                |
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Identity  | `is_verified === true` — Audius's own verification is the strongest available signal that the account is the person                                 |
+| Identity  | No _verified_ account on the source shares the display name — see the 2026-09-02 correction below                                                   |
 | Liveness  | `is_deactivated === false`                                                                                                                          |
 | Substance | `track_count > 0`                                                                                                                                   |
 | Per track | All of `is_streamable`, `is_available`, `access.stream` true **and** all of `is_stream_gated`, `is_unlisted`, `is_delete` false — otherwise skipped |
 | Display   | Honour `field_visibility` — the artist controls what is public, so a hidden `play_count` stays hidden on our page too                               |
 
-The `is_verified` gate is a policy default, not a hard technical limit: an admin importing
-an unverified artist on purpose is a deliberate override, logged as such.
+### Correction (2026-09-02): `is_verified` replaced by a verified-namesake check
+
+The `is_verified === true` gate above was **wrong on both counts** and has been replaced.
+
+_It refused the wrong artists._ Sampling 36 trending slices (genre x time) on 2026-09-02
+returned 1288 unique artists, of which only **353 were verified**. The gate therefore hid
+73% of the source catalog, and the 27% it admitted are established names who will never
+claim a PDM page — while the unverified long tail is exactly the segment a $1-per-artist
+subscription exists to serve.
+
+_It did not actually stop the case it was written for._ The natural repair — allow
+unverified accounts below some follower floor — fails on the very example in section 3.1.
+Probed live 2026-09-02:
+
+| handle         | display name | verified | followers |
+| -------------- | ------------ | -------- | --------- |
+| `deadmau5`     | deadmau5     | yes      | 94,922    |
+| `deadmau54321` | deadmau5     | no       | 704       |
+
+The impostor has 704 followers. Any floor lets it through: it is small _because_ it is
+fake. Account size is not the axis. What gives it away is that it publishes under the
+display name `deadmau5`, byte for byte.
+
+**The gate is now:** import unless the artist is unverified **and** a _verified_ account on
+the source publishes under the same normalised display name. Only a verified account can
+establish that a name belongs to someone else — two unverified namesakes say nothing about
+which is real. Comparison is on the display name, not the handle: handles are unique on the
+source, so an impostor's handle always differs by construction, while the name is what a
+listener reads. The match is exact after normalisation (case and punctuation stripped), not
+fuzzy — a substring rule would refuse every artist whose short name sits inside a longer
+one, and a false refusal means a real indie artist silently missing from the platform.
+
+The check **fails closed**: if the source search errors, the import is refused. An
+unreachable source is not evidence that a name is free.
+
+Refusal `unverified` is gone; `name_conflict` replaces it, overridable with
+`--allow-name-conflict` and logged as such.
 
 The per-track gate is wider than "is it streamable" because the track object — dumped in
 full on 2026-08-29 — carries six independent ways to be unplayable. `is_stream_gated` is

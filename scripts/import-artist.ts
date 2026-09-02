@@ -5,7 +5,7 @@
  *
  *   yarn import:artist --search "deadmau5"
  *   yarn import:artist --id LKdlD
- *   yarn import:artist --id D8OGl --allow-unverified
+ *   yarn import:artist --id D8OGl --allow-name-conflict
  *
  * Imported rows are hidden (`is_active = false`, `is_published = false`) until slice
  * S2b ships the "unofficial page" notice, so running this cannot publish anything.
@@ -15,7 +15,8 @@ import { CatalogSourceService } from '../src/lib/server/catalog-source';
 
 const REFUSAL_HELP: Record<string, string> = {
 	not_found: 'No artist with that id. Run --search first and copy an externalId.',
-	unverified: 'Not verified on the source. Re-run with --allow-unverified if deliberate.',
+	name_conflict:
+		'A verified account on the source already publishes under that display name, and this one is not it. Re-run with --allow-name-conflict only if you have confirmed the identity yourself.',
 	deactivated: 'That account is deactivated on the source.',
 	no_tracks: 'No playable tracks — all are gated, unlisted, deleted or unavailable.',
 	slug_taken: 'A different PDM artist already owns that slug.',
@@ -30,7 +31,7 @@ function arg(name: string): string | undefined {
 async function main() {
 	const search = arg('search');
 	const id = arg('id');
-	const allowUnverified = process.argv.includes('--allow-unverified');
+	const allowNameConflict = process.argv.includes('--allow-name-conflict');
 
 	if (search) {
 		const candidates = await CatalogSourceService.lookupArtist(search);
@@ -44,12 +45,12 @@ async function main() {
 	}
 
 	if (!id) {
-		console.error('Usage: --search "<name>"  |  --id <externalId> [--allow-unverified]');
+		console.error('Usage: --search "<name>"  |  --id <externalId> [--allow-name-conflict]');
 		process.exitCode = 1;
 		return;
 	}
 
-	const result = await CatalogSourceService.importArtist(id, { allowUnverified });
+	const result = await CatalogSourceService.importArtist(id, { allowNameConflict });
 	if (!result.ok) {
 		console.error(`Refused: ${result.reason} — ${REFUSAL_HELP[result.reason] ?? ''}`);
 		process.exitCode = 1;
