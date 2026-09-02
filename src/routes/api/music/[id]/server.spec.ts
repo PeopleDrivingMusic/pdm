@@ -21,6 +21,7 @@ const track = (over = {}) => ({
 	artistId: 'a1',
 	audioUrl: 'a1/audio/t1.mp3',
 	status: 'ready',
+	isPublished: true,
 	visibility: 'public',
 	...over
 });
@@ -102,4 +103,35 @@ it('does not let a source-hosted track skip the subscriber gate', async () => {
 	);
 	const res = await call({ user: null });
 	expect(res.status).toBe(403);
+});
+
+// The endpoint has its own hand-rolled gate instead of `resolveTargetAccess`, and that
+// gate never looked at `is_published` — it did not matter while every unpublished track
+// was also an R2 object we presigned into a broken URL. A source-hosted track has a real,
+// working URL, so the missing check became the difference between dormant and live.
+it('404s an unpublished track', async () => {
+	(TrackService.getTrackById as any).mockResolvedValue(track({ isPublished: false }));
+	const res = await call({ user: null });
+	expect(res.status).toBe(404);
+});
+
+it('404s an unpublished source-hosted track — the shape an import actually writes', async () => {
+	// CatalogImportRepository writes exactly this: ready, public, NOT published.
+	(TrackService.getTrackById as any).mockResolvedValue(
+		track({
+			audioSource: 'audius',
+			audioUrl: 'https://api.audius.co/v1/tracks/7YmNr/stream',
+			isPublished: false
+		})
+	);
+	const res = await call({ user: null });
+	expect(res.status).toBe(404);
+});
+
+it('404s rather than handing out a stored URL that is not https', async () => {
+	(TrackService.getTrackById as any).mockResolvedValue(
+		track({ audioSource: 'audius', audioUrl: 'javascript:alert(1)' })
+	);
+	const res = await call({ user: null });
+	expect(res.status).toBe(404);
 });

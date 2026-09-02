@@ -1,5 +1,6 @@
 import { TrackService, ArtistService } from '$lib/db/queries';
 import { getFileUrlFromR2 } from '$lib/db/services/R2Service';
+import { httpsUrl } from '$lib/server/catalog-source/sanitize';
 import { EntitlementService } from '$lib/server/entitlement';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -12,6 +13,15 @@ export const GET: RequestHandler = async ({ params: { id }, locals }) => {
 		}
 		if (track.status !== 'uploaded' && track.status !== 'ready') {
 			return new Response('Track is not ready', { status: 409 });
+		}
+		// Imported tracks are written `status: 'ready'`, `visibility: 'public'` and
+		// `is_published: false`, and S2b flips the flag together with the unofficial-page
+		// notice. This endpoint has its own gate rather than `resolveTargetAccess`, and
+		// that gate never read `is_published` — harmless while an unpublished track was
+		// always an R2 key we presigned into a URL for a nonexistent object, and a live
+		// leak the moment a source-hosted track carried a URL that actually works.
+		if (!track.isPublished) {
+			return new Response('Track not found', { status: 404 });
 		}
 
 		if (track.visibility === 'subscribers') {
@@ -42,7 +52,15 @@ export const GET: RequestHandler = async ({ params: { id }, locals }) => {
 			return json({ src: signedUrl.streamUrl });
 		}
 
-		return json({ src: track.audioUrl });
+		// Validated again at the read boundary, not only at ingest: this string is handed
+		// to a browser as an audio source, and `sanitize.ts` only guards the one writer
+		// that exists today. A second source, or any writer that skips it, would
+		// otherwise turn a stored value into whatever the browser fetches.
+		const sourceUrl = httpsUrl(track.audioUrl);
+		if (!sourceUrl) {
+			return new Response('Track not found', { status: 404 });
+		}
+		return json({ src: sourceUrl });
 	} catch (error) {
 		console.error('Error fetching track:', error);
 		throw error;

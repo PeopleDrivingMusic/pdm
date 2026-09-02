@@ -1,6 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { ChatService } from '$lib/server/chat';
-import { requireSameOrigin, requireUser, isGuardResponse } from '$lib/server/security/guards';
+import {
+	requireSameOrigin,
+	requireUser,
+	isGuardResponse,
+	tooManyRequests
+} from '$lib/server/security/guards';
 import { isUuid } from '$lib/server/security/uuid';
 import {
 	chatRoomWriteLimiter,
@@ -44,13 +49,21 @@ export const POST: RequestHandler = async (event) => {
 
 	// Metered after the payload parses, because the per-room key needs a real artistId —
 	// a malformed body is a 400, never a 429. Both limiters must pass: the per-room one
-	// is the conversational cap, and the global one is the only thing that sees a
-	// spammer spreading the same volume across hundreds of seeded rooms.
+	// is the conversational cap, and the global one is the only thing that sees a spammer
+	// spreading the same volume across hundreds of seeded rooms.
+	//
+	// Global FIRST, and the order is load-bearing rather than stylistic. `check()` inserts
+	// a window as a side effect, and the room key contains a caller-supplied artistId that
+	// is only shape-checked here — the artist is not resolved until inside the service. As
+	// the left operand the room limiter would run on every request including refused ones,
+	// so an account rotating random UUIDs would insert an unbounded number of live windows
+	// and drive the limiter's O(n) prune scan. Metering the user first caps new room keys
+	// at that user's global allowance.
 	if (
-		!chatRoomWriteLimiter.check(chatWriteKey(auth.userId, payload.artistId)) ||
-		!chatGlobalWriteLimiter.check(auth.userId)
+		!chatGlobalWriteLimiter.check(auth.userId) ||
+		!chatRoomWriteLimiter.check(chatWriteKey(auth.userId, payload.artistId))
 	) {
-		return json({ error: 'rate_limited' }, { status: 429 });
+		return tooManyRequests();
 	}
 
 	const user = event.locals.user;

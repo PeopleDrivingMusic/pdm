@@ -3,9 +3,25 @@
 Issue #43, slice 2a. Spec: `docs/superpowers/specs/2026-08-29-seeded-artist-profiles-design.md`
 §5.3. Follows S1 (`2026-08-29-seeded-artist-profiles-s1.md`).
 
-**Ships:** comments, likes, playback and chat all function on an artist with no `user_id`.
-**Does not ship:** any UI. `/artist/[slug]` still 404s every non-native artist; the page is
-S2b. Everything here is dormant until that gate is replaced.
+**Ships:** the ownerless artist stops being a special case — chat and playback work on a
+page nobody has claimed, and the access layer no longer treats a missing owner as a denial.
+
+**Does not ship:** any UI. `/artist/[slug]` still 404s every non-native artist.
+
+**Correction (2026-09-02, from review).** The first draft of this line said comments, likes
+and playback all start working, and that everything here is dormant until the page ships.
+Both halves were wrong:
+
+- Comments and likes on seeded content stay closed regardless, because `access.ts` also
+  denies `!isPublished` and imports write `is_published = false`. Removing the owner check
+  is necessary, not sufficient — S2b flipping the flag is the other half.
+- "Dormant" was false in the dangerous direction. The page 404 is untouched, but this slice
+  opens two **API** surfaces that reach a seeded artist without going through it:
+  `/api/music/[id]` and `GET /api/chat`. Spec §5.2 predicted exactly this — "any future
+  scope that adds a way to reach an artist (search, **an API**, a sitemap) must add its own
+  `origin` gate, because nothing about the data shape enforces one" — and this slice added
+  API reach without re-reading its own warning. `/api/music/[id]` needed an `is_published`
+  gate it never had; see §1.2.
 
 Per `CLAUDE.md` → "Implementation plans": no test bodies, no implementation bodies. The
 tests below are already on disk and already failing.
@@ -20,7 +36,11 @@ That is an artist-existence check wearing an owner check's clothes — the `notN
 track unplayable and uncommentable forever.
 
 `AccessResult.ownerUserId` widens to `string | null`. Every consumer was already null-safe
-and **none changes** — verified by reading each, not assumed:
+and **none changes** — verified by reading each, not assumed. Note that the first two rows
+below reach the same null owner through `resolveTargetOwnerUserId`, which was already
+`string | null`; the true consumers of the widened `AccessResult` are `CommentService.ts:96-98`
+(plus `:159,184,199-203` on the edit/delete paths), `LikeService.ts:31` and
+`api/comments/+server.ts:45`, the last two of which read only `.ok`:
 
 | Consumer                                                     | With a null owner          | Right?                                                                 |
 | ------------------------------------------------------------ | -------------------------- | ---------------------------------------------------------------------- |
@@ -45,6 +65,20 @@ The branch goes **below** the `visibility === 'subscribers'` gate, which is unto
 is a no-op for seeded tracks (always `public`) but the ordering is pinned by a test, so a
 later gated import cannot hand out a source URL for free.
 
+**The endpoint also needs an `is_published` gate, which it never had.** It runs its own
+hand-rolled access check instead of `resolveTargetAccess`, and that check reads `status`
+and `visibility` but not `is_published`. That was invisible while every unpublished track
+was an R2 key: presigning produced a signed URL for an object that does not exist, so the
+audio was dead by accident. A source-hosted track carries a URL that actually works, so the
+missing check turns straight into a live leak of imported audio to anyone holding the id.
+The flag is load-bearing (`CatalogImportRepository.ts:40-45`) and S2b flips it together
+with the unofficial-page notice, so it must be enforced here too.
+
+The stored URL is also re-validated with `httpsUrl()` at the read boundary, not only at
+ingest. `sanitize.ts` guards the one writer that exists today; the value is handed to a
+browser as an audio source, and a second source or any writer that skips sanitising would
+otherwise decide what the browser fetches.
+
 ### 1.3 Chat opens for reading, stays closed for writing
 
 |              | Native artist              | Seeded page                     |
@@ -58,8 +92,17 @@ Read must open or the room is unreachable by everyone forever: nobody owns the p
 conversion event the whole product rests on.
 
 `isSeeded` is `origin !== 'native'`, and it stays true after a claim. Origin is a fact
-about where the catalog came from, not about the account, and a claimer keeps the open
-room they already had.
+about where the catalog came from, not about the account, and a claimer keeps the open room
+they already had.
+
+**Open question, raised in review and not yet decided.** Because origin never changes, an
+artist who arrives by import and then claims their page can never close their fan chat —
+the `$1/mo` chat perk is permanently free on that artist, with no route back short of a
+schema change. The justification given above for opening reads is "nobody owns the page and
+nobody is its subscriber", and that stops being true the moment someone claims. If the
+intended predicate is really _unclaimed_, it is `ownerUserId === null`, which
+`resolveArtistRoomContext` already returns. Shipped as origin-based; flagged as the largest
+irreversible commitment in the slice.
 
 **`ChatService.create` deliberately does not learn `isSeeded`.** It keeps calling
 `resolveTargetOwnerUserId`, so "the write path is not origin-aware" is enforced by what is
@@ -83,23 +126,36 @@ The per-room limiter alone stops being a limit the moment seeding multiplies roo
 account gets the full allowance in each of hundreds of pages. The global limiter is the
 only thing that sees the total.
 
-`createRateLimiter` needs no change — only the key at the call site. The per-room key
-multiplies live windows (users × rooms) against a `pruneThreshold` of 1024
-(`rateLimiter.ts:7`), which makes the documented Redis upgrade more urgent, not less.
-Recorded here, not fixed here.
+**The global limiter runs first, and the order is load-bearing rather than stylistic.**
+`check()` inserts a window as a side effect, and the room key contains a caller-supplied
+`artistId` that is only shape-checked at this point — the artist is not resolved until
+inside the service. As the left operand the room limiter would therefore run on every
+request including the ones the global limiter is about to refuse, so an authenticated
+account rotating random UUIDs would insert an unbounded number of live windows and drive
+the limiter's O(n) prune scan (`rateLimiter.ts:17-25`) on every call. Metering the user
+first caps new room keys at that user's own global allowance.
+
+`createRateLimiter` needs no change — only the key at the call site. Even ordered
+correctly, the per-room key multiplies live windows (users × rooms) against a
+`pruneThreshold` of 1024 (`rateLimiter.ts:7`), which makes the documented Redis upgrade
+more urgent, not less. Recorded here, not fixed here.
+
+The 429 reuses `tooManyRequests()` from `security/guards.ts:17`, like every other
+rate-limited route, so this endpoint is not the only one whose refusal lacks `Retry-After`.
 
 ## 2. File map
 
-| File                                   | Change                                                         |
-| -------------------------------------- | -------------------------------------------------------------- |
-| `src/lib/server/messages/access.ts`    | delete `:85-86`; widen `AccessResult`                          |
-| `src/lib/server/messages/policy.ts`    | add `resolveArtistRoomContext`                                 |
-| `src/lib/server/chat/visibility.ts`    | **new** — `canReadChatContent`                                 |
-| `src/lib/server/chat/rateLimits.ts`    | **new** — two limiters + `chatWriteKey`                        |
-| `src/lib/server/chat/ChatService.ts`   | `getMessages` uses the context + predicate; `create` untouched |
-| `src/lib/remote/chat.remote.ts`        | same context + predicate feeds `maskChatEvent`                 |
-| `src/routes/api/music/[id]/+server.ts` | branch on `audioSource`                                        |
-| `src/routes/api/chat/+server.ts`       | apply both limiters to POST                                    |
+| File                                                   | Change                                                                            |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `src/lib/server/messages/access.ts`                    | delete `:86`, relax `:85` to `?? null`; widen `AccessResult`                      |
+| `src/lib/server/messages/policy.ts`                    | add `resolveArtistRoomContext`                                                    |
+| `src/lib/server/chat/visibility.ts`                    | **new** — `canReadChatContent`                                                    |
+| `src/lib/server/chat/rateLimits.ts`                    | **new** — two limiters + `chatWriteKey`                                           |
+| `src/lib/server/chat/ChatService.ts`                   | `getMessages` uses the context + predicate; `create` untouched                    |
+| `src/lib/remote/chat.remote.ts`                        | same context + predicate feeds `maskChatEvent`                                    |
+| `src/routes/api/music/[id]/+server.ts`                 | add the `is_published` gate; branch on `audioSource`; `httpsUrl()` the stored URL |
+| `src/routes/api/chat/+server.ts`                       | apply both limiters to POST, global first                                         |
+| `docs/.../2026-08-29-seeded-artist-profiles-design.md` | §5.3 updated to the shipped factoring                                             |
 
 ## 3. Signatures
 

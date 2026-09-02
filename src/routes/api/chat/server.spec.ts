@@ -6,7 +6,12 @@ vi.mock('$lib/server/chat', () => ({
 vi.mock('$lib/server/security/guards');
 
 import { ChatService } from '$lib/server/chat';
-import { requireSameOrigin, requireUser, isGuardResponse } from '$lib/server/security/guards';
+import {
+	requireSameOrigin,
+	requireUser,
+	isGuardResponse,
+	tooManyRequests
+} from '$lib/server/security/guards';
 import { chatRoomWriteLimiter, chatGlobalWriteLimiter } from '$lib/server/chat/rateLimits';
 import { GET, POST } from './+server';
 
@@ -23,6 +28,11 @@ beforeEach(() => {
 	(requireSameOrigin as any).mockReturnValue(undefined);
 	(requireUser as any).mockReturnValue({ userId: 'u1' });
 	(isGuardResponse as any).mockReturnValue(false);
+	// `vi.mock('$lib/server/security/guards')` automocks the whole module, so the shared
+	// 429 helper returns undefined unless it is given a body here.
+	(tooManyRequests as any).mockImplementation(
+		() => new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429 })
+	);
 	chatRoomWriteLimiter.reset();
 	chatGlobalWriteLimiter.reset();
 });
@@ -289,9 +299,18 @@ describe('POST /api/chat rate limiting', () => {
 		expect(other.status).toBe(201);
 	});
 
-	it('meters before spending a service call on an invalid room', async () => {
-		// The limiter keys on the artistId, so it can only run after the payload parses.
+	it('validates the payload before metering, so a malformed body is a 400 and never a 429', async () => {
+		// The ordering is only observable once a limiter would actually refuse — on a
+		// fresh limiter the answer is 400 whichever runs first. Exhaust the GLOBAL one
+		// (30, spread across rooms so the per-room cap of 10 is never the binding
+		// constraint), then send a malformed body: metering first would answer 429.
+		for (const room of [ARTIST_ID, OTHER_ARTIST_ID, THIRD_ARTIST_ID]) {
+			for (let i = 0; i < 10; i++) await POST(makePostEvent({ artistId: room, body: 'hi' }, 'u1'));
+		}
+		(ChatService.create as any).mockClear();
+
 		const bad = await POST(makePostEvent({ artistId: 'nope', body: 'hi' }, 'u1'));
 		expect(bad.status).toBe(400);
+		expect(ChatService.create).not.toHaveBeenCalled();
 	});
 });
