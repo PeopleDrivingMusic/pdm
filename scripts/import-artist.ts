@@ -7,8 +7,9 @@
  *   yarn import:artist --id LKdlD
  *   yarn import:artist --id D8OGl --allow-name-conflict
  *
- * Imported rows are hidden (`is_active = false`, `is_published = false`) until slice
- * S2b ships the "unofficial page" notice, so running this cannot publish anything.
+ * Since slice S2b, an import goes live immediately: the artist's page renders with the
+ * "unofficial page" notice and its tracks are playable/commentable the moment this
+ * command succeeds.
  */
 import 'dotenv/config';
 import { CatalogSourceService } from '../src/lib/server/catalog-source';
@@ -57,7 +58,8 @@ async function main() {
 		return;
 	}
 	console.log(
-		`Imported ${result.slug} (artist ${result.artistId}) with ${result.tracksImported} tracks, hidden.`
+		`Imported ${result.slug} (artist ${result.artistId}) with ${result.tracksImported} tracks. ` +
+			`Live now at /artist/${result.slug}.`
 	);
 }
 

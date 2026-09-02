@@ -52,6 +52,27 @@ export const artists = artistDbSchema.table(
 	]
 );
 
+export const artistClaimRequests = artistDbSchema.table(
+	'artist_claim_requests',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		artistId: uuid('artist_id')
+			.notNull()
+			.references(() => artists.id, { onDelete: 'cascade' }),
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		message: text('message'),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(t) => [
+		// One request per (artist, user) is enough signal for the request-only scope this
+		// slice ships. Review/approval, and therefore a status column, is real handover
+		// work — out of scope per the design spec (§1: "no verification, no handover").
+		uniqueIndex('artist_claim_requests_artist_user_unique').on(t.artistId, t.userId)
+	]
+);
+
 export const artistOnboardingRequests = artistDbSchema.table('artist_onboarding_requests', {
 	id: uuid('id').primaryKey().defaultRandom(),
 	userId: uuid('user_id')

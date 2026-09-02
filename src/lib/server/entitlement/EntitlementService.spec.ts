@@ -8,9 +8,15 @@ vi.mock('$lib/db/services/SubscriptionService', () => ({
 		unsubscribe: vi.fn()
 	}
 }));
+vi.mock('$lib/db/queries', () => ({
+	ArtistService: { getArtistById: vi.fn() }
+}));
 
 import { SubscriptionService } from '$lib/db/services/SubscriptionService';
+import { ArtistService } from '$lib/db/queries';
 import { EntitlementService } from './EntitlementService';
+
+const artist = (over = {}) => ({ id: 'a1', origin: 'native', claimedAt: null, ...over });
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -44,13 +50,40 @@ describe('getSubscribedArtistIds', () => {
 	});
 });
 
-describe('subscribe/unsubscribe', () => {
-	it('subscribe delegates to SubscriptionService', async () => {
+describe('subscribe — kind derived from the artist, not the caller', () => {
+	it('a native artist gets a paid subscription', async () => {
+		vi.mocked(ArtistService.getArtistById).mockResolvedValue(artist({ origin: 'native' }) as never);
 		await EntitlementService.subscribe('u1', 'a1');
-		expect(SubscriptionService.subscribe).toHaveBeenCalledWith('u1', 'a1');
+		expect(SubscriptionService.subscribe).toHaveBeenCalledWith('u1', 'a1', 'paid');
 	});
 
-	it('unsubscribe delegates to SubscriptionService', async () => {
+	it('an unclaimed seeded artist gets a free pre-claim subscription', async () => {
+		vi.mocked(ArtistService.getArtistById).mockResolvedValue(
+			artist({ origin: 'audius', claimedAt: null }) as never
+		);
+		await EntitlementService.subscribe('u1', 'a1');
+		expect(SubscriptionService.subscribe).toHaveBeenCalledWith('u1', 'a1', 'pre_claim_free');
+	});
+
+	// Once claimed, the page has a real owner again — a new subscriber is subscribing
+	// to them, not pledging to an empty page, so the free pre-claim carve-out ends.
+	it('a claimed seeded artist gets a paid subscription, same as native', async () => {
+		vi.mocked(ArtistService.getArtistById).mockResolvedValue(
+			artist({ origin: 'audius', claimedAt: new Date() }) as never
+		);
+		await EntitlementService.subscribe('u1', 'a1');
+		expect(SubscriptionService.subscribe).toHaveBeenCalledWith('u1', 'a1', 'paid');
+	});
+
+	it('falls back to paid if the artist lookup comes back empty', async () => {
+		vi.mocked(ArtistService.getArtistById).mockResolvedValue(undefined);
+		await EntitlementService.subscribe('u1', 'a1');
+		expect(SubscriptionService.subscribe).toHaveBeenCalledWith('u1', 'a1', 'paid');
+	});
+});
+
+describe('unsubscribe', () => {
+	it('delegates to SubscriptionService', async () => {
 		await EntitlementService.unsubscribe('u1', 'a1');
 		expect(SubscriptionService.unsubscribe).toHaveBeenCalledWith('u1', 'a1');
 	});

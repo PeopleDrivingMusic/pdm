@@ -1,4 +1,5 @@
 import { SubscriptionService } from '$lib/db/services/SubscriptionService';
+import { ArtistService } from '$lib/db/queries';
 
 /**
  * Application boundary for subscription entitlement. Returns only primitives —
@@ -20,7 +21,12 @@ export class EntitlementService {
 	}
 
 	static async subscribe(userId: string, artistId: string): Promise<void> {
-		await SubscriptionService.subscribe(userId, artistId);
+		const artist = await ArtistService.getArtistById(artistId);
+		// Free only while the page has no owner. A claimed seeded artist is a real
+		// account again — a new subscriber is subscribing to them, same as any other.
+		const kind =
+			artist && artist.origin !== 'native' && !artist.claimedAt ? 'pre_claim_free' : 'paid';
+		await SubscriptionService.subscribe(userId, artistId, kind);
 	}
 
 	static async unsubscribe(userId: string, artistId: string): Promise<void> {

@@ -30,14 +30,28 @@ export class SubscriptionService {
 		});
 	}
 
-	static async subscribe(userId: string, artistId: string): Promise<void> {
+	static async subscribe(
+		userId: string,
+		artistId: string,
+		kind: 'paid' | 'pre_claim_free' = 'paid'
+	): Promise<void> {
 		await withDbLogging('SubscriptionService.subscribe', async () => {
 			await db
 				.insert(subscriptions)
-				.values({ userId, artistId, status: 'active', startedAt: new Date(), canceledAt: null })
+				.values({
+					userId,
+					artistId,
+					status: 'active',
+					kind,
+					startedAt: new Date(),
+					canceledAt: null
+				})
 				.onConflictDoUpdate({
 					target: [subscriptions.userId, subscriptions.artistId],
-					set: { status: 'active', startedAt: new Date(), canceledAt: null }
+					// Reconciled on every (re)subscribe, not just insert: a fan who first
+					// subscribed pre-claim and unsubscribed after the artist claimed must not
+					// resurrect the free row when they subscribe again.
+					set: { status: 'active', kind, startedAt: new Date(), canceledAt: null }
 				});
 		});
 	}

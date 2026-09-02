@@ -78,9 +78,15 @@ describe('CatalogImportRepository.upsertArtist', () => {
 		);
 	});
 
-	it('imports hidden, so no page can go public before slice S2b', async () => {
+	it('imports active, since S2b renders the page the moment a row exists', async () => {
 		await CatalogImportRepository.upsertArtist(artistRow);
-		expect(m.values).toHaveBeenCalledWith(expect.objectContaining({ isActive: false }));
+		expect(m.values).toHaveBeenCalledWith(expect.objectContaining({ isActive: true }));
+	});
+
+	it('reconciles an S1-era hidden row to active on re-import', async () => {
+		await CatalogImportRepository.upsertArtist(artistRow);
+		const conflict = m.onConflictDoUpdate.mock.calls[0][0];
+		expect(conflict.set.isActive).toBe(true);
 	});
 
 	it('never sets claimedAt on import — that belongs to the claim flow', async () => {
@@ -122,7 +128,7 @@ describe('CatalogImportRepository.upsertArtist', () => {
 		await CatalogImportRepository.upsertArtist(artistRow);
 		const conflict = m.onConflictDoUpdate.mock.calls[0][0];
 		expect(Object.keys(conflict.set).sort()).toEqual(
-			['avatar', 'coverImg', 'description', 'name', 'socialLinks', 'updatedAt'].sort()
+			['avatar', 'coverImg', 'description', 'isActive', 'name', 'socialLinks', 'updatedAt'].sort()
 		);
 	});
 
@@ -139,7 +145,7 @@ describe('CatalogImportRepository.upsertArtist', () => {
 });
 
 describe('CatalogImportRepository.upsertTracks', () => {
-	it('imports tracks unpublished, matching the hidden artist', async () => {
+	it('imports tracks published, since S2b makes the page and its music live together', async () => {
 		await CatalogImportRepository.upsertTracks('artist-1', [trackRow]);
 		expect(m.values).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -148,10 +154,16 @@ describe('CatalogImportRepository.upsertTracks', () => {
 				externalId: '7YmNr',
 				audioUrl: 'https://api.audius.co/v1/tracks/7YmNr/stream',
 				status: 'ready',
-				isPublished: false,
+				isPublished: true,
 				visibility: 'public'
 			})
 		);
+	});
+
+	it('reconciles an S1-era unpublished track to published on re-import', async () => {
+		await CatalogImportRepository.upsertTracks('artist-1', [trackRow]);
+		const conflict = m.onConflictDoUpdate.mock.calls[0][0];
+		expect(conflict.set.isPublished).toBe(true);
 	});
 
 	it('keeps the licence and ISRC with the music', async () => {

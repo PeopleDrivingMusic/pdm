@@ -1,18 +1,13 @@
 import { AlbumService, ArtistService, TrackService } from '$lib/db/queries';
 import { ArtistPublicContentService, PostPollService } from '$lib/db/services/ContentService';
+import { ClaimRequestService } from '$lib/db/services/ClaimRequestService';
 import { EntitlementService } from '$lib/server/entitlement';
 import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const artist = await ArtistService.getArtistBySlug(params.slug);
-	// Imported artists are seeded data, not pages. This route renders a name, avatar,
-	// banner and bio under a Subscribe CTA with no "unofficial account" notice and no
-	// attribution — passing off a real person until slice S2b builds the page that may
-	// legitimately show them. Gate on `origin`, not `isActive`: native artists awaiting
-	// onboarding approval are created inactive too (artist/register) and must stay
-	// reachable, and `isActive` is nullable so its falsiness is ambiguous.
-	if (!artist || artist.origin !== 'native') {
+	if (!artist) {
 		throw error(404, 'Artist not found');
 	}
 
@@ -102,5 +97,31 @@ export const actions: Actions = {
 		}
 
 		return { success: true };
+	},
+
+	claimArtist: async ({ params, locals, request }) => {
+		if (!locals.user?.id) {
+			return fail(401, { error: 'Log in to claim this page' });
+		}
+
+		const artist = await ArtistService.getArtistBySlug(params.slug);
+		if (!artist || artist.origin === 'native' || artist.claimedAt) {
+			return fail(400, { error: 'This page cannot be claimed' });
+		}
+
+		const data = await request.formData();
+		const message = getString(data, 'message');
+
+		const result = await ClaimRequestService.create({
+			artistId: artist.id,
+			userId: locals.user.id,
+			message: message || null
+		});
+
+		if (!result.ok) {
+			return fail(400, { error: 'You already sent a request for this page' });
+		}
+
+		return { claimed: true };
 	}
 };

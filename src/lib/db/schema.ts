@@ -3,6 +3,7 @@ export { users, sessions } from './schemas/users';
 export {
 	artists,
 	artistOnboardingRequests,
+	artistClaimRequests,
 	artistAccounts,
 	artistSessions
 } from './schemas/artist';
@@ -30,6 +31,7 @@ import { users, sessions } from './schemas/users';
 import {
 	artists,
 	artistOnboardingRequests,
+	artistClaimRequests,
 	artistAccounts,
 	artistSessions
 } from './schemas/artist';
@@ -223,7 +225,19 @@ export const artistsRelations = relations(artists, ({ one, many }) => ({
 	photoAlbums: many(photoAlbums),
 	videos: many(videos),
 	videoCollections: many(videoCollections),
-	artistFeedItems: many(artistFeedItems)
+	artistFeedItems: many(artistFeedItems),
+	claimRequests: many(artistClaimRequests)
+}));
+
+export const artistClaimRequestsRelations = relations(artistClaimRequests, ({ one }) => ({
+	artist: one(artists, {
+		fields: [artistClaimRequests.artistId],
+		references: [artists.id]
+	}),
+	user: one(users, {
+		fields: [artistClaimRequests.userId],
+		references: [users.id]
+	})
 }));
 export const postsRelations = relations(posts, ({ one, many }) => ({
 	artist: one(artists, {
@@ -363,6 +377,8 @@ export type Artist = typeof artists.$inferSelect;
 export type NewArtist = typeof artists.$inferInsert;
 export type ArtistOnboardingRequest = typeof artistOnboardingRequests.$inferSelect;
 export type NewArtistOnboardingRequest = typeof artistOnboardingRequests.$inferInsert;
+export type ArtistClaimRequest = typeof artistClaimRequests.$inferSelect;
+export type NewArtistClaimRequest = typeof artistClaimRequests.$inferInsert;
 export type ArtistAccount = typeof artistAccounts.$inferSelect;
 export type NewArtistAccount = typeof artistAccounts.$inferInsert;
 export type ArtistSession = typeof artistSessions.$inferSelect;
@@ -419,6 +435,7 @@ export const schema = {
 	sessions,
 	artists,
 	artistOnboardingRequests,
+	artistClaimRequests,
 	artistAccounts,
 	artistSessions,
 	posts,

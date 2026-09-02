@@ -37,14 +37,19 @@ export interface ImportedTrackRow {
  *
  * Two things here are load-bearing and must not be "simplified" away:
  *
- * 1. `isActive: false` / `isPublished: false`. The app finds content by flags, not by
- *    imports — `getPopularTracks` selects every published playable track globally,
- *    `getActiveArtists` returns every active artist, and `/artist/[slug]` loads purely
- *    by slug. Publishing on import would put a real person's name, photo and banner on
- *    a page that reads as their official PDM presence, with no "unofficial" notice
- *    (slice S2b) and no working audio (slice S2a). S2b flips these on with the notice.
+ * 1. `isActive: true` / `isPublished: true`, reconciled on every re-import too (in the
+ *    `set` of both `onConflictDoUpdate`s), not only on first insert. Through S2a these
+ *    were `false` — the page 404ed regardless (slice S2b), and the audio endpoint had
+ *    no working URL for a source-hosted track (slice S2a) — so publishing on import
+ *    would have put a real person's name, photo and banner on a page that reads as
+ *    their official PDM presence, unofficial notice and all, with no `origin` gate
+ *    protecting it either way. Both gates now exist, and the page renders the moment
+ *    an artist row exists, so import IS the publish action.
  * 2. `setWhere`. Without it, re-importing an artist who has since claimed their page
- *    overwrites the name, bio and avatar they wrote themselves.
+ *    overwrites the name, bio and avatar they wrote themselves. `isActive` is inside
+ *    that same guard (an artist row's own `set`), so a claimed artist's active/inactive
+ *    state stays theirs to manage. Tracks carry no equivalent claimed-guard on their
+ *    `onConflictDoUpdate` — a pre-existing gap, unchanged here.
  */
 export class CatalogImportRepository {
 	/** Returns null when the row exists but is claimed, so nothing was updated. */
@@ -63,7 +68,7 @@ export class CatalogImportRepository {
 					origin: row.origin,
 					externalId: row.externalId,
 					externalUrl: row.externalUrl,
-					isActive: false
+					isActive: true
 				})
 				// `targetWhere` must repeat the partial index predicate from
 				// schemas/artist.ts, or Postgres cannot infer the index and raises 42P10.
@@ -79,6 +84,7 @@ export class CatalogImportRepository {
 						coverImg: row.coverImg,
 						description: row.description,
 						socialLinks: row.socialLinks,
+						isActive: true,
 						updatedAt: new Date()
 					}
 				})
@@ -113,7 +119,7 @@ export class CatalogImportRepository {
 						externalId: row.externalId,
 						// Imported audio skips the R2 upload lifecycle: it is already live.
 						status: 'ready',
-						isPublished: false,
+						isPublished: true,
 						visibility: 'public',
 						metadata: row.metadata
 					})
@@ -125,6 +131,7 @@ export class CatalogImportRepository {
 							duration: row.duration,
 							audioUrl: row.audioUrl,
 							imageUrl: row.imageUrl,
+							isPublished: true,
 							updatedAt: new Date()
 						}
 					});
