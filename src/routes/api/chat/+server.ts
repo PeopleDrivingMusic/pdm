@@ -2,6 +2,11 @@ import { json } from '@sveltejs/kit';
 import { ChatService } from '$lib/server/chat';
 import { requireSameOrigin, requireUser, isGuardResponse } from '$lib/server/security/guards';
 import { isUuid } from '$lib/server/security/uuid';
+import {
+	chatRoomWriteLimiter,
+	chatGlobalWriteLimiter,
+	chatWriteKey
+} from '$lib/server/chat/rateLimits';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async (event) => {
@@ -35,6 +40,17 @@ export const POST: RequestHandler = async (event) => {
 	const payload = await event.request.json().catch(() => null);
 	if (!isUuid(payload?.artistId) || typeof payload?.body !== 'string') {
 		return json({ error: 'invalid_request' }, { status: 400 });
+	}
+
+	// Metered after the payload parses, because the per-room key needs a real artistId —
+	// a malformed body is a 400, never a 429. Both limiters must pass: the per-room one
+	// is the conversational cap, and the global one is the only thing that sees a
+	// spammer spreading the same volume across hundreds of seeded rooms.
+	if (
+		!chatRoomWriteLimiter.check(chatWriteKey(auth.userId, payload.artistId)) ||
+		!chatGlobalWriteLimiter.check(auth.userId)
+	) {
+		return json({ error: 'rate_limited' }, { status: 429 });
 	}
 
 	const user = event.locals.user;

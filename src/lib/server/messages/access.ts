@@ -7,7 +7,7 @@ import { EntitlementService } from '$lib/server/entitlement';
 
 export type AccessTargetType = 'post' | 'track' | 'comment';
 
-type AccessResult = { ok: true; ownerUserId: string } | { ok: false };
+type AccessResult = { ok: true; ownerUserId: string | null } | { ok: false };
 
 const DENIED: AccessResult = { ok: false };
 
@@ -82,10 +82,16 @@ async function accessForContent(
 	if (!target) return DENIED;
 
 	const artist = await ArtistService.getArtistById(target.artistId);
-	const ownerUserId = artist?.userId;
-	if (!ownerUserId) return DENIED;
+	// Null for a seeded page nobody has claimed. It is not an error and it is not a
+	// reason to deny: the `notNull` FK already guarantees the artist row exists, so the
+	// old `if (!ownerUserId) return DENIED` was an existence check in disguise — one
+	// that made every imported track unplayable and uncommentable for everyone.
+	const ownerUserId = artist?.userId ?? null;
 
-	// The artist reaches their own content whatever its state.
+	// The artist reaches their own content whatever its state. `viewerUserId &&` is
+	// load-bearing, not defensive: with no owner both sides are null, and `null ===
+	// null` would hand an anonymous stranger the artist's own access to drafts and
+	// subscriber-only content.
 	if (viewerUserId && viewerUserId === ownerUserId) return { ok: true, ownerUserId };
 
 	if (!target.isPublished) return DENIED;

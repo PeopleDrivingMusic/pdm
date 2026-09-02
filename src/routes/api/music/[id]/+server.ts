@@ -30,8 +30,19 @@ export const GET: RequestHandler = async ({ params: { id }, locals }) => {
 			}
 		}
 
-		const signedUrl = await getFileUrlFromR2({ uniqueKey: track.audioUrl, bucket: 'music' });
-		return json({ src: signedUrl.streamUrl });
+		// A source-hosted track's `audio_url` is the source's own stable stream endpoint,
+		// not an object key in our bucket — presigning it would sign an object that does
+		// not exist. The endpoint itself redirects to a short-lived signed URL at request
+		// time, which is why it is safe to store and hand out verbatim.
+		//
+		// This sits below the entitlement gate on purpose: the branch must never become a
+		// way to reach a subscriber-only track without subscribing.
+		if (track.audioSource === 'r2' || !track.audioSource) {
+			const signedUrl = await getFileUrlFromR2({ uniqueKey: track.audioUrl, bucket: 'music' });
+			return json({ src: signedUrl.streamUrl });
+		}
+
+		return json({ src: track.audioUrl });
 	} catch (error) {
 		console.error('Error fetching track:', error);
 		throw error;

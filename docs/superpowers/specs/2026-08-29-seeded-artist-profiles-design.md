@@ -374,11 +374,14 @@ anyway.
 | Live frames (`maskChatEvent`) | masked teaser for non-subscribers (unchanged) | **unmasked for all**                 |
 | Write (`:97`)                 | subscriber or owner (unchanged)               | **subscriber only** (free subscribe) |
 
-Implementation: resolve `isSeeded` (`artist.origin !== 'native'`) alongside the existing
-`isSubscriber` / `ownerUserId` lookup, then use `!isSubscriber && !isOwner && !isSeeded`
-at `:72`, and `maskChatEvent(event, isSubscriber || isArtist || isSeeded)` in
-`chat.remote.ts`. Line `:97` is **not** changed — write stays subscriber-gated, which is
-what keeps Subscribe as the conversion event.
+Implementation as shipped (see the S2a plan): owner and origin resolve together through
+one `resolveArtistRoomContext` call rather than two artist reads, and the decision itself
+is a single predicate, `canReadChatContent`, called from both the history endpoint and the
+live stream. The spec first described the rule inline in each place; that would have left
+the same three-term boolean written twice, which is how a room ends up readable in the
+history and masked in the stream. `ChatService.create` is **not** changed and deliberately
+never learns `isSeeded` — write stays subscriber-gated, which is what keeps Subscribe as
+the conversion event.
 
 **Chat rate limiting** — new `src/lib/server/chat/rateLimits.ts` mirroring
 `comments/rateLimits.ts`. Two limiters, both of which must pass:

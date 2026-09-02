@@ -76,3 +76,29 @@ export async function resolveTargetOwnerUserId(
 			return null;
 	}
 }
+
+/** Everything the chat room needs to know about an artist, from one row. */
+export interface ArtistRoomContext {
+	ownerUserId: string | null;
+	/**
+	 * Imported rather than registered. Stays true after a claim: origin records where
+	 * the catalog came from, which is a fact about the data and not about the account.
+	 */
+	isSeeded: boolean;
+}
+
+/**
+ * Owner and origin in a single artist read. Resolving them through two calls would
+ * double the query on the hottest path in a chat room for nothing — both values come
+ * off the same row.
+ *
+ * An unknown id resolves to no owner and not seeded, so an artist that does not exist
+ * cannot open a room.
+ */
+export async function resolveArtistRoomContext(artistId: string): Promise<ArtistRoomContext> {
+	const artist = await ArtistService.getArtistById(artistId);
+	return {
+		ownerUserId: artist?.userId ?? null,
+		isSeeded: !!artist && artist.origin !== 'native'
+	};
+}
