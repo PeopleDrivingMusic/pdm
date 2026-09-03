@@ -15,6 +15,8 @@
  * These live outside the adapters so a second source inherits them.
  */
 
+import { isHttpsUrl, URL_MAX_LENGTH } from '$lib/utils/url';
+
 /** Mirrors the column widths in `schemas/artist.ts` and `schemas/catalog.ts`. */
 export const LIMITS = {
 	name: 100,
@@ -24,8 +26,10 @@ export const LIMITS = {
 	genre: 50,
 	/** `description` is `text`; bounded anyway so one hostile bio cannot bloat a row. */
 	description: 5000,
-	/** `avatar`/`cover_img`/`audio_url` are `text`; a URL past this is not a real URL. */
-	url: 2048,
+	/** `avatar`/`cover_img`/`audio_url` are `text`; a URL past this is not a real URL.
+	 *  Shared with `$lib/utils/url` so a client-side re-check of the same value (see
+	 *  `SeededPageNotice.svelte`) can't silently drift from this one. */
+	url: URL_MAX_LENGTH,
 	socialHandle: 100
 } as const;
 
@@ -56,14 +60,7 @@ export function bounded(value: string | null | undefined, max: number): string |
 export function httpsUrl(value: string | null | undefined): string | null {
 	if (typeof value !== 'string') return null;
 	const clean = value.replace(CONTROL, '').trim();
-	if (clean.length === 0 || clean.length > LIMITS.url) return null;
-	let parsed: URL;
-	try {
-		parsed = new URL(clean);
-	} catch {
-		return null;
-	}
-	return parsed.protocol === 'https:' ? clean : null;
+	return isHttpsUrl(clean, LIMITS.url) ? clean : null;
 }
 
 /**

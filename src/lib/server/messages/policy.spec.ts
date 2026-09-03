@@ -114,18 +114,19 @@ describe('resolveArtistRoomContext', () => {
 		expect(await resolveArtistRoomContext('a1')).toEqual({ ownerUserId: null, isSeeded: true });
 	});
 
-	it('keeps a claimed page seeded — the origin does not change on claim', async () => {
-		// Claiming sets `user_id` and `claimed_at`; `origin` stays `audius` forever,
-		// because where the catalog came from is a fact about the data, not about the
-		// account. The chat stays open, which is what the claimer already had.
+	it('closes the free read once the page is claimed, even though origin stays audius', async () => {
+		// Claiming sets `user_id` and `claimed_at`; `origin` stays `audius` forever
+		// (a fact about the data, not the account), but the room now has a real owner
+		// and real subscribers, so the open-to-everyone read must end here.
 		(ArtistService.getArtistById as any).mockResolvedValue({
 			id: 'a1',
 			userId: 'claimer1',
-			origin: 'audius'
+			origin: 'audius',
+			claimedAt: new Date()
 		});
 		expect(await resolveArtistRoomContext('a1')).toEqual({
 			ownerUserId: 'claimer1',
-			isSeeded: true
+			isSeeded: false
 		});
 	});
 

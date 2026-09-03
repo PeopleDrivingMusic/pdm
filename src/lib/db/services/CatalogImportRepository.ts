@@ -1,4 +1,4 @@
-import { isNull, ne } from 'drizzle-orm';
+import { eq, isNull, ne } from 'drizzle-orm';
 import { db, withDbLogging } from '$lib/db';
 import { artists, tracks } from '$lib/db/schema';
 
@@ -45,11 +45,14 @@ export interface ImportedTrackRow {
  *    their official PDM presence, unofficial notice and all, with no `origin` gate
  *    protecting it either way. Both gates now exist, and the page renders the moment
  *    an artist row exists, so import IS the publish action.
- * 2. `setWhere`. Without it, re-importing an artist who has since claimed their page
- *    overwrites the name, bio and avatar they wrote themselves. `isActive` is inside
- *    that same guard (an artist row's own `set`), so a claimed artist's active/inactive
- *    state stays theirs to manage. Tracks carry no equivalent claimed-guard on their
- *    `onConflictDoUpdate` — a pre-existing gap, unchanged here.
+ * 2. `setWhere`/claimed-guard. Without it, re-importing an artist who has since claimed
+ *    their page overwrites the name, bio and avatar they wrote themselves. `isActive` is
+ *    inside that same guard (an artist row's own `set`), so a claimed artist's
+ *    active/inactive state stays theirs to manage. Tracks have no `claimedAt` column of
+ *    their own to `setWhere` on, so `upsertTracks` reads the parent artist's once up
+ *    front and drops `isPublished` from `set` entirely when claimed — otherwise a track
+ *    the new owner deliberately unpublished via Studio would silently reappear on the
+ *    next re-import.
  */
 export class CatalogImportRepository {
 	/** Returns null when the row exists but is claimed, so nothing was updated. */
@@ -100,6 +103,15 @@ export class CatalogImportRepository {
 		if (rows.length === 0) return { imported: 0 };
 
 		return withDbLogging('CatalogImportRepository.upsertTracks', async () => {
+			// One read for the whole batch, not per track: every row in `rows` belongs to
+			// this same `artistId`, so "is the parent claimed" can't change mid-loop.
+			const [artistRow] = await db
+				.select({ claimedAt: artists.claimedAt })
+				.from(artists)
+				.where(eq(artists.id, artistId))
+				.limit(1);
+			const claimed = !!artistRow?.claimedAt;
+
 			// One statement per track rather than one multi-row insert. A multi-row upsert
 			// would have to say `excluded.*` to give each conflicting row its own new value,
 			// and Drizzle 0.45 ships no typed helper for that — it would mean hand-written
@@ -131,7 +143,9 @@ export class CatalogImportRepository {
 							duration: row.duration,
 							audioUrl: row.audioUrl,
 							imageUrl: row.imageUrl,
-							isPublished: true,
+							// Omitted (not `false`) once claimed: leaves whatever the artist
+							// set via Studio alone, rather than forcing it back to true.
+							...(claimed ? {} : { isPublished: true }),
 							updatedAt: new Date()
 						}
 					});

@@ -80,6 +80,15 @@ describe('claimArtist action', () => {
 		expect(result).toMatchObject({ status: 401 });
 	});
 
+	it('refuses a message over MAX_MESSAGE_LENGTH', async () => {
+		vi.mocked(ArtistService.getArtistBySlug).mockResolvedValue(
+			artist({ origin: 'audius', claimedAt: null }) as never
+		);
+		const result = await runAction({ user: { id: 'u1' } }, 'x'.repeat(2001));
+		expect(result).toMatchObject({ status: 400 });
+		expect(ClaimRequestService.create).not.toHaveBeenCalled();
+	});
+
 	it('refuses a claim on a native artist', async () => {
 		vi.mocked(ArtistService.getArtistBySlug).mockResolvedValue(
 			artist({ origin: 'native' }) as never

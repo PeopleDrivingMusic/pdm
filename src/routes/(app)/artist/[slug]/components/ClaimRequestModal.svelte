@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { ActionResult } from '@sveltejs/kit';
-	import { Button } from '$lib/ui';
+	import { Button, Textarea } from '$lib/ui';
 	import Modal from '$lib/ui/components/Modal/Modal.svelte';
 
 	let { show = $bindable(false) }: { show: boolean } = $props();
@@ -41,14 +41,13 @@
 		</p>
 	{:else}
 		<form method="POST" action="?/claimArtist" use:enhance={handleSubmit}>
-			<label for="claim-message">Message (optional)</label>
-			<textarea
-				id="claim-message"
+			<Textarea
+				label="Message (optional)"
 				name="message"
 				bind:value={message}
-				rows="4"
+				rows={4}
 				placeholder="Tell us how we can verify this is you."
-			></textarea>
+			/>
 			{#if error}
 				<p class="claim-error" role="alert">{error}</p>
 			{/if}
@@ -64,28 +63,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-	}
-
-	label {
-		font-size: var(--font-size-sm);
-		font-weight: 600;
-		color: var(--text-primary);
-	}
-
-	textarea {
-		width: 100%;
-		resize: vertical;
-		padding: var(--space-3);
-		border-radius: var(--radius-md);
-		border: 1px solid var(--border-primary);
-		background: var(--bg-primary);
-		color: var(--text-primary);
-		font: inherit;
-
-		&:focus-visible {
-			outline: 2px solid var(--primary);
-			outline-offset: 1px;
-		}
 	}
 
 	.claim-error {

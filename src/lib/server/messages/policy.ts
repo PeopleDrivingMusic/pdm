@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '$lib/db';
 import { posts } from '$lib/db/schema';
 import { ArtistService, TrackService } from '$lib/db/queries';
+import { isSeededUnclaimed } from '$lib/utils/seeded-artist';
 
 export type MessageTargetType = 'post' | 'track' | 'artist';
 
@@ -81,8 +82,9 @@ export async function resolveTargetOwnerUserId(
 export interface ArtistRoomContext {
 	ownerUserId: string | null;
 	/**
-	 * Imported rather than registered. Stays true after a claim: origin records where
-	 * the catalog came from, which is a fact about the data and not about the account.
+	 * Imported and not yet claimed. Turns false the moment the artist claims the page
+	 * (`claimedAt` set) — an owner exists again, so the chat goes back to being gated
+	 * like any other artist's room instead of staying open to every visitor forever.
 	 */
 	isSeeded: boolean;
 }
@@ -99,6 +101,6 @@ export async function resolveArtistRoomContext(artistId: string): Promise<Artist
 	const artist = await ArtistService.getArtistById(artistId);
 	return {
 		ownerUserId: artist?.userId ?? null,
-		isSeeded: !!artist && artist.origin !== 'native'
+		isSeeded: !!artist && isSeededUnclaimed(artist)
 	};
 }

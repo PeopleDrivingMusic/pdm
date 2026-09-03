@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { mdiOpenInNew } from '@mdi/js';
 	import { Link, SvgIcon } from '$lib/ui';
+	import { isHttpsUrl } from '$lib/utils/url';
 	import ClaimRequestModal from './ClaimRequestModal.svelte';
 
 	let {
@@ -17,15 +18,10 @@
 	// so this can't be tripped right now — but it's rendered into a `target="_blank"` href,
 	// and re-checking the scheme at the point of render is the same defense S2a applied to
 	// `audioUrl`: a future second source or writer that skips sanitising must not get to
-	// decide what this anchor navigates to.
-	const safeExternalUrl = $derived.by(() => {
-		if (!externalUrl) return null;
-		try {
-			return new URL(externalUrl).protocol === 'https:' ? externalUrl : null;
-		} catch {
-			return null;
-		}
-	});
+	// decide what this anchor navigates to. `isHttpsUrl` is the same check the server-side
+	// `httpsUrl()` sanitizer uses (shared via `$lib/utils/url`, not reimplemented here), so
+	// the two can't quietly diverge.
+	const safeExternalUrl = $derived(isHttpsUrl(externalUrl) ? externalUrl : null);
 </script>
 
 <div class="seeded-notice">

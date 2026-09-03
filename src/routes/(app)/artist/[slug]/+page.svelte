@@ -12,9 +12,10 @@
 	import SeededPageNotice from './components/SeededPageNotice.svelte';
 	import ChatWidget from '$lib/ui/components/ChatWidget.svelte';
 	import { playerStore } from '$lib/stores/player.svelte';
+	import { isSeededUnclaimed } from '$lib/utils/seeded-artist';
 
 	const { artist, viewer, tracks, albums, content } = $derived(page.data as PageData);
-	const isSeeded = $derived(artist.origin !== 'native');
+	const isSeeded = $derived(isSeededUnclaimed(artist));
 	// The music player is a fixed bar docked to the viewport bottom (see
 	// `(app)/+layout.svelte`, which shrinks `.page` by the same 76px when a
 	// track is loaded) — the sidebar's own height cap has to shrink to match,

@@ -25,11 +25,18 @@ const m = vi.hoisted(() => {
 	const onConflictDoUpdate = vi.fn((_config: ConflictConfig) => ({ returning }));
 	const values = vi.fn((_row: Record<string, unknown>) => ({ onConflictDoUpdate }));
 	const insert = vi.fn((_table: unknown) => ({ values }));
-	return { returning, onConflictDoUpdate, values, insert };
+	// upsertTracks reads the parent artist's `claimedAt` once before the loop; defaults
+	// to "not claimed" so every pre-existing test (none of which cares about this) keeps
+	// its original behaviour.
+	const limit = vi.fn(async (): Promise<{ claimedAt: Date | null }[]> => [{ claimedAt: null }]);
+	const where = vi.fn((_cond: unknown) => ({ limit }));
+	const from = vi.fn((_table: unknown) => ({ where }));
+	const select = vi.fn((_cols: unknown) => ({ from }));
+	return { returning, onConflictDoUpdate, values, insert, limit, where, from, select };
 });
 
 vi.mock('$lib/db', () => ({
-	db: { insert: m.insert },
+	db: { insert: m.insert, select: m.select },
 	withDbLogging: vi.fn(async (_name: string, fn: () => unknown) => fn())
 }));
 
@@ -62,6 +69,7 @@ const trackRow: ImportedTrackRow = {
 beforeEach(() => {
 	vi.clearAllMocks();
 	m.returning.mockResolvedValue([{ id: 'artist-1' }]);
+	m.limit.mockResolvedValue([{ claimedAt: null }]);
 });
 
 describe('CatalogImportRepository.upsertArtist', () => {
@@ -205,5 +213,19 @@ describe('CatalogImportRepository.upsertTracks', () => {
 		const result = await CatalogImportRepository.upsertTracks('artist-1', []);
 		expect(m.insert).not.toHaveBeenCalled();
 		expect(result).toEqual({ imported: 0 });
+	});
+
+	it('does not force-republish a track once the artist has claimed the page', async () => {
+		m.limit.mockResolvedValue([{ claimedAt: new Date() }]);
+		await CatalogImportRepository.upsertTracks('artist-1', [trackRow]);
+		const conflict = m.onConflictDoUpdate.mock.calls[0][0];
+		expect(conflict.set).not.toHaveProperty('isPublished');
+	});
+
+	it('still reconciles isPublished on re-import while the page is unclaimed', async () => {
+		m.limit.mockResolvedValue([{ claimedAt: null }]);
+		await CatalogImportRepository.upsertTracks('artist-1', [trackRow]);
+		const conflict = m.onConflictDoUpdate.mock.calls[0][0];
+		expect(conflict.set.isPublished).toBe(true);
 	});
 });

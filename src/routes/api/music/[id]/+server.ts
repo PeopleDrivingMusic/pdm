@@ -1,7 +1,7 @@
-import { TrackService, ArtistService } from '$lib/db/queries';
+import { TrackService } from '$lib/db/queries';
 import { getFileUrlFromR2 } from '$lib/db/services/R2Service';
 import { httpsUrl } from '$lib/server/catalog-source/sanitize';
-import { EntitlementService } from '$lib/server/entitlement';
+import { resolveTargetAccess } from '$lib/server/messages/access';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
@@ -14,30 +14,16 @@ export const GET: RequestHandler = async ({ params: { id }, locals }) => {
 		if (track.status !== 'uploaded' && track.status !== 'ready') {
 			return new Response('Track is not ready', { status: 409 });
 		}
-		// Imported tracks are written `status: 'ready'`, `visibility: 'public'` and
-		// `is_published: false`, and S2b flips the flag together with the unofficial-page
-		// notice. This endpoint has its own gate rather than `resolveTargetAccess`, and
-		// that gate never read `is_published` — harmless while an unpublished track was
-		// always an R2 key we presigned into a URL for a nonexistent object, and a live
-		// leak the moment a source-hosted track carried a URL that actually works.
-		if (!track.isPublished) {
-			return new Response('Track not found', { status: 404 });
-		}
 
-		if (track.visibility === 'subscribers') {
-			const userId = locals.user?.id;
-			if (!userId) {
-				return new Response('Subscribe to listen', { status: 403 });
-			}
-
-			const artist = await ArtistService.getArtistById(track.artistId);
-			const isOwner = userId === artist?.userId;
-			if (!isOwner) {
-				const allowed = await EntitlementService.isSubscriberOf(userId, track.artistId);
-				if (!allowed) {
-					return new Response('Subscribe to listen', { status: 403 });
-				}
-			}
+		// The same status/is_published/visibility/owner/subscriber policy every other
+		// content endpoint uses — previously hand-rolled here, which is how a missing
+		// `is_published` check went unnoticed (see git history). `resolveTargetAccess`
+		// also covers the seeded/null-owner case for free.
+		const access = await resolveTargetAccess('track', id, locals.user?.id ?? null);
+		if (!access.ok) {
+			return track.isPublished
+				? new Response('Subscribe to listen', { status: 403 })
+				: new Response('Track not found', { status: 404 });
 		}
 
 		// A source-hosted track's `audio_url` is the source's own stable stream endpoint,
