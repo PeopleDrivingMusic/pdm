@@ -1,0 +1,51 @@
+{
+	"data": [
+		{
+			"id": "LKdlD",
+			"handle": "deadmau5",
+			"name": "deadmau5",
+			"bio": "cube v3 on standby until further notice ;)",
+			"follower_count": 94917,
+			"track_count": 9,
+			"is_verified": true,
+			"is_deactivated": false,
+			"erc_wallet": "0x8aada2f1b43f4a36edea369dc01ed30abb9df9cd",
+			"twitter_handle": "deadmau5",
+			"instagram_handle": "deadmau5",
+			"profile_picture": {
+				"1000x1000": "https://validator.stuffisup.com/content/QmWMKwECYqpJ9zXajwpEtmdGc4cntX9ktJMtUHGJfQNvs2/1000x1000.jpg",
+				"150x150": "https://validator.stuffisup.com/content/QmWMKwECYqpJ9zXajwpEtmdGc4cntX9ktJMtUHGJfQNvs2/150x150.jpg",
+				"480x480": "https://validator.stuffisup.com/content/QmWMKwECYqpJ9zXajwpEtmdGc4cntX9ktJMtUHGJfQNvs2/480x480.jpg",
+				"mirrors": [
+					"https://audius-creator-11.theblueprint.xyz",
+					"https://v.monophonic.digital",
+					"https://audius-content-14.figment.io"
+				]
+			},
+			"cover_photo": {
+				"2000x": "https://audius-creator-3.theblueprint.xyz/content/QmRVVvqd2tAVDSNF2qHNFGNNWJmf3VqS9wiyHRka4QQ2B4/2000x.jpg",
+				"640x": "https://audius-creator-3.theblueprint.xyz/content/QmRVVvqd2tAVDSNF2qHNFGNNWJmf3VqS9wiyHRka4QQ2B4/640x.jpg",
+				"mirrors": [
+					"https://v.monophonic.digital",
+					"https://val003.open-audio-validator.com",
+					"https://audius-figment-1-validator-18.figment.io"
+				]
+			}
+		},
+		{
+			"id": "D8OGl",
+			"handle": "deadmau54321",
+			"name": "deadmau5",
+			"bio": null,
+			"follower_count": 704,
+			"track_count": 7,
+			"is_verified": false,
+			"is_deactivated": false,
+			"erc_wallet": null,
+			"twitter_handle": null,
+			"instagram_handle": null,
+			"profile_picture": null,
+			"cover_photo": null
+		}
+	]
+}

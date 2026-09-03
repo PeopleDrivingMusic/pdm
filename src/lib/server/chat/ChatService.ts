@@ -2,10 +2,12 @@ import { ChatRepository, type ChatMessageWithAuthor } from '$lib/db/services/Cha
 import {
 	containsUrl,
 	resolveTargetOwnerUserId,
+	resolveArtistRoomContext,
 	MAX_MESSAGE_LENGTH
 } from '$lib/server/messages/policy';
 import { EntitlementService } from '$lib/server/entitlement';
 import { publishChatMessage } from './broadcast';
+import { canReadChatContent } from './visibility';
 import type { ChatDTO } from '$lib/messages/types';
 
 export type { ChatDTO };
@@ -52,10 +54,15 @@ function toDTO(
 }
 
 /**
- * Application boundary for the subscriber fan chat. Every operation here — read and
- * write — is gated by `EntitlementService.isSubscriberOf` OR by being the artist who
- * owns the room: the artist must always be able to read and post in their own fan
- * room regardless of subscription status (they can't subscribe to themselves).
+ * Application boundary for the subscriber fan chat. Writing is gated by
+ * `EntitlementService.isSubscriberOf` OR by being the artist who owns the room: the
+ * artist must always be able to post in their own fan room regardless of subscription
+ * status (they can't subscribe to themselves).
+ *
+ * Reading follows the same rule with one addition — a seeded page has no owner and no
+ * subscribers, so its history is open to everyone (`canReadChatContent`). Writing is
+ * not opened, which is what keeps Subscribe as the conversion event.
+ *
  * Returns only DTOs — no Drizzle rows leak across this seam.
  */
 export class ChatService {
@@ -64,12 +71,14 @@ export class ChatService {
 		viewerUserId: string | null;
 		before?: Date;
 	}): Promise<ListResult> {
-		const [isSubscriber, ownerUserId] = await Promise.all([
+		const [isSubscriber, { ownerUserId, isSeeded }] = await Promise.all([
 			EntitlementService.isSubscriberOf(input.viewerUserId, input.artistId),
-			resolveTargetOwnerUserId('artist', input.artistId)
+			resolveArtistRoomContext(input.artistId)
 		]);
 		const isOwner = !!input.viewerUserId && input.viewerUserId === ownerUserId;
-		if (!isSubscriber && !isOwner) return { ok: false, reason: 'not_subscribed' };
+		if (!canReadChatContent({ isSubscriber, isOwner, isSeeded })) {
+			return { ok: false, reason: 'not_subscribed' };
+		}
 
 		const rows = await ChatRepository.getMessages({
 			artistId: input.artistId,
@@ -89,6 +98,10 @@ export class ChatService {
 	}): Promise<CreateResult> {
 		if (!input.authorId) return { ok: false, reason: 'unauthorized' };
 
+		// Deliberately `resolveTargetOwnerUserId`, not the room context: the write path
+		// must not be able to see `isSeeded`. Opening reads on a seeded page is what
+		// makes it worth visiting; opening writes would remove the only reason to
+		// subscribe. Keeping the flag out of scope enforces that better than a comment.
 		const [isSubscriber, ownerUserId] = await Promise.all([
 			EntitlementService.isSubscriberOf(input.authorId, input.artistId),
 			resolveTargetOwnerUserId('artist', input.artistId)

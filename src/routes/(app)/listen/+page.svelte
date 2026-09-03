@@ -199,6 +199,8 @@
 											updatedAt: new Date(),
 											genre: null,
 											status: 'uploaded',
+											audioSource: 'r2',
+											externalId: null,
 											artistId: '1',
 											title: 'Metallica',
 											isPublished: null,

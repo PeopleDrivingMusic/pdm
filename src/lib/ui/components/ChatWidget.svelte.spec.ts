@@ -50,6 +50,34 @@ describe('ChatWidget — guest (non-subscriber)', () => {
 	});
 });
 
+describe('ChatWidget — seeded room, anonymous visitor', () => {
+	it('opens a live connection and shows messages, but never the composer', async () => {
+		const { fetchChatHistory } = await import('$lib/client/chat');
+		const { getChatRoom } = await import('$lib/remote/chat.remote');
+		vi.mocked(fetchChatHistory).mockResolvedValue({
+			ok: true,
+			messages: [chatMsg('s1', new Date(2026, 7, 20, 0, 0, 1).toISOString())]
+		});
+		const getChatRoomSpy = vi.mocked(getChatRoom);
+
+		render(ChatWidget, {
+			artistId: 'a1',
+			isSubscriber: false,
+			isArtist: false,
+			isSeeded: true
+		});
+
+		// The server already opens this room to anonymous reads (S2a) — the widget's own
+		// gate has to widen to match, or a real visitor never sees the open room it was
+		// promised. `hasAccess` used to be the only gate for both fetching AND rendering;
+		// `isSeeded` must clear it for reads without also clearing it for writes.
+		await expect.element(page.getByText('msg s1')).toBeInTheDocument();
+		expect(getChatRoomSpy).toHaveBeenCalledWith('a1');
+		await expect.element(page.getByPlaceholder(/message/i)).not.toBeInTheDocument();
+		await expect.element(page.getByText(/visible to everyone/i)).toBeInTheDocument();
+	});
+});
+
 describe('ChatWidget — artist owner (not a subscriber of themselves)', () => {
 	it('still shows the composer, since the artist owns the room', async () => {
 		render(ChatWidget, {

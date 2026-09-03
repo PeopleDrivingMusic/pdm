@@ -130,3 +130,51 @@ describe('comment targets inherit their parent access', () => {
 		expect(await resolveTargetAccess('comment', 'c1', 'u2')).toEqual({ ok: false });
 	});
 });
+
+// An imported artist has no `userId` — nobody has claimed the page yet. Before slice
+// S2a the missing owner denied access outright, which would have made a seeded track
+// unplayable and uncommentable for everyone, permanently.
+describe('an artist nobody owns', () => {
+	beforeEach(() => {
+		(ArtistService.getArtistById as any).mockResolvedValue({ id: 'a1', userId: null });
+	});
+
+	it('allows a published public target and reports no owner', async () => {
+		expect(await resolveTargetAccess('post', 'p1', 'u2')).toEqual({
+			ok: true,
+			ownerUserId: null
+		});
+	});
+
+	it('still hides an unpublished target', async () => {
+		postRow.mockResolvedValue([{ artistId: 'a1', visibility: 'public', status: 'draft' }]);
+		expect(await resolveTargetAccess('post', 'p1', 'u2')).toEqual({ ok: false });
+	});
+
+	it('does not let an anonymous viewer match the absent owner', async () => {
+		// The owner bypass compares `viewerUserId === ownerUserId`. With both null a
+		// naive comparison grants an anonymous stranger the artist's own access, which
+		// reaches unpublished drafts and subscriber-only content.
+		postRow.mockResolvedValue([{ artistId: 'a1', visibility: 'subscribers', status: 'draft' }]);
+		expect(await resolveTargetAccess('post', 'p1', null)).toEqual({ ok: false });
+	});
+
+	it('still requires a subscription for gated content', async () => {
+		postRow.mockResolvedValue([{ artistId: 'a1', visibility: 'subscribers', status: 'published' }]);
+		(EntitlementService.isSubscriberOf as any).mockResolvedValue(false);
+		expect(await resolveTargetAccess('post', 'p1', 'u2')).toEqual({ ok: false });
+	});
+
+	it('applies the same rule to a track', async () => {
+		(TrackService.getTrackById as any).mockResolvedValue({
+			id: 't1',
+			artistId: 'a1',
+			visibility: 'public',
+			isPublished: true
+		});
+		expect(await resolveTargetAccess('track', 't1', 'u2')).toEqual({
+			ok: true,
+			ownerUserId: null
+		});
+	});
+});

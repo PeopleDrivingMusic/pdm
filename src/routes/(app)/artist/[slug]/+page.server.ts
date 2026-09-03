@@ -1,6 +1,8 @@
 import { AlbumService, ArtistService, TrackService } from '$lib/db/queries';
 import { ArtistPublicContentService, PostPollService } from '$lib/db/services/ContentService';
+import { ClaimRequestService } from '$lib/db/services/ClaimRequestService';
 import { EntitlementService } from '$lib/server/entitlement';
+import { MAX_MESSAGE_LENGTH } from '$lib/server/messages/policy';
 import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -96,5 +98,34 @@ export const actions: Actions = {
 		}
 
 		return { success: true };
+	},
+
+	claimArtist: async ({ params, locals, request }) => {
+		if (!locals.user?.id) {
+			return fail(401, { error: 'Log in to claim this page' });
+		}
+
+		const artist = await ArtistService.getArtistBySlug(params.slug);
+		if (!artist || artist.origin === 'native' || artist.claimedAt) {
+			return fail(400, { error: 'This page cannot be claimed' });
+		}
+
+		const data = await request.formData();
+		const message = getString(data, 'message');
+		if (message.length > MAX_MESSAGE_LENGTH) {
+			return fail(400, { error: 'Message is too long' });
+		}
+
+		const result = await ClaimRequestService.create({
+			artistId: artist.id,
+			userId: locals.user.id,
+			message: message || null
+		});
+
+		if (!result.ok) {
+			return fail(400, { error: 'You already sent a request for this page' });
+		}
+
+		return { claimed: true };
 	}
 };

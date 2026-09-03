@@ -6,7 +6,13 @@ vi.mock('$lib/server/chat', () => ({
 vi.mock('$lib/server/security/guards');
 
 import { ChatService } from '$lib/server/chat';
-import { requireSameOrigin, requireUser, isGuardResponse } from '$lib/server/security/guards';
+import {
+	requireSameOrigin,
+	requireUser,
+	isGuardResponse,
+	tooManyRequests
+} from '$lib/server/security/guards';
+import { chatRoomWriteLimiter, chatGlobalWriteLimiter } from '$lib/server/chat/rateLimits';
 import { GET, POST } from './+server';
 
 const ARTIST_ID = '11111111-1111-1111-1111-111111111111';
@@ -22,6 +28,13 @@ beforeEach(() => {
 	(requireSameOrigin as any).mockReturnValue(undefined);
 	(requireUser as any).mockReturnValue({ userId: 'u1' });
 	(isGuardResponse as any).mockReturnValue(false);
+	// `vi.mock('$lib/server/security/guards')` automocks the whole module, so the shared
+	// 429 helper returns undefined unless it is given a body here.
+	(tooManyRequests as any).mockImplementation(
+		() => new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429 })
+	);
+	chatRoomWriteLimiter.reset();
+	chatGlobalWriteLimiter.reset();
 });
 
 describe('GET /api/chat', () => {
@@ -233,5 +246,71 @@ describe('POST /api/chat', () => {
 		const response = await POST(event);
 		expect(response.status).toBe(201);
 		expect(await response.json()).toEqual({ message: { id: 'm3' } });
+	});
+});
+
+const OTHER_ARTIST_ID = '22222222-2222-2222-2222-222222222222';
+const THIRD_ARTIST_ID = '33333333-3333-3333-3333-333333333333';
+const FOURTH_ARTIST_ID = '44444444-4444-4444-4444-444444444444';
+
+// Seeded pages multiply the number of rooms one account can write into, so a per-room
+// allowance alone stops being a limit. Both limiters must pass.
+describe('POST /api/chat rate limiting', () => {
+	beforeEach(() => {
+		(ChatService.create as any).mockResolvedValue({ ok: true, message: { id: 'm1' } });
+	});
+
+	it('429s once one room takes more than its share', async () => {
+		for (let i = 0; i < 10; i++) {
+			const ok = await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }, 'u1'));
+			expect(ok.status).toBe(201);
+		}
+		const blocked = await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }, 'u1'));
+		expect(blocked.status).toBe(429);
+	});
+
+	it('does not write when the limiter refuses', async () => {
+		for (let i = 0; i < 10; i++)
+			await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }, 'u1'));
+		(ChatService.create as any).mockClear();
+		await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }, 'u1'));
+		expect(ChatService.create).not.toHaveBeenCalled();
+	});
+
+	it('429s a spammer spreading the same volume across rooms', async () => {
+		// 10 in one room is within that room's allowance, and so is 10 in the next; the
+		// global limiter is the only thing that sees the total.
+		for (let i = 0; i < 10; i++)
+			await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }, 'u1'));
+		for (let i = 0; i < 10; i++)
+			await POST(makePostEvent({ artistId: OTHER_ARTIST_ID, body: 'hi' }, 'u1'));
+		for (let i = 0; i < 10; i++)
+			await POST(makePostEvent({ artistId: THIRD_ARTIST_ID, body: 'hi' }, 'u1'));
+
+		const blocked = await POST(makePostEvent({ artistId: FOURTH_ARTIST_ID, body: 'hi' }, 'u1'));
+		expect(blocked.status).toBe(429);
+	});
+
+	it('leaves another user unthrottled', async () => {
+		for (let i = 0; i < 11; i++)
+			await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }, 'u1'));
+		(requireUser as any).mockReturnValue({ userId: 'u2' });
+		const other = await POST(makePostEvent({ artistId: ARTIST_ID, body: 'hi' }, 'u2'));
+		expect(other.status).toBe(201);
+	});
+
+	it('validates the payload before metering, so a malformed body is a 400 and never a 429', async () => {
+		// The ordering is only observable once a limiter would actually refuse — on a
+		// fresh limiter the answer is 400 whichever runs first. Exhaust the GLOBAL one
+		// (30, spread across rooms so the per-room cap of 10 is never the binding
+		// constraint), then send a malformed body: metering first would answer 429.
+		for (const room of [ARTIST_ID, OTHER_ARTIST_ID, THIRD_ARTIST_ID]) {
+			for (let i = 0; i < 10; i++) await POST(makePostEvent({ artistId: room, body: 'hi' }, 'u1'));
+		}
+		(ChatService.create as any).mockClear();
+
+		const bad = await POST(makePostEvent({ artistId: 'nope', body: 'hi' }, 'u1'));
+		expect(bad.status).toBe(400);
+		expect(ChatService.create).not.toHaveBeenCalled();
 	});
 });

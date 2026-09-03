@@ -30,6 +30,8 @@ export const subscriptions = financeDbSchema.table(
 			.notNull()
 			.references(() => artists.id),
 		status: varchar('status', { length: 20 }).default('active').notNull(),
+		// 'pre_claim_free' rows carry no payment — they must never reach revenue reporting.
+		kind: varchar('kind', { length: 16 }).default('paid').notNull(),
 		startedAt: timestamp('started_at').defaultNow().notNull(),
 		canceledAt: timestamp('canceled_at')
 	},

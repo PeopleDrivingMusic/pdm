@@ -1,17 +1,19 @@
 import { query, getRequestEvent } from '$app/server';
 import { EntitlementService } from '$lib/server/entitlement';
-import { resolveTargetOwnerUserId } from '$lib/server/messages/policy';
+import { resolveArtistRoomContext } from '$lib/server/messages/policy';
 import { subscribeToChatRoom } from '$lib/server/chat/listener';
 import { presence } from '$lib/server/chat/presence';
 import { maskChatEvent } from '$lib/server/chat/broadcast';
+import { canReadChatContent } from '$lib/server/chat/visibility';
 import { createAsyncQueue } from '$lib/server/chat/asyncQueue';
 import { isUuid } from '$lib/server/security/uuid';
 import type { ChatFrame } from '$lib/messages/types';
 import type { ChatMessagePublished } from '$lib/server/chat/broadcast';
 
 /**
- * Streams one artist chat room to whoever is connected. Subscribers get real
- * messages; everyone else gets the masked teaser (spec §4.3–4.5). Presence frames
+ * Streams one artist chat room to whoever is connected. Subscribers — and everyone at
+ * all, on a seeded page — get real messages; the rest get the masked teaser
+ * (spec §4.3–4.5). Presence frames
  * (`onlineCount`, `artistOnline`) go to both, unmasked — that's the whole point of
  * the teaser: real signal, fake content.
  */
@@ -21,11 +23,14 @@ export const getChatRoom = query.live('unchecked', async function* (artistId: un
 	const { locals, request } = getRequestEvent();
 	const viewerUserId = locals.user?.id ?? null;
 
-	const [isSubscriber, ownerUserId] = await Promise.all([
+	const [isSubscriber, { ownerUserId, isSeeded }] = await Promise.all([
 		EntitlementService.isSubscriberOf(viewerUserId, artistId),
-		resolveTargetOwnerUserId('artist', artistId)
+		resolveArtistRoomContext(artistId)
 	]);
 	const isArtist = Boolean(viewerUserId) && viewerUserId === ownerUserId;
+	// Same predicate the history endpoint uses, so a room can never be readable in one
+	// and masked in the other.
+	const seesContent = canReadChatContent({ isSubscriber, isOwner: isArtist, isSeeded });
 	const connectionId = crypto.randomUUID();
 
 	const queue = createAsyncQueue<ChatFrame>();
@@ -56,7 +61,7 @@ export const getChatRoom = query.live('unchecked', async function* (artistId: un
 	let stopListening: (() => Promise<void>) | undefined;
 	try {
 		stopListening = await subscribeToChatRoom(artistId, (event: ChatMessagePublished) => {
-			queue.push(maskChatEvent(event, isSubscriber || isArtist));
+			queue.push(maskChatEvent(event, seesContent));
 		});
 
 		for await (const frame of queue.iterate()) {

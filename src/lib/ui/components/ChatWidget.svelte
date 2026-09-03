@@ -13,23 +13,29 @@
 	let {
 		artistId,
 		isSubscriber,
-		isArtist
+		isArtist,
+		isSeeded = false
 	}: {
 		artistId: string;
 		isSubscriber: boolean;
 		isArtist: boolean;
+		isSeeded?: boolean;
 	} = $props();
 
 	// The artist always has full access to their own room — they can't subscribe to
 	// themselves, so `isSubscriber` alone would otherwise lock them out of it.
-	const hasAccess = $derived(isSubscriber || isArtist);
+	const canWrite = $derived(isSubscriber || isArtist);
+	// A seeded room is open for reads to everyone (server-enforced in
+	// `canReadChatContent`) but stays subscriber-gated for writes — `isSeeded` must
+	// widen this half only, never `canWrite`, or an anonymous visitor could post.
+	const canRead = $derived(canWrite || isSeeded);
 
 	// Subscribers read from the platform-wide store (opened in the root layout).
-	// The artist opens their own page-scoped connection here (they're not "a
-	// subscriber" of themselves, so they're not in that store), torn down on
-	// unmount. A plain guest gets neither — they can't see real messages anyway,
-	// so there is nothing worth holding a live connection open for; the locked
-	// panel is fully static.
+	// The artist, and any visitor to a seeded room's open read, opens its own
+	// page-scoped connection here (neither is "a subscriber", so neither is in that
+	// store), torn down on unmount. A plain guest on a non-seeded page gets neither —
+	// they can't see real messages anyway, so there is nothing worth holding a live
+	// connection open for; the locked panel is fully static.
 	let localMessages = $state<ChatFrame[]>([]);
 	let onlineCount = $state(0);
 	let artistOnline = $state(false);
@@ -52,7 +58,7 @@
 			}
 			return;
 		}
-		if (!isArtist) return;
+		if (!isArtist && !isSeeded) return;
 
 		let cancelled = false;
 		(async () => {
@@ -74,7 +80,7 @@
 	let scrollEl = $state<HTMLDivElement | null>(null);
 
 	onMount(async () => {
-		if (!hasAccess) return;
+		if (!canRead) return;
 		const result = await fetchChatHistory(artistId);
 		if (!result.ok) return;
 		history = [...result.messages].reverse();
@@ -136,7 +142,7 @@
 	}
 
 	const messages = $derived(
-		hasAccess
+		canRead
 			? dedupeById([
 					...history,
 					...(chatStore.rooms[artistId]?.messages ?? localMessages)
@@ -174,7 +180,7 @@
 			<p class="eyebrow">Community</p>
 			<h2>Fan room</h2>
 		</div>
-		{#if hasAccess}
+		{#if canRead}
 			<div class="presence-cluster">
 				<span class="online-dot" class:offline={onlineCount === 0}></span>
 				<span class="online-count">{onlineCount} online</span>
@@ -186,7 +192,10 @@
 	</header>
 
 	<div class="chat-body">
-		{#if hasAccess}
+		{#if canRead}
+			{#if isSeeded}
+				<p class="seeded-notice">Messages here are visible to everyone, not just subscribers.</p>
+			{/if}
 			{#if messages.length === 0}
 				<div class="empty-state">
 					<SvgIcon path={mdiChatOutline} size={20} />
@@ -209,9 +218,13 @@
 					/>
 				</div>
 			{/if}
-			<div class="composer-slot">
-				<MessageComposer placeholder="Message the room…" onSubmit={handleSubmit} />
-			</div>
+			{#if canWrite}
+				<div class="composer-slot">
+					<MessageComposer placeholder="Message the room…" onSubmit={handleSubmit} />
+				</div>
+			{:else}
+				<p class="write-gate-note">Subscribe above to join the conversation.</p>
+			{/if}
 		{:else}
 			<div class="teaser-locked">
 				<!-- Only the synthetic decoration is hidden from assistive tech — the
@@ -374,6 +387,21 @@
 		margin-top: var(--space-3);
 		padding-top: var(--space-3);
 		border-top: 1px solid var(--chat-divider);
+	}
+
+	.seeded-notice {
+		margin: 0 0 var(--space-3);
+		color: var(--text-tertiary);
+		font-size: var(--font-size-xs);
+	}
+
+	.write-gate-note {
+		margin: var(--space-3) 0 0;
+		padding-top: var(--space-3);
+		border-top: 1px solid var(--chat-divider);
+		color: var(--text-secondary);
+		font-size: var(--font-size-sm);
+		text-align: center;
 	}
 
 	.empty-state {

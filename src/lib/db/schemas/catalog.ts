@@ -7,8 +7,10 @@ import {
 	integer,
 	jsonb,
 	uuid,
-	index
+	index,
+	uniqueIndex
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { artists } from './artist';
 
 export const catalogDbSchema = pgSchema('catalog');
@@ -55,6 +57,9 @@ export const tracks = catalogDbSchema.table(
 		trackNumber: integer('track_number'),
 		genre: jsonb('genres').$type<string[]>(),
 		status: varchar('status', { length: 32 }).default('draft').notNull(),
+		// 'r2' = we host the audio. 'audius' = audioUrl is the stable /stream endpoint.
+		audioSource: varchar('audio_source', { length: 16 }).default('r2').notNull(),
+		externalId: varchar('external_id', { length: 64 }),
 		isPublished: boolean('is_published').default(false),
 		visibility: varchar('visibility', { length: 16 }).default('public').notNull(),
 		contentId: uuid('content_id'),
@@ -64,7 +69,12 @@ export const tracks = catalogDbSchema.table(
 	},
 	(table) => [
 		index('tracks_artist_status_idx').on(table.artistId, table.status),
-		index('tracks_published_status_idx').on(table.isPublished, table.status)
+		index('tracks_published_status_idx').on(table.isPublished, table.status),
+		// `sql` template, not `ne()` — same migration-serialisation reason as the
+		// artists index.
+		uniqueIndex('tracks_source_external_unique')
+			.on(table.audioSource, table.externalId)
+			.where(sql`${table.audioSource} <> 'r2'`)
 	]
 );
 

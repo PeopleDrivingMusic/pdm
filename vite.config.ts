@@ -66,6 +66,8 @@ export default defineConfig({
 				'src/lib/server/security/**',
 				'src/lib/server/chat/**',
 				'src/lib/db/services/ChatRepository.ts',
+				'src/lib/db/services/CatalogImportRepository.ts',
+				'src/lib/server/catalog-source/**',
 				'src/routes/api/chat/**'
 			],
 			// Barrel re-exports and type-only modules carry no testable logic.

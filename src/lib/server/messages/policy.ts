@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '$lib/db';
 import { posts } from '$lib/db/schema';
 import { ArtistService, TrackService } from '$lib/db/queries';
+import { isSeededUnclaimed } from '$lib/utils/seeded-artist';
 
 export type MessageTargetType = 'post' | 'track' | 'artist';
 
@@ -75,4 +76,31 @@ export async function resolveTargetOwnerUserId(
 		default:
 			return null;
 	}
+}
+
+/** Everything the chat room needs to know about an artist, from one row. */
+export interface ArtistRoomContext {
+	ownerUserId: string | null;
+	/**
+	 * Imported and not yet claimed. Turns false the moment the artist claims the page
+	 * (`claimedAt` set) — an owner exists again, so the chat goes back to being gated
+	 * like any other artist's room instead of staying open to every visitor forever.
+	 */
+	isSeeded: boolean;
+}
+
+/**
+ * Owner and origin in a single artist read. Resolving them through two calls would
+ * double the query on the hottest path in a chat room for nothing — both values come
+ * off the same row.
+ *
+ * An unknown id resolves to no owner and not seeded, so an artist that does not exist
+ * cannot open a room.
+ */
+export async function resolveArtistRoomContext(artistId: string): Promise<ArtistRoomContext> {
+	const artist = await ArtistService.getArtistById(artistId);
+	return {
+		ownerUserId: artist?.userId ?? null,
+		isSeeded: !!artist && isSeededUnclaimed(artist)
+	};
 }

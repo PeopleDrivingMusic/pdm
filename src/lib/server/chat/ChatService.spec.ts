@@ -10,7 +10,8 @@ vi.mock('$lib/db/services/ChatRepository', () => ({
 }));
 vi.mock('$lib/server/messages/policy', async (importOriginal) => ({
 	...(await importOriginal<typeof import('$lib/server/messages/policy')>()),
-	resolveTargetOwnerUserId: vi.fn()
+	resolveTargetOwnerUserId: vi.fn(),
+	resolveArtistRoomContext: vi.fn()
 }));
 vi.mock('$lib/server/entitlement', () => ({
 	EntitlementService: { isSubscriberOf: vi.fn() }
@@ -20,7 +21,7 @@ vi.mock('./broadcast', () => ({
 }));
 
 import { ChatRepository } from '$lib/db/services/ChatRepository';
-import { resolveTargetOwnerUserId } from '$lib/server/messages/policy';
+import { resolveTargetOwnerUserId, resolveArtistRoomContext } from '$lib/server/messages/policy';
 import { EntitlementService } from '$lib/server/entitlement';
 import { publishChatMessage } from './broadcast';
 import { ChatService } from './ChatService';
@@ -28,6 +29,7 @@ import { ChatService } from './ChatService';
 beforeEach(() => {
 	vi.clearAllMocks();
 	(resolveTargetOwnerUserId as any).mockResolvedValue('owner1');
+	(resolveArtistRoomContext as any).mockResolvedValue({ ownerUserId: 'owner1', isSeeded: false });
 });
 
 describe('ChatService.getMessages', () => {
@@ -313,5 +315,64 @@ describe('ChatService.delete', () => {
 
 		expect(result).toEqual({ ok: false, reason: 'not_found' });
 		expect(ChatRepository.softDelete).not.toHaveBeenCalled();
+	});
+});
+
+// A seeded page has no owner and nobody can be its subscriber in the ordinary sense, so
+// the subscriber-or-owner rule would make its chat unreadable by everyone, forever.
+// Reading opens; writing does NOT — Subscribe stays the conversion event.
+describe('a seeded artist room', () => {
+	beforeEach(() => {
+		(resolveArtistRoomContext as any).mockResolvedValue({ ownerUserId: null, isSeeded: true });
+		(EntitlementService.isSubscriberOf as any).mockResolvedValue(false);
+	});
+
+	it('lets a non-subscriber read the history', async () => {
+		(ChatRepository.getMessages as any).mockResolvedValue([]);
+		await expect(ChatService.getMessages({ artistId: 'a1', viewerUserId: 'u2' })).resolves.toEqual({
+			ok: true,
+			messages: []
+		});
+	});
+
+	it('lets an anonymous visitor read the history', async () => {
+		(ChatRepository.getMessages as any).mockResolvedValue([]);
+		await expect(
+			ChatService.getMessages({ artistId: 'a1', viewerUserId: null })
+		).resolves.toMatchObject({ ok: true });
+	});
+
+	it('marks nobody as the artist, because nobody owns the page', async () => {
+		(ChatRepository.getMessages as any).mockResolvedValue([
+			{
+				id: 'm1',
+				body: 'hi',
+				createdAt: new Date(),
+				authorId: 'u2',
+				authorName: 'Fan',
+				authorUsername: 'fan',
+				authorAvatar: null
+			}
+		]);
+		const result = await ChatService.getMessages({ artistId: 'a1', viewerUserId: 'u2' });
+		expect(result).toMatchObject({ ok: true });
+		if (!result.ok) return;
+		expect(result.messages[0].isArtist).toBe(false);
+		// The author still deletes their own message.
+		expect(result.messages[0].canDelete).toBe(true);
+	});
+
+	it('still refuses a write from a non-subscriber', async () => {
+		await expect(
+			ChatService.create({
+				artistId: 'a1',
+				authorId: 'u2',
+				authorName: 'Fan',
+				authorUsername: 'fan',
+				authorAvatar: null,
+				body: 'hello'
+			})
+		).resolves.toEqual({ ok: false, reason: 'not_subscribed' });
+		expect(ChatRepository.create).not.toHaveBeenCalled();
 	});
 });

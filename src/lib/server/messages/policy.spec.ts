@@ -8,7 +8,7 @@ vi.mock('$lib/db', () => ({ db: {} }));
 vi.mock('$lib/db/schema', () => ({ posts: {} }));
 
 import { ArtistService, TrackService } from '$lib/db/queries';
-import { containsUrl, resolveTargetOwnerUserId } from './policy';
+import { containsUrl, resolveTargetOwnerUserId, resolveArtistRoomContext } from './policy';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -87,5 +87,65 @@ describe('resolveTargetOwnerUserId', () => {
 	it('returns null for a missing artist', async () => {
 		(ArtistService.getArtistById as any).mockResolvedValue(undefined);
 		expect(await resolveTargetOwnerUserId('artist', 'nope')).toBeNull();
+	});
+});
+
+// Owner and origin in ONE artist read. Resolving them separately would double the query
+// on the hottest path in the chat room for no gain — both come off the same row.
+describe('resolveArtistRoomContext', () => {
+	it('reports the owner and a native origin', async () => {
+		(ArtistService.getArtistById as any).mockResolvedValue({
+			id: 'a1',
+			userId: 'owner1',
+			origin: 'native'
+		});
+		expect(await resolveArtistRoomContext('a1')).toEqual({
+			ownerUserId: 'owner1',
+			isSeeded: false
+		});
+	});
+
+	it('reports an imported artist as seeded and ownerless', async () => {
+		(ArtistService.getArtistById as any).mockResolvedValue({
+			id: 'a1',
+			userId: null,
+			origin: 'audius'
+		});
+		expect(await resolveArtistRoomContext('a1')).toEqual({ ownerUserId: null, isSeeded: true });
+	});
+
+	it('closes the free read once the page is claimed, even though origin stays audius', async () => {
+		// Claiming sets `user_id` and `claimed_at`; `origin` stays `audius` forever
+		// (a fact about the data, not the account), but the room now has a real owner
+		// and real subscribers, so the open-to-everyone read must end here.
+		(ArtistService.getArtistById as any).mockResolvedValue({
+			id: 'a1',
+			userId: 'claimer1',
+			origin: 'audius',
+			claimedAt: new Date()
+		});
+		expect(await resolveArtistRoomContext('a1')).toEqual({
+			ownerUserId: 'claimer1',
+			isSeeded: false
+		});
+	});
+
+	it('reads the artist exactly once', async () => {
+		(ArtistService.getArtistById as any).mockResolvedValue({
+			id: 'a1',
+			userId: null,
+			origin: 'audius'
+		});
+		await resolveArtistRoomContext('a1');
+		expect(ArtistService.getArtistById).toHaveBeenCalledTimes(1);
+	});
+
+	it('treats a missing artist as ownerless and not seeded', async () => {
+		// Fail closed: an unknown id must not open a chat room.
+		(ArtistService.getArtistById as any).mockResolvedValue(undefined);
+		expect(await resolveArtistRoomContext('nope')).toEqual({
+			ownerUserId: null,
+			isSeeded: false
+		});
 	});
 });

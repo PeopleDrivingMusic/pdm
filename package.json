@@ -16,6 +16,7 @@
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"test:e2e": "node e2e/setup-test-db.mjs && playwright test",
 		"test:coverage": "vitest --run --project server --coverage",
+		"import:artist": "vite-node -c vite.config.script.ts scripts/import-artist.ts",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:push": "drizzle-kit push",
@@ -62,6 +63,7 @@
 		"typescript": "^5.0.0",
 		"typescript-eslint": "^8.20.0",
 		"vite": "^7.3.6",
+		"vite-node": "^6.0.0",
 		"vitest": "^3.2.7",
 		"vitest-browser-svelte": "^0.1.0"
 	},

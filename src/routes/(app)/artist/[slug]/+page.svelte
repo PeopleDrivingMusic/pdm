@@ -9,10 +9,13 @@
 	import ArtistPosts from './components/ArtistPosts.svelte';
 	import ArtistPhotos from './components/ArtistPhotos.svelte';
 	import ArtistVideos from './components/ArtistVideos.svelte';
+	import SeededPageNotice from './components/SeededPageNotice.svelte';
 	import ChatWidget from '$lib/ui/components/ChatWidget.svelte';
 	import { playerStore } from '$lib/stores/player.svelte';
+	import { isSeededUnclaimed } from '$lib/utils/seeded-artist';
 
 	const { artist, viewer, tracks, albums, content } = $derived(page.data as PageData);
+	const isSeeded = $derived(isSeededUnclaimed(artist));
 	// The music player is a fixed bar docked to the viewport bottom (see
 	// `(app)/+layout.svelte`, which shrinks `.page` by the same 76px when a
 	// track is loaded) — the sidebar's own height cap has to shrink to match,
@@ -56,10 +59,7 @@
 			<div class="hero-content">
 				<div class="identity">
 					<Avatar size="lg" src={artist.avatar} name={artist.name} />
-					<div>
-						<p class="eyebrow">Artist</p>
-						<h1>{artist?.name || 'Unknown Artist'}</h1>
-					</div>
+					<h1>{artist?.name || 'Unknown Artist'}</h1>
 				</div>
 				<div class="actions">
 					<Button variant="secondary">Follow</Button>
@@ -70,9 +70,11 @@
 							>Subscribed &check;</Button
 						>
 					{:else if viewer.canSubscribe}
-						<Button onClick={subscribe} disabled={busy}>Subscribe &middot; $1/mo</Button>
+						<Button onClick={subscribe} disabled={busy}>
+							{isSeeded ? 'Subscribe · Free' : 'Subscribe · $1/mo'}
+						</Button>
 					{:else if !viewer.isLoggedIn}
-						<Button href="/login" variant="secondary">Log in to subscribe</Button>
+						<Button href="/login">Log in to subscribe</Button>
 					{/if}
 					{#if ctaError}
 						<span class="cta-error" role="alert">{ctaError}</span>
@@ -80,6 +82,10 @@
 				</div>
 			</div>
 		</header>
+
+		{#if isSeeded}
+			<SeededPageNotice externalUrl={artist.externalUrl} isLoggedIn={viewer.isLoggedIn} />
+		{/if}
 
 		<section class="content-surface">
 			<Tabs {tabs} bind:activeTab type="pill" />
@@ -161,7 +167,12 @@
 	</main>
 
 	<aside class="side-content" class:player-active={playerActive}>
-		<ChatWidget artistId={artist.id} isSubscriber={viewer.isSubscribed} isArtist={viewer.isOwner} />
+		<ChatWidget
+			artistId={artist.id}
+			isSubscriber={viewer.isSubscribed}
+			isArtist={viewer.isOwner}
+			{isSeeded}
+		/>
 	</aside>
 </div>
 
@@ -246,14 +257,15 @@
 		bottom: 0;
 		z-index: 1;
 		display: flex;
-		justify-content: space-between;
-		gap: var(--space-4);
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-3);
 		padding: 0 var(--space-6, 1.5rem) var(--space-6, 1.5rem);
 	}
 
 	.identity {
 		display: flex;
-		align-items: flex-end;
+		align-items: center;
 		gap: var(--space-4);
 
 		h1 {
@@ -278,7 +290,17 @@
 		align-items: center;
 		gap: var(--space-3);
 		flex-shrink: 0;
-		padding-top: var(--space-5);
+	}
+
+	// Equal width across "Follow" and the much longer "Log in to subscribe" /
+	// "Subscribe · $1/mo" — sized to the longest label so none of them wrap. Scoped to
+	// where `.actions` is a compact row (mobile makes it `width: 100%` with its own
+	// `flex: 1` sizing instead, which this would fight).
+	@media (min-width: 721px) {
+		.actions :global(.btn) {
+			min-width: 176px;
+			white-space: nowrap;
+		}
 	}
 
 	.owner-note {
@@ -355,18 +377,12 @@
 		}
 
 		.hero-content {
-			flex-direction: column;
 			margin-top: -48px;
 			padding: 0 var(--space-4) var(--space-4);
 		}
 
-		.identity {
-			align-items: flex-end;
-		}
-
 		.actions {
 			width: 100%;
-			padding-top: 0;
 
 			:global(.btn) {
 				flex: 1;
